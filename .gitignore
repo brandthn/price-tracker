@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OS
 .DS_Store
 Thumbs.db
@@ -54,3 +55,6 @@ yarn-error.log*
 service-account*.json
 firebase-admin*.json
 gcp-key*.json
+=======
+images_tickets_caisse
+>>>>>>> b5a1d0b (ajouté gitignore)
