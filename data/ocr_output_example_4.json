@@ -1,0 +1,17 @@
+{
+  "ticket": {
+    "supermarché": "Carrefour",
+    "adresse": "6 Route de Vienne, 69007 Lyon",
+    "ville": "Lyon",
+    "date": "2026-05-10"
+  },
+  "produits": [
+    { "libellé": "Lait Demi-Écrémé Lactel UHT 1L", "prix_unitaire": 1.25 },
+    { "libellé": "Poulet Rôti Fermier Loué 1.2kg", "prix_unitaire": 8.90 },
+    { "libellé": "Gruyère Râpé Entremont 200g", "prix_unitaire": 2.60 },
+    { "libellé": "Quenelles Natures Giraudet 2x90g", "prix_unitaire": 3.50 },
+    { "libellé": "Saucisson Sec Pur Porc Aoste 200g", "prix_unitaire": 4.15 },
+    { "libellé": "Beurre Doux Paysan Breton 250g", "prix_unitaire": 2.30 },
+    { "libellé": "Pommes de Terre Charlotte Carrefour 1.5kg", "prix_unitaire": 2.85 }
+  ]
+}

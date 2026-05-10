@@ -1,0 +1,21 @@
+{
+  "ticket": {
+    "supermarché": "Monoprix",
+    "adresse": "93 Rue de la République, 69002 Lyon",
+    "ville": "Lyon",
+    "date": "2026-05-10"
+  },
+  "produits": [
+    { "libellé": "Salade Verte Mélangée Monoprix Bio 150g", "prix_unitaire": 2.20 },
+    { "libellé": "Jus de Raisin Welch's 1L", "prix_unitaire": 3.10 },
+    { "libellé": "Pâtes Fraîches Tagliatelles Lustucru 250g", "prix_unitaire": 2.50 },
+    { "libellé": "Sauce Béchamel Knorr 50cl", "prix_unitaire": 1.80 },
+    { "libellé": "Yaourt Grec Fage Total 0% 500g", "prix_unitaire": 3.65 },
+    { "libellé": "Galettes de Riz Soufflé Bjorg Nature 130g", "prix_unitaire": 1.95 },
+    { "libellé": "Thé Vert Menthe Lipton x25 Sachets", "prix_unitaire": 3.30 },
+    { "libellé": "Magret de Canard Séché Monoprix Gourmet 100g", "prix_unitaire": 4.80 },
+    { "libellé": "Tarte Tatin aux Pommes Monoprix Pâtisserie 450g", "prix_unitaire": 5.20 },
+    { "libellé": "Vinaigre Balsamique de Modène Monini 250ml", "prix_unitaire": 3.75 },
+    { "libellé": "Flan Parisien Nature Bonne Maman 600g", "prix_unitaire": 4.50 }
+  ]
+}
