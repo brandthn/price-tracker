@@ -1,0 +1,15 @@
+{
+  "ticket": {
+    "supermarché": "Monoprix",
+    "adresse": "21 Avenue de l'Opéra, 75001 Paris",
+    "ville": "Paris",
+    "date": "2026-05-10"
+  },
+  "produits": [
+    { "libellé": "Eau Minérale Naturelle Evian 1.5L", "prix_unitaire": 0.95 },
+    { "libellé": "Fromage Râpé Emmental Président 200g", "prix_unitaire": 2.45 },
+    { "libellé": "Céréales Fitness Original Nestlé 375g", "prix_unitaire": 3.80 },
+    { "libellé": "Jambon Blanc Supérieur Le Gaulois x4 160g", "prix_unitaire": 3.20 },
+    { "libellé": "Bananes Cavendish Bio Monoprix 1kg", "prix_unitaire": 2.10 }
+  ]
+}
