@@ -1,0 +1,10 @@
+project_id      = "price-tracker-prod-01"
+region          = "europe-west1"
+name_prefix     = "prt-prod"
+tf_state_bucket = "price-tracker-prod-01-tf-state"
+
+labels = {
+  app        = "price-tracker"
+  env        = "prod"
+  managed_by = "terraform"
+}
