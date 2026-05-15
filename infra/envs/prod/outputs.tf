@@ -42,3 +42,31 @@ output "secrets" {
   description = "Map of secret_id => resource ID."
   value       = module.secrets.secret_ids
 }
+
+# --- Phase 4 -----------------------------------------------------------------
+
+output "cloud_sql" {
+  description = "Cloud SQL instance — connection_name (project:region:instance) + private IP + db name."
+  value = {
+    instance_name   = module.cloud_sql_main.instance_name
+    connection_name = module.cloud_sql_main.connection_name
+    private_ip      = module.cloud_sql_main.private_ip_address
+    db_name         = module.cloud_sql_main.db_name
+    db_user         = module.cloud_sql_main.db_user
+  }
+}
+
+output "bigquery_datasets" {
+  description = "BigQuery datasets (project.dataset_id)."
+  value       = { for k, v in module.bigquery.datasets : k => v.qualified }
+}
+
+output "pubsub_topics" {
+  description = "Pub/Sub topics created."
+  value       = module.pubsub.topic_ids
+}
+
+output "gcs_notification_ticket_uploaded" {
+  description = "GCS→Pub/Sub notification ID for ticket uploads."
+  value       = google_storage_notification.ticket_uploaded.id
+}

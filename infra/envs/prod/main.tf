@@ -77,6 +77,12 @@ module "iam" {
         "roles/logging.logWriter",
         "roles/monitoring.metricWriter",
         "roles/cloudtrace.agent",
+        # Phase 4 — accès Cloud SQL via Cloud SQL Auth Proxy / connecteur, et BQ
+        # pour la lecture des indices observatoire. Le rôle `instanceUser` est
+        # requis si on s'authentifie via IAM database authentication.
+        "roles/cloudsql.client",
+        "roles/cloudsql.instanceUser",
+        "roles/bigquery.jobUser",
       ]
     }
     worker = {
@@ -86,6 +92,13 @@ module "iam" {
         "roles/logging.logWriter",
         "roles/monitoring.metricWriter",
         "roles/cloudtrace.agent",
+        # Phase 4 — workers ingestion/OFF/indices ont besoin de Cloud SQL +
+        # BQ jobs. Vertex AI est ajouté pour la génération des embeddings
+        # produit dans le worker OFF (Phase 6.2).
+        "roles/cloudsql.client",
+        "roles/cloudsql.instanceUser",
+        "roles/bigquery.jobUser",
+        "roles/aiplatform.user",
       ]
     }
     gh-actions = {

@@ -1,4 +1,4 @@
- locals {
+locals {
   # SA members convenience accessors (used by storage/AR/secrets IAM bindings).
   backend_sa    = module.iam.service_accounts["backend"].member
   worker_sa     = module.iam.service_accounts["worker"].member

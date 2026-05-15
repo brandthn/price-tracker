@@ -1,6 +1,6 @@
 # `infra/` — Terraform GCP
 
-Infrastructure as Code de PriceTracker. Phase 1 (state + SAs) et Phase 2 (storage, network, AR, secrets) complétées.
+Infrastructure as Code de PriceTracker. Phase 1 (state + SAs), Phase 2 (storage, network, AR, secrets) et Phase 4 (Cloud SQL + BigQuery + Pub/Sub + GCS notifications) complétées. Phase 3 (CI/CD WIF) **non encore implémentée** — un seul opérateur lance `terraform apply` en attendant.
 
 ## Structure Repo
 
@@ -17,14 +17,23 @@ infra/
 │       ├── storage.tf        # 3 buckets : bronze, silver, models
 │       ├── artifact_registry.tf
 │       ├── secret_manager.tf
+│       ├── cloud_sql.tf      # Phase 4 — Postgres 15 private IP
+│       ├── bigquery.tf       # Phase 4 — datasets silver/gold/ml
+│       ├── pubsub.tf         # Phase 4 — topic ticket-uploaded
+│       ├── notifications.tf  # Phase 4 — GCS bronze → Pub/Sub
 │       ├── outputs.tf
 │       └── terraform.tfvars.example
-└── modules/
-    ├── iam/                  # SAs + project IAM bindings
-    ├── network/              # VPC + subnet + Private Services Access
-    ├── storage/              # Bucket générique paramétré (lifecycle, IAM)
-    ├── artifact_registry/    # Docker repo + IAM bindings
-    └── secret_manager/       # Secrets + secretAccessor bindings
+├── modules/
+│   ├── iam/                  # SAs + project IAM bindings
+│   ├── network/              # VPC + subnet + Private Services Access
+│   ├── storage/              # Bucket générique paramétré (lifecycle, IAM)
+│   ├── artifact_registry/    # Docker repo + IAM bindings
+│   ├── secret_manager/       # Secrets + secretAccessor bindings
+│   ├── cloud_sql/            # Postgres + random password + push to secret
+│   ├── bigquery/             # Datasets + dataset-level IAM
+│   └── pubsub/               # Topics + topic-level IAM
+└── sql/
+    └── bootstrap_pgvector.sql  # One-shot post-apply : CREATE EXTENSION vector
 ```
 
 Un seul `terraform init` à faire, depuis `infra/envs/prod/`. Tous les modules `infra/modules/` sont réutilisables tels quels (paramétrés, pas de hardcoding).
@@ -51,11 +60,11 @@ Voir `.claude/plans/plan-01.md` (section *Convention de nommage*).
 
 ## Service Accounts
 
-| SA | Usage | Rôles projet | Rôles resource-level ajoutés en Phase 2 |
+| SA | Usage | Rôles projet | Rôles resource-level |
 |---|---|---|---|
 | `prt-prod-terraform-sa` | Exécutions `terraform apply` (impersonation) | `editor`, `resourcemanager.projectIamAdmin`, `iam.serviceAccountAdmin`, `iam.serviceAccountUser`, `storage.admin`, `serviceusage.serviceUsageAdmin` | — |
-| `prt-prod-backend-sa` | Cloud Run backend FastAPI (Phase 7) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent` | bronze=`objectAdmin`, silver=`objectViewer`, AR=`reader`, secrets cloudsql+firebase=`accessor` |
-| `prt-prod-worker-sa` | Workers Cloud Run (OCR + ingestion + OFF + indices + alertes) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent` | bronze=`objectViewer`, silver=`objectAdmin`, models=`objectViewer`, AR=`reader`, secrets cloudsql+hf=`accessor` |
+| `prt-prod-backend-sa` | Cloud Run backend FastAPI (Phase 7) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `cloudsql.client`, `cloudsql.instanceUser`, `bigquery.jobUser` | bronze=`objectAdmin`, silver=`objectViewer`, AR=`reader`, secrets cloudsql+firebase=`accessor`, BQ datasets silver/gold/ml=`dataViewer` |
+| `prt-prod-worker-sa` | Workers Cloud Run (OCR + ingestion + OFF + indices + alertes) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `cloudsql.client`, `cloudsql.instanceUser`, `bigquery.jobUser`, `aiplatform.user` | bronze=`objectViewer`, silver=`objectAdmin`, models=`objectViewer`, AR=`reader`, secrets cloudsql+hf=`accessor`, BQ datasets silver/gold/ml=`dataEditor`, topic ticket-uploaded=`subscriber` |
 | `prt-prod-gh-actions-sa` | Impersonné par GitHub Actions via WIF (Phase 3) | _aucun_ | AR=`writer` |
 
 Les rôles applicatifs additionnels (Cloud SQL Client, BQ Job/Data User, Pub/Sub Subscriber, Vertex AI User, FCM Sender…) seront ajoutés par les modules des phases suivantes, sur les ressources concernées.
@@ -277,8 +286,104 @@ Pas d'import à refaire — le state distant connaît déjà toutes les ressourc
 - **Labels** : tous les `google_*` qui supportent les labels reçoivent au minimum `app=price-tracker`, `env=prod`, `managed_by=terraform`. Un `component` spécifique est ajouté ressource par ressource.
 - **Pas de clé JSON SA** : tout passe par ADC (humain) ou WIF (CI, Phase 3). Les `service-account*.json` sont gitignorés par sécurité.
 
+## Ressources Phase 4
+
+> ⚠️ **Collaboration groupe** : tant que la Phase 3 (CI/CD via GitHub Actions WIF) n'est pas en place, **un seul membre désigné** lance `terraform apply`. Deux `apply` concurrents = state désynchronisé. Prévenir le groupe sur Slack/Discord avant chaque apply.
+
+### Cloud SQL
+
+| Ressource | Valeur |
+|---|---|
+| Instance | `prt-prod-sql-main` (POSTGRES_15, `db-g1-small`, **ZONAL** = HA off) |
+| Disque | 10 GB SSD, auto-resize ON |
+| Network | **Private IP only** (pas d'IP publique), VPC `prt-vpc`, peering PSA `prt-psa-range` |
+| Database | `price_tracker` |
+| User applicatif | `pt_app` (mot de passe random 32 chars → secret `prt-prod-cloudsql-password` v1) |
+| IAM database auth | **ON** (`cloudsql.iam_authentication=on`) — les SAs peuvent à terme se connecter via Cloud SQL Auth Proxy sans mot de passe |
+| Backups | Quotidiens 03h00 UTC, **PITR ON** (7j de WAL retention) |
+| Maintenance | Dimanche 04h00 UTC, track `stable` |
+| Deletion protection | **ON** — pour détruire, éditer `cloud_sql.tf` → `deletion_protection=false`, apply, puis destroy |
+
+> Coût mensuel estimé : ~25-28 $/mois (db-g1-small ZONAL + 10 GB SSD + backup quotidien).
+
+### BigQuery
+
+| Dataset | Editors | Viewers | Usage |
+|---|---|---|---|
+| `prt_prod_silver` | `worker-sa` | `backend-sa` | Open Prices nettoyés (alimenté Phase 6.1), catalogue produits OFF (Phase 6.2). |
+| `prt_prod_gold` | `worker-sa` | `backend-sa` | Indices d'inflation, agrégats enseignes, rankings (Phase 9.1). |
+| `prt_prod_ml` | `worker-sa` | `backend-sa` | Datasets entraînement / monitoring qualité ML. |
+
+Location multi-région `EU`. IAM appliqué au niveau **dataset** (plus précis qu'au niveau projet).
+
+### Pub/Sub & GCS notifications
+
+| Ressource | Détail |
+|---|---|
+| Topic Pub/Sub | `ticket-uploaded` (retention 7j, max Pub/Sub standard) |
+| GCS notification | `bucket=…-bronze`, `prefix=tickets/raw/`, `event_types=[OBJECT_FINALIZE]`, `payload_format=JSON_API_V1`, `topic=ticket-uploaded` |
+| Service agent GCS | `service-{project_number}@gs-project-accounts.iam.gserviceaccount.com` reçoit `pubsub.publisher` sur le topic |
+| Subscriber | `worker-sa` (préparation Phase 8 : worker OCR créera sa push subscription) |
+
+> **Changement vs plan initial** : on utilise `google_storage_notification` au lieu d'un trigger Eventarc. Pourquoi ? Filtre `object_name_prefix` natif (Eventarc ne le supporte pas), 1 ressource au lieu de 4, aucun coût d'overhead. Fonctionnellement équivalent côté consommateur.
+
+## Runbook — Bootstrap pgvector (post-apply Phase 4)
+
+L'extension `vector` doit être activée **une fois** après le premier `terraform apply` de Phase 4. Terraform ne le fait pas lui-même car le provider `postgresql` exige une connectivité réseau qu'on n'a pas depuis le runner local (private IP only). Trois options, par ordre de simplicité :
+
+### Option 1 — Cloud SQL Studio (le plus simple, recommandé)
+
+1. Console GCP → SQL → cliquer `prt-prod-sql-main` → onglet **« Studio »**
+2. Première connexion : choisir database `price_tracker`, user `pt_app`, password = contenu du secret :
+   ```bash
+   gcloud secrets versions access latest --secret=prt-prod-cloudsql-password --project=price-tracker-prod-01
+   ```
+3. Coller le contenu de `infra/sql/bootstrap_pgvector.sql` dans l'éditeur, cliquer **Run**.
+4. Vérifier le résultat : doit afficher `vector | <version>` (ex. `0.7.0`).
+
+### Option 2 — Cloud SQL Auth Proxy en local
+
+```bash
+# Une seule fois — récupérer le proxy
+curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.11.0/cloud-sql-proxy.darwin.arm64
+chmod +x cloud-sql-proxy
+
+# Démarrer le proxy en background (private-ip = bypass VPC peering)
+./cloud-sql-proxy --private-ip price-tracker-prod-01:europe-west1:prt-prod-sql-main &
+# → écoute sur localhost:5432
+
+# Récupérer le password
+PGPASSWORD=$(gcloud secrets versions access latest \
+  --secret=prt-prod-cloudsql-password --project=price-tracker-prod-01)
+
+# Exécuter le bootstrap
+PGPASSWORD="$PGPASSWORD" psql -h 127.0.0.1 -U pt_app -d price_tracker \
+  -f infra/sql/bootstrap_pgvector.sql
+
+# Nettoyer
+unset PGPASSWORD
+kill %1   # stoppe le proxy
+```
+
+> Le proxy en mode `--private-ip` ne fonctionne **pas** depuis ta machine locale si tu n'es pas dans le VPC. Si ça échoue : passe par Option 1 (Cloud SQL Studio) ou Option 3.
+
+### Option 3 — Activer temporairement l'IP publique (à éviter)
+
+Si Options 1 et 2 ne sont pas accessibles : éditer `cloud_sql.tf` pour mettre temporairement `ipv4_enabled=true` + ajouter ton IP en authorized network, faire le bootstrap, puis re-désactiver. Méthode déconseillée (exposition publique même brève) — utiliser Option 1.
+
+### Vérification finale
+
+```bash
+# Via Cloud SQL Studio : la requête SELECT du script doit retourner 1 ligne.
+# Via psql :
+PGPASSWORD="$(gcloud secrets versions access latest --secret=prt-prod-cloudsql-password --project=price-tracker-prod-01)" \
+  psql -h 127.0.0.1 -U pt_app -d price_tracker \
+  -c "SELECT extname, extversion FROM pg_extension WHERE extname='vector';"
+# Attendu : 1 ligne "vector | 0.7.0" (ou version équivalente)
+```
+
 ## À venir (phases suivantes)
 
-- **Phase 3** : `infra/modules/wif/` (Workload Identity Federation pour GitHub Actions).
-- **Phase 4** : `infra/modules/{cloud_sql,bigquery,pubsub,eventarc}/`.
+- **Phase 3** (différée) : `infra/modules/wif/` (Workload Identity Federation pour GitHub Actions) + `.github/workflows/`.
 - **Phase 5** : `infra/modules/{cloud_run,cloud_scheduler}/`.
+- **Phase 6** : workers ingestion + OFF (peuplent `prt_prod_silver`).
