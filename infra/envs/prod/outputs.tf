@@ -70,3 +70,38 @@ output "gcs_notification_ticket_uploaded" {
   description = "GCS→Pub/Sub notification ID for ticket uploads."
   value       = google_storage_notification.ticket_uploaded.id
 }
+
+# --- Phase 5 -----------------------------------------------------------------
+
+output "cloud_run_services" {
+  description = "Cloud Run services and their auto-generated HTTPS URIs."
+  value = {
+    backend          = { name = module.run_backend.name, uri = module.run_backend.uri }
+    worker-ocr       = { name = module.run_worker_ocr.name, uri = module.run_worker_ocr.uri }
+    worker-ingestion = { name = module.run_worker_ingestion.name, uri = module.run_worker_ingestion.uri }
+    worker-off       = { name = module.run_worker_off.name, uri = module.run_worker_off.uri }
+    worker-indices   = { name = module.run_worker_indices.name, uri = module.run_worker_indices.uri }
+    worker-alertes   = { name = module.run_worker_alertes.name, uri = module.run_worker_alertes.uri }
+  }
+}
+
+output "cloud_scheduler_jobs" {
+  description = "Cloud Scheduler job IDs (cron triggers for batch workers)."
+  value       = module.cloud_scheduler_jobs.job_ids
+}
+
+output "pubsub_subscriptions" {
+  description = "Pub/Sub subscriptions wired in Phase 5."
+  value = {
+    ocr_push       = google_pubsub_subscription.ticket_uploaded_ocr_push.id
+    dlq_inspection = google_pubsub_subscription.ticket_uploaded_dlq_inspection.id
+  }
+}
+
+output "service_agents" {
+  description = "Google-managed service agents materialized in Phase 5 (emails)."
+  value = {
+    cloudscheduler = google_project_service_identity.cloudscheduler.email
+    pubsub         = google_project_service_identity.pubsub.email
+  }
+}

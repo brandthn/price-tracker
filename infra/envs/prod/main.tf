@@ -3,6 +3,13 @@ provider "google" {
   region  = var.region
 }
 
+# google-beta : utilisé uniquement par `google_project_service_identity`
+# (cf. service_agents.tf). Le reste du code reste sur le provider stable.
+provider "google-beta" {
+  project = var.project_id
+  region  = var.region
+}
+
 # --- tf-state bucket -------------------------------------------------------
 # Créé manuellement en Phase 0 (chicken-and-egg : Terraform a besoin d'un
 # backend pour stocker son state). On l'adopte ensuite sous Terraform via

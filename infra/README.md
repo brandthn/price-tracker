@@ -1,6 +1,6 @@
 # `infra/` — Terraform GCP
 
-Infrastructure as Code de PriceTracker. Phase 1 (state + SAs), Phase 2 (storage, network, AR, secrets) et Phase 4 (Cloud SQL + BigQuery + Pub/Sub + GCS notifications) complétées. Phase 3 (CI/CD WIF) **non encore implémentée** — un seul opérateur lance `terraform apply` en attendant.
+Infrastructure as Code de PriceTracker. Phases 1 (state + SAs), 2 (storage, network, AR, secrets), 4 (Cloud SQL + BigQuery + Pub/Sub + GCS notifications) et 5 (Cloud Run skeleton + Cloud Scheduler + push subscription Pub/Sub) complétées. Phase 3 (CI/CD WIF) **non encore implémentée** — un seul opérateur lance `terraform apply` en attendant.
 
 ## Structure Repo
 
@@ -19,8 +19,12 @@ infra/
 │       ├── secret_manager.tf
 │       ├── cloud_sql.tf      # Phase 4 — Postgres 15 private IP
 │       ├── bigquery.tf       # Phase 4 — datasets silver/gold/ml
-│       ├── pubsub.tf         # Phase 4 — topic ticket-uploaded
+│       ├── pubsub.tf         # Phase 4 — topic ticket-uploaded + Phase 5 — DLQ topic
 │       ├── notifications.tf  # Phase 4 — GCS bronze → Pub/Sub
+│       ├── cloud_run.tf      # Phase 5 — 6 services Cloud Run (skeleton hello) + run.invoker IAM
+│       ├── cloud_scheduler.tf # Phase 5 — 4 cron jobs HTTP+OIDC
+│       ├── service_agents.tf # Phase 5 — service agents Scheduler/Pub/Sub (lazy) + tokenCreator
+│       ├── subscriptions.tf  # Phase 5 — push sub ticket-uploaded→worker-ocr + DLQ inspection
 │       ├── outputs.tf
 │       └── terraform.tfvars.example
 ├── modules/
@@ -31,7 +35,9 @@ infra/
 │   ├── secret_manager/       # Secrets + secretAccessor bindings
 │   ├── cloud_sql/            # Postgres + random password + push to secret
 │   ├── bigquery/             # Datasets + dataset-level IAM
-│   └── pubsub/               # Topics + topic-level IAM
+│   ├── pubsub/               # Topics + topic-level IAM
+│   ├── cloud_run/            # Service Cloud Run v2 + Direct VPC egress + secrets
+│   └── cloud_scheduler/      # Jobs HTTP avec OIDC token
 └── sql/
     └── bootstrap_pgvector.sql  # One-shot post-apply : CREATE EXTENSION vector
 ```
@@ -63,7 +69,7 @@ Voir `.claude/plans/plan-01.md` (section *Convention de nommage*).
 | SA | Usage | Rôles projet | Rôles resource-level |
 |---|---|---|---|
 | `prt-prod-terraform-sa` | Exécutions `terraform apply` (impersonation) | `editor`, `resourcemanager.projectIamAdmin`, `iam.serviceAccountAdmin`, `iam.serviceAccountUser`, `storage.admin`, `serviceusage.serviceUsageAdmin` | — |
-| `prt-prod-backend-sa` | Cloud Run backend FastAPI (Phase 7) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `cloudsql.client`, `cloudsql.instanceUser`, `bigquery.jobUser` | bronze=`objectAdmin`, silver=`objectViewer`, AR=`reader`, secrets cloudsql+firebase=`accessor`, BQ datasets silver/gold/ml=`dataViewer` |
+| `prt-prod-backend-sa` | Cloud Run backend FastAPI (Phase 7) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `cloudsql.client`, `cloudsql.instanceUser`, `bigquery.jobUser` | bronze=`objectAdmin`, silver=`objectViewer`, AR=`reader`, secret cloudsql=`accessor`, BQ datasets silver/gold/ml=`dataViewer` |
 | `prt-prod-worker-sa` | Workers Cloud Run (OCR + ingestion + OFF + indices + alertes) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `cloudsql.client`, `cloudsql.instanceUser`, `bigquery.jobUser`, `aiplatform.user` | bronze=`objectViewer`, silver=`objectAdmin`, models=`objectViewer`, AR=`reader`, secrets cloudsql+hf=`accessor`, BQ datasets silver/gold/ml=`dataEditor`, topic ticket-uploaded=`subscriber` |
 | `prt-prod-gh-actions-sa` | Impersonné par GitHub Actions via WIF (Phase 3) | _aucun_ | AR=`writer` |
 
@@ -105,20 +111,23 @@ URL : `europe-west1-docker.pkg.dev/price-tracker-prod-01/prt-prod-docker/<image>
 | Secret | Populé par | Accessors |
 |---|---|---|
 | `prt-prod-cloudsql-password` | **AUTO** Phase 4 (Terraform `random_password` + version pushée à Secret Manager) | backend-sa, worker-sa |
-| `prt-prod-firebase-admin` | **MANUEL** post-apply Phase 2 (cf. runbook ci-dessous) | backend-sa |
-| `prt-prod-hf-token` | **MANUEL** post-apply Phase 2 (cf. runbook ci-dessous) | worker-sa |
+| `prt-prod-hf-token` | **MANUEL** post-apply Phase 2 (cf. runbook §B ci-dessous) | worker-sa |
 
 > Les secrets sont créés vides par Terraform (containers + IAM seulement). Sans valeur ajoutée, toute lecture par le backend/worker échouera (`NotFound`). Les sections suivantes détaillent comment ajouter la valeur réelle.
 
+> **Pas de secret Firebase Admin SDK** : l'org `b-niyungeko-org` enforce la policy `iam.disableServiceAccountKeyCreation` (default GCP depuis 2024). La création de clé JSON pour le service account `firebase-adminsdk-fbsvc@…` échoue donc en console. C'est aligné avec les best practices 2026 : le backend utilisera **ADC** (Application Default Credentials) — voir §A pour l'activation Firebase, et la note Phase 7 dans `.claude/plans/plan-01.md` pour le code backend.
+
 ## Runbook — Populer les secrets post-apply Phase 2
 
-### A. `prt-prod-firebase-admin` — Firebase Admin SDK service account JSON
+### A. Firebase Auth — activation projet (pas de secret à pousser)
 
-**Ce que c'est** : un fichier JSON contenant les credentials d'un service account Firebase. Le backend FastAPI s'en servira (via la lib `firebase-admin` en Python) pour **vérifier les JWT** émis par Firebase Auth côté frontend, sans avoir à appeler Firebase à chaque requête.
+**Ce qu'on configure** : Firebase Auth (Email/Password) pour gérer l'authentification utilisateur côté frontend (Phase 10). Le backend FastAPI (Phase 7) **vérifiera** les JWT émis par Firebase via la lib `firebase-admin`.
 
-**Prérequis** : ton projet GCP `price-tracker-prod-01` doit avoir Firebase activé.
+**Pourquoi pas de clé JSON ?** L'org `b-niyungeko-org` enforce `iam.disableServiceAccountKeyCreation` (default GCP depuis 2024) → la console Firebase refuse de générer une clé pour le SA `firebase-adminsdk-fbsvc@…`. C'est en réalité une bonne nouvelle : Google recommande depuis 2024 d'utiliser **ADC** (Application Default Credentials) plutôt que des clés long-lived. Le backend FastAPI sur Cloud Run utilisera automatiquement la SA attachée (`prt-prod-backend-sa`).
 
-#### A.1 — Activer Firebase sur le projet GCP (si pas déjà fait)
+> Pour la simple vérification de JWT (use case backend), **aucun rôle IAM n'est requis** : `firebase_admin.auth.verify_id_token()` télécharge les certs publics de Google (`securetoken@system.gserviceaccount.com`) et fait la vérif côté client. Si plus tard on a besoin d'**opérations admin** Firebase (créer/supprimer des users, custom claims), il faudra ajouter `roles/firebaseauth.admin` à `prt-prod-backend-sa` — mais toujours **pas de clé JSON**.
+
+#### A.1 — Activer Firebase sur le projet GCP
 
 1. Aller sur https://console.firebase.google.com/
 2. Cliquer **« Add project »** → choisir **« Add Firebase to Google Cloud project »**
@@ -128,55 +137,29 @@ URL : `europe-west1-docker.pkg.dev/price-tracker-prod-01/prt-prod-docker/<image>
 
 > Vérification : `https://console.firebase.google.com/project/price-tracker-prod-01/overview` doit s'ouvrir sans erreur.
 
-#### A.2 — Activer Firebase Authentication (sera utilisé en Phase 7/10)
+#### A.2 — Activer Firebase Authentication (Email/Password)
 
 1. https://console.firebase.google.com/project/price-tracker-prod-01/authentication
 2. Cliquer **« Get started »**
 3. Onglet **« Sign-in method »** → activer **« Email/Password »** uniquement (ne pas activer Google/Facebook/etc. pour l'instant)
 4. **Save**
 
-#### A.3 — Générer la clé Admin SDK et la pousser dans Secret Manager
-
-1. Ouvrir https://console.firebase.google.com/project/price-tracker-prod-01/settings/serviceaccounts/adminsdk
-2. Cliquer **« Generate new private key »** → confirmer **« Generate key »**
-3. Un fichier `price-tracker-prod-01-firebase-adminsdk-xxxxx-xxxxxxxxxx.json` se télécharge automatiquement (par défaut dans `~/Downloads/`)
-4. **Immédiatement** pousser dans Secret Manager puis supprimer le fichier du disque :
-
-```bash
-# Ajuster le chemin si ton navigateur sauve ailleurs
-DOWNLOAD=~/Downloads/price-tracker-prod-01-firebase-adminsdk-*.json
-
-# Sanity check : doit afficher 1 ligne avec un fichier .json récent
-ls -la $DOWNLOAD
-
-# Push dans Secret Manager (crée la version v1)
-gcloud secrets versions add prt-prod-firebase-admin \
-  --data-file="$(ls -t $DOWNLOAD | head -1)" \
-  --project=price-tracker-prod-01
-
-# Vérifier que la version existe
-gcloud secrets versions list prt-prod-firebase-admin --project=price-tracker-prod-01
-# Attendu : une ligne "1  ENABLED  <date>"
-
-# Supprimer la clé en clair du disque (CRITIQUE)
-shred -u $(ls -t $DOWNLOAD | head -1)   # Linux
-# OU sur macOS (pas de shred par défaut) :
-rm -P $(ls -t $DOWNLOAD | head -1)
-```
-
-> Cette clé donne accès en tant que **propriétaire Firebase** de ton projet. Si elle fuit, c'est game over — rotation obligatoire via le bouton « Delete » dans la console + nouvelle génération + push v2.
-
-#### A.4 — Lire la valeur depuis le backend (Phase 7, pour info)
+#### A.3 — Pour info : code backend Phase 7 (ADC)
 
 ```python
-# Le backend lit le secret via google-cloud-secret-manager
-from google.cloud import secretmanager
-client = secretmanager.SecretManagerServiceClient()
-name = "projects/price-tracker-prod-01/secrets/prt-prod-firebase-admin/versions/latest"
-response = client.access_secret_version(name=name)
-firebase_admin_json = response.payload.data.decode("utf-8")
-# → initialiser firebase_admin.initialize_app(credentials.Certificate(json.loads(firebase_admin_json)))
+# Cloud Run : utilise automatiquement la SA attachée (prt-prod-backend-sa).
+# En local : nécessite `gcloud auth application-default login` au préalable.
+import firebase_admin
+from firebase_admin import auth
+
+firebase_admin.initialize_app()  # ADC, zéro fichier de credentials à charger
+
+# Dans une dependency FastAPI :
+decoded = auth.verify_id_token(bearer_token)
+user_id = decoded["uid"]
 ```
+
+Aucun appel à `Secret Manager` côté Firebase. Aucune env var `FIREBASE_*` côté serveur (seul le frontend Next.js a besoin de la config publique `NEXT_PUBLIC_FIREBASE_*`).
 
 ---
 
@@ -226,15 +209,14 @@ gcloud secrets versions list prt-prod-hf-token --project=price-tracker-prod-01
 ### Vérification globale
 
 ```bash
-# Doit lister 3 secrets
+# Doit lister 2 secrets (cloudsql-password + hf-token) ; pas de firebase-admin (cf. §A)
 gcloud secrets list --project=price-tracker-prod-01 --filter="name~prt-prod-"
 
-# Pour chaque secret, doit avoir au moins une version active
-for s in prt-prod-firebase-admin prt-prod-hf-token; do
-  echo "=== $s ==="
-  gcloud secrets versions list "$s" --project=price-tracker-prod-01 --limit=1
-done
-# `prt-prod-cloudsql-password` n'a PAS encore de version — c'est attendu (Phase 4 le génèrera).
+# hf-token doit avoir une version active après §B
+gcloud secrets versions list prt-prod-hf-token --project=price-tracker-prod-01 --limit=1
+
+# cloudsql-password : version générée AUTO par Terraform en Phase 4
+gcloud secrets versions list prt-prod-cloudsql-password --project=price-tracker-prod-01 --limit=1
 ```
 
 ## Première utilisation (un seul opérateur, une seule fois)
@@ -382,8 +364,119 @@ PGPASSWORD="$(gcloud secrets versions access latest --secret=prt-prod-cloudsql-p
 # Attendu : 1 ligne "vector | 0.7.0" (ou version équivalente)
 ```
 
+## Ressources Phase 5
+
+> ⚠️ **Collaboration groupe** : même règle qu'en Phase 4 — un seul opérateur lance `terraform apply` tant que la Phase 3 (CI/CD WIF) n'est pas en place. Prévenir Slack/Discord avant chaque apply.
+
+### Cloud Run services (skeleton `hello`)
+
+Tous les services tournent en image `us-docker.pkg.dev/cloudrun/container/hello` au déploiement initial. Ils seront remplacés par les vraies images applicatives à mesure que le code arrive (Phase 6, 7, 8, 9). L'image AR sera `europe-west1-docker.pkg.dev/price-tracker-prod-01/prt-prod-docker/<service>:<sha>`.
+
+| Service | SA runtime | Ingress | min / max | CPU / RAM | Usage cible |
+|---|---|---|---|---|---|
+| `prt-prod-backend` | `prt-prod-backend-sa` | `INGRESS_TRAFFIC_ALL` + `allUsers` invoker | 0 / 3 | 1 / 512Mi | Backend FastAPI (Phase 7). Sera durci derrière un Load Balancer + Firebase JWT en Phase 7. |
+| `prt-prod-worker-ocr` | `prt-prod-worker-sa` | `INTERNAL_LOAD_BALANCER` | 0 / 5 | 1 / 512Mi | Worker OCR déclenché par Pub/Sub push (Phase 8). Mémoire à relever à 2Gi en Phase 8. |
+| `prt-prod-worker-ingestion` | `prt-prod-worker-sa` | `INTERNAL_LOAD_BALANCER` | 0 / 1 | 1 / 512Mi | Cron 03h UTC — HuggingFace Open Prices → BQ Silver (Phase 6.1). |
+| `prt-prod-worker-off` | `prt-prod-worker-sa` | `INTERNAL_LOAD_BALANCER` | 0 / 1 | 1 / 512Mi | Cron 04h UTC — OpenFoodFacts + embeddings Vertex AI (Phase 6.2). |
+| `prt-prod-worker-indices` | `prt-prod-worker-sa` | `INTERNAL_LOAD_BALANCER` | 0 / 1 | 1 / 512Mi | Cron 05h UTC — Laspeyres + anomalies → BQ Gold (Phase 9.1). |
+| `prt-prod-worker-alertes` | `prt-prod-worker-sa` | `INTERNAL_LOAD_BALANCER` | 0 / 1 | 1 / 512Mi | Cron 07h UTC — push FCM (Phase 9.2). |
+
+Tous les services sont attachés au subnet `prt-subnet-ew1` via **Direct VPC egress** (`vpc_access.network_interfaces`), egress = `PRIVATE_RANGES_ONLY` (seul le trafic vers RFC1918 — donc Cloud SQL private IP — passe par le VPC ; Vertex/BQ/Internet sortent natif). Exécution `EXECUTION_ENVIRONMENT_GEN2` (requise pour Direct VPC egress).
+
+> **Note `INTERNAL_LOAD_BALANCER`** : nom Google trompeur. Ce mode accepte le trafic du VPC interne **+** des services GCP managés (Cloud Scheduler, Pub/Sub push, Eventarc) routé via le edge GCP. Pas de LB à provisionner pour autant.
+
+### Cloud Scheduler — 4 cron jobs (HTTP + OIDC)
+
+| Job | Schedule (UTC) | Cible | SA OIDC | Audience |
+|---|---|---|---|---|
+| `prt-prod-trigger-ingestion` | `0 3 * * *` | `prt-prod-worker-ingestion` URL | `prt-prod-worker-sa` | URL service |
+| `prt-prod-trigger-off` | `0 4 * * *` | `prt-prod-worker-off` URL | `prt-prod-worker-sa` | URL service |
+| `prt-prod-trigger-indices` | `0 5 * * *` | `prt-prod-worker-indices` URL | `prt-prod-worker-sa` | URL service |
+| `prt-prod-trigger-alertes` | `0 7 * * *` | `prt-prod-worker-alertes` URL | `prt-prod-worker-sa` | URL service |
+
+> Heure FR équivalente : été (CEST UTC+2) = 05/06/07/09h locale · hiver (CET UTC+1) = 04/05/06/08h locale. UTC conservé en interne (convention SRE).
+
+### Pub/Sub — push subscription + DLQ (Phase 5)
+
+| Ressource | Détail |
+|---|---|
+| Topic DLQ | `ticket-uploaded-dlq` (retention 7j) |
+| Subscription push | `ticket-uploaded-ocr-push` : `ticket-uploaded` → `${run_worker_ocr.uri}/push`, OIDC `worker-sa`, ack_deadline 600s, retry backoff 10→600s, DLQ après 5 échecs |
+| Subscription DLQ | `ticket-uploaded-dlq-inspection` : pull, retention 7j (inspection humaine) |
+
+### IAM Phase 5 (résumé)
+
+| Binding | Role | Where | Why |
+|---|---|---|---|
+| Service agent Cloud Scheduler → `worker-sa` | `roles/iam.serviceAccountTokenCreator` | SA-level | Scheduler mint OIDC token en se faisant passer pour worker-sa |
+| Service agent Pub/Sub → `worker-sa` | `roles/iam.serviceAccountTokenCreator` | SA-level | Pub/Sub push idem |
+| `worker-sa` → 5 workers Cloud Run | `roles/run.invoker` | Cloud Run resource | OIDC iss=worker-sa autorisé à invoquer |
+| Service agent Pub/Sub → DLQ topic | `roles/pubsub.publisher` | Topic-level | Forward des messages empoisonnés vers le DLQ |
+| Service agent Pub/Sub → push sub | `roles/pubsub.subscriber` | Subscription-level | Lecture pour forward DLQ |
+| `worker-sa` → DLQ topic | `roles/pubsub.subscriber` | Topic-level | Replay / inspection |
+| `allUsers` → `prt-prod-backend` | `roles/run.invoker` | Cloud Run resource | Hello accessible publiquement (à durcir Phase 7) |
+
+> Service agents Cloud Scheduler / Pub/Sub sont matérialisés via `google_project_service_identity` (provider google-beta) — **jamais hardcodés**.
+
+## Runbook — Phase 5
+
+### Vérifier l'état des Cloud Run
+
+```bash
+gcloud run services list --project=price-tracker-prod-01 --region=europe-west1 \
+  --format="table(metadata.name,status.url,spec.template.spec.serviceAccountName)"
+# Attendu : 6 lignes prt-prod-{backend,worker-ocr,worker-ingestion,worker-off,worker-indices,worker-alertes}
+```
+
+### Vérifier le hello backend (public)
+
+```bash
+BACKEND_URL=$(terraform output -raw cloud_run_services | jq -r '.["backend"].uri' 2>/dev/null \
+  || gcloud run services describe prt-prod-backend --region=europe-west1 \
+       --project=price-tracker-prod-01 --format='value(status.url)')
+curl -fsS "$BACKEND_URL" | head -5
+# Attendu : page HTML "Congratulations! You successfully deployed your first revision..."
+```
+
+### Trigger manuel d'un job Scheduler
+
+Aller console : https://console.cloud.google.com/cloudscheduler?project=price-tracker-prod-01 → cliquer **Force run** sur la ligne du job. Ou en CLI :
+
+```bash
+gcloud scheduler jobs run prt-prod-trigger-ingestion --location=europe-west1 \
+  --project=price-tracker-prod-01
+# Le job appellera worker-ingestion ; tant que le service tourne en image hello,
+# il répondra 200 immédiatement.
+```
+
+### Inspecter les logs d'un worker
+
+```bash
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="prt-prod-worker-ingestion"' \
+  --limit=20 --project=price-tracker-prod-01 \
+  --format="value(timestamp,severity,textPayload)"
+```
+
+### Inspecter le DLQ
+
+```bash
+# Compter les messages en attente dans le DLQ
+gcloud pubsub subscriptions pull ticket-uploaded-dlq-inspection \
+  --auto-ack --limit=10 --project=price-tracker-prod-01
+# (Auto-ack uniquement si tu veux drainer. Sinon utiliser --limit + Studio.)
+```
+
+### Trouver l'URL d'un service (sans Terraform)
+
+```bash
+gcloud run services describe prt-prod-worker-ocr \
+  --region=europe-west1 --project=price-tracker-prod-01 \
+  --format='value(status.url)'
+```
+
 ## À venir (phases suivantes)
 
 - **Phase 3** (différée) : `infra/modules/wif/` (Workload Identity Federation pour GitHub Actions) + `.github/workflows/`.
-- **Phase 5** : `infra/modules/{cloud_run,cloud_scheduler}/`.
+- **Phase 5.5** (proposée) : code worker OCR stub via Gemini Vision pour valider le pipeline E2E avant le vrai modèle PaddleOCR/Tesseract de Phase 8.
 - **Phase 6** : workers ingestion + OFF (peuplent `prt_prod_silver`).
