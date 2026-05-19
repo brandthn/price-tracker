@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "receipt_ocr"
+version = "0.1.0"
+description = "Extract structured data from photos of French supermarket receipts."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Price Tracker" }]
+license = { text = "MIT" }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: marks tests that require real receipt images on disk.",
+]
+addopts = "-ra"
