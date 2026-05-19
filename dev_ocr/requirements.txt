@@ -1,0 +1,21 @@
+# --- Core runtime ----------------------------------------------------------
+# The package itself has no hard dependency on any specific OCR engine —
+# the third-party libraries below are only required for the backends you
+# actually want to *use*. Install them à la carte to keep the footprint
+# small, e.g. `pip install -r requirements.txt --no-deps` then add only
+# the backend you need.
+
+# Default backend
+paddleocr>=2.7.0
+paddlepaddle>=2.6.0
+
+# Stub backends — uncomment when their implementations land
+# pytesseract>=0.3.10
+# easyocr>=1.7.1
+
+# --- Dataset download helpers ---------------------------------------------
+huggingface_hub>=0.23.0
+kagglehub>=0.2.0
+
+# --- Development / testing -------------------------------------------------
+pytest>=8.0.0
