@@ -1,0 +1,81 @@
+# FICHIER : docker-compose.yml
+# RÔLE    : Lancer tous les services du projet avec une seule commande
+#
+# Commande pour démarrer : docker compose up -d
+# Commande pour arrêter  : docker compose down
+#
+# Services lancés :
+#   - PostgreSQL  : base de données warehouse (port 5432)
+#   - Airflow     : orchestrateur de pipeline (port 8080)
+#   - Metabase    : dashboard de visualisation (port 3000)
+
+version: "3.9"
+
+services:
+
+  # ─── Base de données PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine     # version légère de PostgreSQL
+    container_name: pricetracker_db
+    environment:
+      POSTGRES_DB: pricetracker
+      POSTGRES_USER: pricetracker_user
+      POSTGRES_PASSWORD: changeme_en_prod
+    volumes:
+      # Persistance : les données survivent au redémarrage du container
+      - pgdata:/var/lib/postgresql/data
+      # Script SQL exécuté au premier démarrage pour créer les tables
+      - ./serving/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"    # port local : port du container
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pricetracker_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Airflow : orchestrateur ─────────────────────────────────────────────────
+  airflow:
+    image: apache/airflow:2.9.1
+    container_name: pricetracker_airflow
+    depends_on:
+      postgres:
+        condition: service_healthy  # attend que Postgres soit prêt
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://pricetracker_user:changeme_en_prod@postgres/pricetracker
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"    # désactive les DAGs d'exemple
+    volumes:
+      # Montage de nos DAGs dans le container Airflow
+      - ./orchestration:/opt/airflow/dags
+      - ./ingestion:/opt/airflow/ingestion
+      - ./transform:/opt/airflow/transform
+      - ./raw:/opt/airflow/raw
+    ports:
+      - "8080:8080"    # interface web Airflow
+    command: >
+      bash -c "airflow db migrate && airflow users create
+        --username admin --password admin
+        --firstname Admin --lastname User
+        --role Admin --email admin@pricetracker.fr
+      && airflow webserver & airflow scheduler"
+
+  # ─── Metabase : dashboard gratuit ────────────────────────────────────────────
+  metabase:
+    image: metabase/metabase:latest
+    container_name: pricetracker_metabase
+    depends_on:
+      - postgres
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: postgres
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: pricetracker
+      MB_DB_USER: pricetracker_user
+      MB_DB_PASS: changeme_en_prod
+    ports:
+      - "3000:3000"    # interface web Metabase
+
+# ─── Volumes persistants ─────────────────────────────────────────────────────
+volumes:
+  pgdata:    # stocke les données PostgreSQL entre les redémarrages

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "week_start_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Semaine où l'anomalie a été détectée."
+  },
+  {
+    "name": "product_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "EAN-13 du produit concerné."
+  },
+  {
+    "name": "store_brand_normalized",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Enseigne normalisée où l'anomalie a été détectée."
+  },
+  {
+    "name": "median_price_eur",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix médian de la semaine pour ce produit/enseigne."
+  },
+  {
+    "name": "observations",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Nombre de relevés utilisés."
+  },
+  {
+    "name": "mean_med",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Moyenne des médianes sur toute la fenêtre historique."
+  },
+  {
+    "name": "std_med",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Écart-type des médianes sur toute la fenêtre historique."
+  },
+  {
+    "name": "z_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "z = (median - mean) / std. Alerte si |z| >= 3."
+  }
+]

@@ -1,0 +1,21 @@
+# ─── Ingestion des données ───────────────────────────────
+datasets==2.19.0        # librairie HuggingFace pour lire les fichiers Parquet
+duckdb==0.10.2          # base de données analytique ultra-rapide, lit le Parquet nativement
+pandas==2.2.2           # manipulation de tableaux de données
+httpx==0.27.0           # client HTTP moderne pour appeler l'API INSEE
+python-dotenv==1.0.1    # lit les variables du fichier .env
+
+# ─── API Backend ─────────────────────────────────────────
+fastapi==0.111.0        # framework API Python, performant et bien documenté
+uvicorn==0.29.0         # serveur qui fait tourner FastAPI
+
+# ─── Transformation (dbt) ────────────────────────────────
+dbt-core==1.8.0         # moteur de transformation SQL
+dbt-duckdb==1.8.0       # connecteur dbt pour DuckDB
+
+# ─── Orchestration ───────────────────────────────────────
+apache-airflow==2.9.1   # orchestrateur de pipelines (installé via Docker, pas ici)
+
+# ─── Qualité & logs ──────────────────────────────────────
+loguru==0.7.2           # logs lisibles et colorés, bien mieux que print()
+great-expectations==0.18.15  # tests de qualité des données

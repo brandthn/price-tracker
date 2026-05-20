@@ -1,0 +1,44 @@
+[
+  {
+    "name": "week_start_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Lundi de la semaine ISO."
+  },
+  {
+    "name": "store_brand_normalized",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Enseigne normalisée."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "ISO-3166 alpha-2."
+  },
+  {
+    "name": "observations",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Nombre de relevés utilisés pour calculer la médiane."
+  },
+  {
+    "name": "median_price_eur",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix médian de la semaine."
+  },
+  {
+    "name": "base_price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix médian de la première semaine disponible (base 100)."
+  },
+  {
+    "name": "index_value",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Indice chaîné base 100. 103.5 = +3.5% vs première semaine."
+  }
+]

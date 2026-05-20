@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: raw_open_prices
+    schema: bronze
+    tables:
+      - name: open_prices_parquet
+        description: "Fichiers parquet bruts depuis ingestion (bronze)."

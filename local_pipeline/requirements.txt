@@ -1,0 +1,11 @@
+# Dépendances pour le pipeline local (sans GCP)
+# Installer avec : pip install -r local_pipeline/requirements.txt
+
+pandas>=2.0
+pyarrow>=14.0        # moteur Parquet pour pandas
+duckdb>=0.10         # moteur SQL local (remplace BigQuery)
+python-dotenv>=1.0   # lecture du .env (partagé avec les workers)
+loguru>=0.7          # logging structuré (partagé avec les workers)
+
+# Optionnel — uniquement pour le mode --hf (téléchargement Hugging Face)
+# datasets>=2.18

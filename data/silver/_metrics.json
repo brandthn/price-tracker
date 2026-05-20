@@ -1,0 +1,43 @@
+{
+  "started_at": "2026-05-19T21:14:47.393264+00:00",
+  "finished_at": "2026-05-19T21:16:11.579525+00:00",
+  "total_records": 257607,
+  "accepted_records": 151491,
+  "rejected_records": 106116,
+  "acceptance_rate": 0.5881,
+  "store_brand_coverage": 1.0178,
+  "rejections_by_reason": {
+    "INVALID_CURRENCY": 51529,
+    "INVALID_PROOF_TYPE": 21751,
+    "INVALID_COUNTRY": 21707,
+    "MISSING_REQUIRED_FIELD": 8257,
+    "SUSPICIOUS_PRICE_IQR": 2695,
+    "INVALID_EAN": 133,
+    "OUT_OF_RANGE_PRICE": 42,
+    "INCOHERENT_DISCOUNT": 2
+  },
+  "quality_gates": [
+    {
+      "name": "acceptance_rate",
+      "value": 0.5881,
+      "threshold": 0.4,
+      "passed": true
+    },
+    {
+      "name": "store_brand_coverage",
+      "value": 1.0178,
+      "threshold": 0.7,
+      "passed": true
+    }
+  ],
+  "enrichments": {
+    "brands_normalized": 154186,
+    "cities_standardized": 11423,
+    "ean_rejected": 133,
+    "discount_rejected": 2,
+    "suspicious_price_rejected": 2695,
+    "products_with_iqr_bounds": 6777
+  },
+  "clean_parquet": "/Users/fandatongnia/Documents/projetannuelv1/data/silver/openpricesclean.parquet",
+  "reject_parquet": "/Users/fandatongnia/Documents/projetannuelv1/data/silver/openpricesrejections.parquet"
+}

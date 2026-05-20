@@ -1,0 +1,11 @@
+pricetracker:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: your-gcp-project
+      dataset: silver
+      keyfile: /path/to/service_account.json
+      threads: 4
+      timeout_seconds: 300

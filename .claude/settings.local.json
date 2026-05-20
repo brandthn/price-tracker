@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv .venv)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -m local_pipeline.run_pipeline)",
+      "Bash(.venv/bin/python -m local_pipeline.run_pipeline --skip-bronze)"
+    ]
+  }
+}

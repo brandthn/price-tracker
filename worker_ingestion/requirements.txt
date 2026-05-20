@@ -1,0 +1,8 @@
+# Worker ingestion — Hugging Face, Parquet, GCP
+datasets>=2.16.0
+duckdb>=1.0.0
+pyarrow>=15.0.0
+loguru>=0.7.0
+python-dotenv>=1.0.0
+google-cloud-bigquery>=3.25.0
+google-cloud-storage>=2.14.0

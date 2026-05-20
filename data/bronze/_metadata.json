@@ -1,0 +1,26 @@
+{
+  "source": "huggingface_open_prices",
+  "ingested_at": "2026-05-17T16:56:34.702508+00:00",
+  "n_rows": 257607,
+  "n_columns": 16,
+  "columns": [
+    "id",
+    "product_code",
+    "price",
+    "price_is_discounted",
+    "price_without_discount",
+    "currency",
+    "location_id",
+    "date",
+    "source",
+    "proof_type",
+    "location_osm_display_name",
+    "location_osm_address_postcode",
+    "location_osm_address_city",
+    "location_osm_address_country",
+    "location_osm_lat",
+    "location_osm_lon"
+  ],
+  "parquet_path": "/Users/fandatongnia/Documents/projetannuelv1/data/bronze/open_prices.parquet",
+  "size_bytes": 6337060
+}
