@@ -1,0 +1,80 @@
+[
+  {
+    "name": "ean",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "EAN/barcode produit. PK et cle de MERGE."
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Libelle OFF (product_name_fr fallback product_name)."
+  },
+  {
+    "name": "brand",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Marque principale."
+  },
+  {
+    "name": "category_l1",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Categorie OFF niveau 1."
+  },
+  {
+    "name": "category_l2",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Categorie OFF niveau 2."
+  },
+  {
+    "name": "category_l3",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Categorie OFF niveau 3."
+  },
+  {
+    "name": "nutriscore",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "A | B | C | D | E."
+  },
+  {
+    "name": "nova",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Groupe NOVA 1-4."
+  },
+  {
+    "name": "ecoscore",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "A | B | C | D | E."
+  },
+  {
+    "name": "image_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "URL image OFF front."
+  },
+  {
+    "name": "off_found",
+    "type": "BOOL",
+    "mode": "REQUIRED",
+    "description": "False si EAN absent de OFF (404)."
+  },
+  {
+    "name": "enriched_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "UTC timestamp du run worker."
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Toujours openfoodfacts."
+  }
+]

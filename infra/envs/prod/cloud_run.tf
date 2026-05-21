@@ -79,7 +79,19 @@ module "run_worker_ocr" {
 }
 
 # --- Worker Ingestion (Phase 6.1) ----------------------------------------
-# Cron quotidien (03h UTC) — pull du snapshot Open Prices HuggingFace.
+# Cron quotidien (03h UTC) — pull du snapshot Open Prices HuggingFace,
+# upload Bronze parquet, MERGE BQ `silver.open_prices_clean`.
+#
+# Tailles ajustées Phase 6.1 :
+# - timeout 1800s : parquet HF ~150MB → transform pyarrow → upload GCS → BQ MERGE.
+#   30 min est suffisant en steady state ; reste large vs cold start HF.
+# - memory 2Gi : pyarrow peut materialiser tout le parquet en RAM lors de la
+#   normalisation. 1Gi est trop juste si OFF étoffe le dataset.
+# - cpu 2 : transform pyarrow CPU-bound, le doublement raccourcit le run et
+#   ne coûte que sur la durée de cold-start (scale-to-zero entre runs).
+#
+# Image reste skeleton (hello) jusqu'au premier `gcloud builds submit` +
+# bump de `image` Phase 6.1 (cf. docs/phase-06-handoff.md §Déploiement).
 module "run_worker_ingestion" {
   source = "../../modules/cloud_run"
 
@@ -89,21 +101,57 @@ module "run_worker_ingestion" {
   image                 = local.cloud_run_skeleton_image
   service_account_email = module.iam.emails["worker"]
 
-  min_instances = 0
-  max_instances = 1
-  cpu           = "1"
-  memory        = "512Mi"
+  min_instances   = 0
+  max_instances   = 1
+  cpu             = "2"
+  memory          = "2Gi"
+  timeout_seconds = 1800
 
   vpc_subnet = local.cloud_run_subnet
   vpc_egress = "PRIVATE_RANGES_ONLY"
   ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT     = var.project_id
+    PRT_GCP_REGION           = var.region
+    PRT_BRONZE_BUCKET        = "${var.project_id}-bronze"
+    PRT_BQ_DATASET_SILVER    = local.bq_silver_dataset
+    PRT_BQ_TABLE_OPEN_PRICES = google_bigquery_table.open_prices_clean.table_id
+    PRT_HF_DATASET           = "openfoodfacts/open-prices"
+    PRT_HF_FILENAME          = "prices.parquet"
+    PRT_FILTER_COUNTRY_CODE  = "FR"
+
+    # OIDC : on laisse l'audience vide → le code fallback sur l'URL résolue
+    # depuis `x-forwarded-host` (cf. auth.py). Évite le cycle TF
+    # service→env→service. L'allowlist du worker-sa fait la défense en
+    # profondeur (Cloud Run a déjà refusé tout caller non OIDC en amont).
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    HF_TOKEN = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-hf-token"]
+      version = "latest"
+    }
+  }
 
   labels = merge(var.labels, { component = "worker-ingestion" })
 }
 
 # --- Worker OFF (Phase 6.2) ----------------------------------------------
 # Cron quotidien (04h UTC) — enrichissement EAN via OpenFoodFacts +
-# embeddings Vertex AI.
+# embeddings Vertex AI text-embedding-004 → BQ `silver.catalogue_produits`
+# + Cloud SQL `products` (pgvector 768).
+#
+# Tailles ajustées Phase 6.2 :
+# - timeout 3600s : max Cloud Run gen2. À 15 req/min OFF, ≈800 EAN max par run.
+#   Le worker s'auto-arrête à PRT_OFF_RUN_TIMEOUT_S=3500s pour ne pas se faire
+#   killer brutalement (laisse marge pour flush BQ + pg).
+# - memory 1Gi : asyncpg + httpx + Vertex SDK ; 512Mi est tendu avec le SDK
+#   aiplatform qui charge plusieurs deps lourdes.
+# - cpu 1 : workload I/O-bound (OFF + Vertex + pg), pas de CPU spike.
+#
+# Image reste skeleton (hello) jusqu'au premier build Phase 6.2.
 module "run_worker_off" {
   source = "../../modules/cloud_run"
 
@@ -113,14 +161,50 @@ module "run_worker_off" {
   image                 = local.cloud_run_skeleton_image
   service_account_email = module.iam.emails["worker"]
 
-  min_instances = 0
-  max_instances = 1
-  cpu           = "1"
-  memory        = "512Mi"
+  min_instances   = 0
+  max_instances   = 1
+  cpu             = "1"
+  memory          = "1Gi"
+  timeout_seconds = 3600
 
   vpc_subnet = local.cloud_run_subnet
   vpc_egress = "PRIVATE_RANGES_ONLY"
   ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT     = var.project_id
+    PRT_GCP_REGION           = var.region
+    PRT_BQ_DATASET_SILVER    = local.bq_silver_dataset
+    PRT_BQ_TABLE_OPEN_PRICES = google_bigquery_table.open_prices_clean.table_id
+    PRT_BQ_TABLE_CATALOGUE   = google_bigquery_table.catalogue_produits.table_id
+
+    PRT_OFF_BASE_URL         = "https://world.openfoodfacts.org"
+    PRT_OFF_RATE_RPM         = "15"
+    PRT_OFF_MAX_EANS_PER_RUN = "2000"
+    PRT_OFF_RUN_TIMEOUT_S    = "3500"
+    PRT_OFF_HTTP_TIMEOUT_S   = "20"
+    PRT_OFF_MAX_RETRIES      = "4"
+
+    PRT_VERTEX_MODEL      = "text-embedding-004"
+    PRT_VERTEX_BATCH      = "250"
+    PRT_VERTEX_TASK_TYPE  = "RETRIEVAL_DOCUMENT"
+    PRT_VERTEX_OUTPUT_DIM = "768"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+  }
 
   labels = merge(var.labels, { component = "worker-off" })
 }

@@ -1,0 +1,80 @@
+[
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "PK Open Prices, cle de MERGE."
+  },
+  {
+    "name": "date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date du prix observe. Colonne de partition."
+  },
+  {
+    "name": "product_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "EAN/barcode. NULL pour les kind=CATEGORY."
+  },
+  {
+    "name": "product_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Libelle brut tel que saisi par le contributeur."
+  },
+  {
+    "name": "price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix unitaire dans currency."
+  },
+  {
+    "name": "currency",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "ISO-4217 (EUR pour la France)."
+  },
+  {
+    "name": "location_id",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Open Prices location id."
+  },
+  {
+    "name": "location_osm_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Nom OSM du magasin."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "ISO-3166 alpha-2."
+  },
+  {
+    "name": "category_tag",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "OFF category tag (ex: fr:oeufs)."
+  },
+  {
+    "name": "kind",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "PRODUCT | CATEGORY."
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Provenance, toujours hf-open-prices."
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "UTC timestamp du run worker."
+  }
+]
