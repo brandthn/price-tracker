@@ -130,6 +130,16 @@ Options:
 
 **Expect ~30–40 s** for first model load, then **~1–2 min per large photo** on CPU. That is normal; the machine should stay responsive (no full freeze) with default settings.
 
+### Test script (`extract_receipt` import + full pipeline)
+
+```bash
+$env:PYTHONPATH = "src"
+python scripts/test_extract_receipt.py
+python scripts/test_extract_receipt.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg --backend ppocrv4
+```
+
+The script imports `extract_receipt` from `receipt_ocr`, runs it on one image, validates the JSON schema, and prints the result.
+
 ### Python API
 
 ```python
