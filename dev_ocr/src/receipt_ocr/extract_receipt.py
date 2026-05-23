@@ -17,6 +17,7 @@ from typing import Optional
 from receipt_ocr.backends.base import OcrBackend
 from receipt_ocr.backends.easyocr_backend import EasyOcrBackend
 from receipt_ocr.backends.paddle_backend import PaddleOcrBackend
+from receipt_ocr.backends.ppocr_v4_backend import PpOcrV4MobileBackend
 from receipt_ocr.backends.tesseract_backend import TesseractBackend
 from receipt_ocr.backends.vlm_backend import VlmBackend
 from receipt_ocr.constants import ENV_BACKEND, BackendName
@@ -24,6 +25,7 @@ from receipt_ocr.parser import ReceiptParser
 
 _BACKEND_REGISTRY: dict[BackendName, type[OcrBackend]] = {
     BackendName.PADDLE: PaddleOcrBackend,
+    BackendName.PPOCRV4: PpOcrV4MobileBackend,
     BackendName.TESSERACT: TesseractBackend,
     BackendName.EASYOCR: EasyOcrBackend,
     BackendName.VLM: VlmBackend,
