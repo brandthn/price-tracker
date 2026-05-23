@@ -3,6 +3,10 @@
 This module exposes :func:`extract_receipt`, the one function users of
 the package are expected to call. It also implements the env-variable
 driven backend selection described in ``project_guidelines.md``.
+
+The default backend is **cached** after the first call to
+:func:`build_backend` / :func:`extract_receipt` so that heavy OCR models
+are not reloaded on every image.
 """
 
 from __future__ import annotations
@@ -25,6 +29,10 @@ _BACKEND_REGISTRY: dict[BackendName, type[OcrBackend]] = {
     BackendName.VLM: VlmBackend,
 }
 
+# Singleton cache — avoids reloading Paddle weights on every call.
+_cached_backend: OcrBackend | None = None
+_cached_backend_name: BackendName | None = None
+
 
 def _resolve_backend_name(name: Optional[str]) -> BackendName:
     """Convert a string (env value or argument) into a :class:`BackendName`."""
@@ -39,18 +47,39 @@ def _resolve_backend_name(name: Optional[str]) -> BackendName:
         ) from exc
 
 
-def build_backend(name: Optional[str] = None) -> OcrBackend:
-    """Instantiate an :class:`OcrBackend` from its registered name.
+def reset_default_backend() -> None:
+    """Clear the cached default backend (useful in tests or after config changes)."""
+    global _cached_backend, _cached_backend_name
+    _cached_backend = None
+    _cached_backend_name = None
 
-    Resolution order:
+
+def build_backend(name: Optional[str] = None, *, force_new: bool = False) -> OcrBackend:
+    """Instantiate (or return cached) :class:`OcrBackend` for the given name.
+
+    Resolution order for the name:
 
     1. The explicit ``name`` argument, if given.
     2. The ``RECEIPT_OCR_BACKEND`` environment variable.
     3. Default = ``"paddle"``.
+
+    Unless ``force_new=True``, the same instance is reused across calls
+    when the resolved backend name has not changed.
     """
+    global _cached_backend, _cached_backend_name
+
     resolved = _resolve_backend_name(name or os.environ.get(ENV_BACKEND))
-    backend_cls = _BACKEND_REGISTRY[resolved]
-    return backend_cls()
+    if (
+        not force_new
+        and _cached_backend is not None
+        and _cached_backend_name == resolved
+    ):
+        return _cached_backend
+
+    backend = _BACKEND_REGISTRY[resolved]()
+    _cached_backend = backend
+    _cached_backend_name = resolved
+    return backend
 
 
 def extract_receipt(
@@ -64,9 +93,8 @@ def extract_receipt(
     image_path:
         Path to the receipt image file.
     backend:
-        Optional :class:`OcrBackend` instance. If ``None`` the backend
-        is built via :func:`build_backend`, which honours the
-        ``RECEIPT_OCR_BACKEND`` environment variable.
+        Optional :class:`OcrBackend` instance. If ``None`` the cached
+        default backend from :func:`build_backend` is used.
 
     Returns
     -------

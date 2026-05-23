@@ -122,4 +122,121 @@ Output schema:
 - Specification: [`project_guidelines.md`](project_guidelines.md)
 - User guide: [`README.md`](README.md)
 
+### Entry 2 — 2026-05-19 21:00 (UTC+2)
+
+**Scope:** First pass at performance fixes (superseded in detail by Entry 3).
+
+#### Changes (initial)
+
+| Area | Change |
+|------|--------|
+| `paddle_backend.py` | Image resize, CPU thread cap, PaddleOCR 3.x `predict()` API |
+| `extract_receipt.py` | Singleton cache for default backend |
+| `constants.py` | `RECEIPT_OCR_MAX_IMAGE_SIDE`, `RECEIPT_OCR_CPU_THREADS` |
+| Integration tests | Scoped to `images_tickets_caisse/` + `--integration-max-images` |
+| `scripts/smoke_test_ocr.py` | One-image CLI smoke test |
+
+---
+## Version 0.1.1
+
+### Entry 3 — 2026-05-23 15:00 (UTC+2)
+
+**Scope:** Diagnose and fix PC freezes during PaddleOCR testing; complete the end-to-end pipeline on a real receipt (`4PQOWWaPoa.jpg`); harden parser for real-world OCR layouts.
+
+#### Problem observed
+
+Running `PaddleOcrBackend` or `pytest -m integration` caused the machine to appear frozen (100 % CPU, minutes without response). This was **not** an infinite loop in our code, but a combination of:
+
+| Factor | Why it hurts on a laptop |
+|--------|---------------------------|
+| **PaddleOCR / PaddlePaddle** | Large models, high RAM use, aggressive multi-threading (oneDNN / OpenMP) |
+| **PaddleOCR 3.x API change** | Old code used `show_log`, `use_angle_cls`, `.ocr(cls=True)` — init failed or behaved incorrectly |
+| **`paddle_static` on Windows** | Default mobile det weights require `paddle_static`; triggers oneDNN `NotImplementedError` on some Windows builds |
+| **Full-resolution photos** | e.g. `4PQOWWaPoa.jpg` (~2.3 MB) sent to OCR with no downscaling |
+| **Reloading models every call** | `extract_receipt(path)` without `backend=` created a new `PaddleOcrBackend()` each time |
+| **Integration tests on ~395 images** | `data/raw/` + Kaggle cache discovered hundreds of files; one OCR per image = hours at 100 % CPU |
+| **Cold start** | First run downloads/loads `PP-OCRv5_server_det` + `latin_PP-OCRv5_mobile_rec` (~30–90 s) |
+
+#### Considerations that drove the design
+
+1. **Stability over raw speed on Windows** — use `engine="paddle_dynamic"` by default (known to work); keep `use_mobile_models=False` unless on Linux/server where `paddle_static` is reliable.
+2. **Bound resource usage** — cap CPU threads (`RECEIPT_OCR_CPU_THREADS=2`), resize before OCR (`RECEIPT_OCR_MAX_IMAGE_SIDE=1280`), disable MKL-DNN (`enable_mkldnn=False`, `FLAGS_use_mkldnn=0`).
+3. **Load models once** — cache the default backend in `build_backend()`; document explicit reuse for batch scripts.
+4. **Safe local testing** — smoke script for one image; integration tests limited to `images_tickets_caisse/` with `--integration-max-images` (default 3).
+5. **Real receipt layouts** — OCR often splits product name, unit price, line total, and quantity (`2 x`) across lines; parser must handle that, plus date/time on separate lines (`15/10/24` + `12:40`).
+6. **Skip PaddleX network check** — `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True` set in code to avoid slow host connectivity checks.
+
+#### What was implemented
+
+| Area | Implementation |
+|------|----------------|
+| **`paddle_backend.py`** | PaddleOCR 3.x: `predict()` → `rec_texts` / `rec_scores`; auto engine (`paddle_dynamic` default); image resize via Pillow; `text_det_limit_side_len`; thread limits; optional `use_mobile_models=True` → `paddle_static` with fallback |
+| **`extract_receipt.py`** | `_cached_backend` singleton; `reset_default_backend()` for tests |
+| **`parser.py`** | Multi-line products (name → unit price → total → `N x`); split date/time; section headers (`> PATES`); multi-line weight (`0,972 kg` + `2,79 €/kg`); fixture `tests/fixtures/super_u_ocr_text.py` |
+| **`constants.py`** | `ENV_MAX_IMAGE_SIDE`, `ENV_CPU_THREADS`, `DEFAULT_MAX_IMAGE_SIDE=1280`, `PADDLE_MOBILE_DET_MODEL` |
+| **`conftest.py`** | `--integration-max-images`, `--integration-all-data` |
+| **`test_integration_real_images.py`** | `pytest_generate_tests` + session-scoped `paddle_backend` fixture |
+| **`scripts/smoke_test_ocr.py`** | Single-image test with init/OCR timings; `--raw-only` flag |
+| **`requirements.txt`** | Explicit `Pillow` |
+| **Tests** | `33 passed` unit tests (`pytest --no-integration`); Super U multiline parser test |
+
+#### Validated on `4PQOWWaPoa.jpg` (Super U)
+
+Smoke test (`python scripts/smoke_test_ocr.py …`) on Windows / Python 3.11:
+
+| Phase | Approx. duration |
+|-------|------------------|
+| Model init (first run) | ~35 s |
+| OCR + parse (per large image, CPU) | ~100–120 s |
+
+Example structured output (after parser fixes):
+
+```json
+{
+  "ticket": {
+    "date": "20241015 12:40",
+    "chaine_supermarche": "SUPER(U",
+    "adresse": "14 RUE PAUL, 75011",
+    "produits": [
+      { "nom_produit": "TORSADES COMPLETES U BIO 500G", "prix_unitaire_ou_kg": 1.1, "unites": 2 },
+      { "nom_produit": "BOISSON SOJA NATURE U BIO 1L", "prix_unitaire_ou_kg": 0.88, "unites": 4 }
+    ]
+  }
+}
+```
+
+(Full run extracts five products including raisin, chocolate, fish — see unit test `test_parse_super_u_multiline_layout`.)
+
+#### How to test without freezing the PC
+
+```powershell
+$env:PYTHONPATH = "src"
+$env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "True"
+$env:RECEIPT_OCR_CPU_THREADS = "2"
+
+# One image (recommended)
+python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg
+
+# Raw OCR text only
+python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg --raw-only
+
+# Fast unit tests (no OCR, no GPU)
+pytest --no-integration
+
+# Integration: 3 images from images_tickets_caisse/ only
+pytest -m integration
+```
+
+#### Pitfalls to avoid
+
+- Do **not** call `extract_receipt()` in a tight loop without passing the same `backend=` instance.
+- Do **not** run `pytest -m integration --integration-all-data` on a laptop unless you accept hours of CPU load.
+- Do **not** enable `use_mobile_models=True` on Windows without expecting possible `paddle_static` / oneDNN errors.
+- First OCR after install still downloads models to `~/.paddlex/` — plan for one slow cold start.
+
+#### References
+
+- User guide: [`README.md`](README.md)
+- Specification: [`project_guidelines.md`](project_guidelines.md)
+
 ---

@@ -60,6 +60,11 @@ _WEIGHT_LINE = re.compile(
     rf"(?P<weight>\d+[.,]\d+)\s*kg\s*[xX×]?\s*(?P<unit_price>{_PRICE})\s*(?:€/?kg)?",
     re.IGNORECASE,
 )
+_KG_ONLY_LINE = re.compile(rf"^(?P<weight>\d+[.,]\d+)\s*kg\s*(?:€|EUR)?\s*$", re.IGNORECASE)
+_PRICE_PER_KG_LINE = re.compile(
+    rf"^(?P<price>{_PRICE})\s*(?:€|EUR)?\s*/?\s*kg\s*$",
+    re.IGNORECASE,
+)
 
 # A typical product line ends with a price, possibly followed by € and a TVA letter.
 # Examples:
@@ -67,8 +72,22 @@ _WEIGHT_LINE = re.compile(
 #   "COCA COLA 1.5L          2,49"
 #   "BANANES               2,15 A"
 _PRODUCT_LINE = re.compile(
-    rf"^(?P<name>.+?)\s+(?P<price>{_PRICE})\s*(?:€|EUR)?\s*[A-Z]?\s*$"
+    rf"^(?P<name>.+?)\s+(?P<price>{_PRICE})\s*(?:€|EUR)?\s*[A-Z0-9]?\s*$"
 )
+
+# Multi-line layouts (common on real photos): name on one line, price on the next.
+#   "TORSADES COMPLETES U BIO 500G"
+#   "1,10 €"
+#   "2,20 € 11"   ← line total (optional)
+#   "2 x"
+_STANDALONE_PRICE = re.compile(
+    rf"^(?P<price>{_PRICE})\s*(?:€|EUR)?\s*(?:\d+)?\s*$"
+)
+_STANDALONE_QTY = re.compile(r"^\s*(?P<qty>\d{1,3})\s*[xX×]\s*$")
+_STANDALONE_QTY_COMPACT = re.compile(r"^\s*(?P<qty>\d{1,3})[xX×]\s*$")
+_SECTION_HEADER = re.compile(r"^>{1,2}\s+")
+_DATE_ONLY = re.compile(r"^(\d{2})[/\-.](\d{2})[/\-.](\d{2,4})$")
+_TIME_ONLY = re.compile(r"^(\d{1,2}):(\d{2})$")
 
 # Lines that should never be treated as products. Matched case-insensitively
 # against the *stripped* line. Keep this conservative.
@@ -117,6 +136,16 @@ _IGNORED_KEYWORDS: tuple[str, ...] = (
     "code",
     "facture",
     "n°",
+    "article(s)",
+    "articles",
+    "heure",
+    "telephone",
+    "téléphone",
+    "fruits",
+    "poisson",
+    "chocolat",
+    "dietetique",
+    "diététique",
 )
 
 # Hints for chain detection — *not* a hardcoded list of brands, but
@@ -280,18 +309,42 @@ class ReceiptParser:
 
     def _extract_date(self, lines: Iterable[str]) -> str:
         """Find the first parsable date and return it as ``yyyyMMdd HH:mm``."""
-        for line in lines:
+        line_list = list(lines)
+
+        for line in line_list:
             for pattern, template in _DATE_PATTERNS:
                 match = pattern.search(line)
                 if not match:
                     continue
                 try:
                     candidate = template.format(*match.groups())
-                    # Validate by round-tripping through datetime.
                     parsed = datetime.strptime(candidate, OUTPUT_DATE_FORMAT)
                     return parsed.strftime(OUTPUT_DATE_FORMAT)
                 except (ValueError, IndexError):
                     continue
+
+        # Receipts often print date and time on separate lines (e.g. 15/10/24 then 12:40).
+        date_match = None
+        time_match = None
+        for line in line_list:
+            stripped = line.strip()
+            dm = _DATE_ONLY.match(stripped)
+            if dm:
+                date_match = dm
+            tm = _TIME_ONLY.match(stripped)
+            if tm:
+                time_match = tm
+        if date_match and time_match:
+            day, month, year = date_match.groups()
+            if len(year) == 2:
+                year = f"20{year}"
+            hour, minute = time_match.groups()
+            candidate = f"{year}{month}{day} {int(hour):02d}:{minute}"
+            try:
+                parsed = datetime.strptime(candidate, OUTPUT_DATE_FORMAT)
+                return parsed.strftime(OUTPUT_DATE_FORMAT)
+            except ValueError:
+                pass
         return ""
 
     @staticmethod
@@ -316,6 +369,19 @@ class ReceiptParser:
         products: list[_ParsedProduct] = []
         seen_first_product = False
         header_skip = header_skip or set()
+        pending_name: str | None = None
+
+        def _flush_pending(
+            name: str,
+            unit_price: float,
+            units: int = 1,
+        ) -> None:
+            nonlocal seen_first_product
+            if name and self._is_plausible_product_name(name):
+                products.append(
+                    _ParsedProduct(name=name, unit_price=unit_price, units=units)
+                )
+                seen_first_product = True
 
         i = 0
         while i < len(lines):
@@ -323,49 +389,127 @@ class ReceiptParser:
                 i += 1
                 continue
 
-            line = lines[i]
-            stripped = line.strip()
+            stripped = lines[i].strip()
 
             if not stripped:
                 i += 1
                 continue
 
-            # A line that's just a date is never a product.
+            if _SECTION_HEADER.match(stripped):
+                pending_name = None
+                i += 1
+                continue
+
             if self._looks_like_date(stripped) and not _PRODUCT_LINE.match(stripped):
                 i += 1
                 continue
 
             if self._is_ignored(stripped):
-                # Once we've seen totals/TVA we're typically past the product block.
                 if seen_first_product and self._is_footer_terminator(stripped):
                     break
+                pending_name = None
                 i += 1
                 continue
 
-            # Quantity / weight lines without a preceding product are noise.
-            qty_match = _QUANTITY_LINE.match(stripped)
+            # Weight line (per-kg) on its own or embedded.
+            weight_match = _WEIGHT_LINE.search(stripped)
+            if weight_match and pending_name:
+                unit_price = _parse_price(weight_match.group("unit_price"))
+                _flush_pending(pending_name, unit_price, units=1)
+                pending_name = None
+                i += 1
+                continue
 
+            # Multi-line weight: "0,972 kg" then "2,79 €/kg" then "2,71 €"
+            if pending_name and _KG_ONLY_LINE.match(stripped):
+                per_kg = None
+                if i + 1 < len(lines):
+                    per_kg_m = _PRICE_PER_KG_LINE.match(lines[i + 1].strip())
+                    if per_kg_m:
+                        per_kg = _parse_price(per_kg_m.group("price"))
+                        i += 1
+                if per_kg is not None:
+                    _flush_pending(pending_name, per_kg, units=1)
+                    pending_name = None
+                    i += 1
+                    continue
+
+            # Standalone quantity: "2 x" or "4x"
+            qty_only = _STANDALONE_QTY.match(stripped) or _STANDALONE_QTY_COMPACT.match(
+                stripped
+            )
+            if qty_only and products:
+                products[-1].units = int(qty_only.group("qty"))
+                pending_name = None
+                i += 1
+                continue
+
+            # Standalone unit price after a product name on the previous line.
+            price_only = _STANDALONE_PRICE.match(stripped)
+            if price_only and pending_name:
+                unit_price = _parse_price(price_only.group("price"))
+                units = 1
+                # Look ahead: line total then "N x", or just "N x".
+                if i + 1 < len(lines):
+                    nxt = lines[i + 1].strip()
+                    total_m = _STANDALONE_PRICE.match(nxt)
+                    if total_m and i + 2 < len(lines):
+                        total_price = _parse_price(total_m.group("price"))
+                        if unit_price > 0:
+                            units = max(1, round(total_price / unit_price))
+                        qty_m = _STANDALONE_QTY.match(
+                            lines[i + 2].strip()
+                        ) or _STANDALONE_QTY_COMPACT.match(lines[i + 2].strip())
+                        if qty_m:
+                            units = int(qty_m.group("qty"))
+                        i += 2
+                    else:
+                        qty_m = _STANDALONE_QTY.match(nxt) or _STANDALONE_QTY_COMPACT.match(
+                            nxt
+                        )
+                        if qty_m:
+                            units = int(qty_m.group("qty"))
+                            i += 1
+                        elif total_m and unit_price > 0:
+                            units = max(
+                                1, round(_parse_price(total_m.group("price")) / unit_price)
+                            )
+                            i += 1
+                _flush_pending(pending_name, unit_price, units=units)
+                pending_name = None
+                i += 1
+                continue
+
+            qty_match = _QUANTITY_LINE.match(stripped)
             product_match = _PRODUCT_LINE.match(stripped)
             if product_match and not qty_match:
                 name = product_match.group("name").strip(" .-:")
                 price = _parse_price(product_match.group("price"))
-                if name and self._is_plausible_product_name(name):
-                    product = _ParsedProduct(name=name, unit_price=price, units=1)
-                    # Look ahead for quantity/weight refinement.
-                    if i + 1 < len(lines):
-                        nxt = lines[i + 1].strip()
-                        nxt_qty = _QUANTITY_LINE.match(nxt)
-                        nxt_weight = _WEIGHT_LINE.search(nxt)
-                        if nxt_qty:
-                            product.units = int(nxt_qty.group("qty"))
-                            product.unit_price = _parse_price(nxt_qty.group("unit_price"))
-                            i += 1
-                        elif nxt_weight:
-                            product.unit_price = _parse_price(nxt_weight.group("unit_price"))
-                            product.units = 1
-                            i += 1
-                    products.append(product)
-                    seen_first_product = True
+                product = _ParsedProduct(name=name, unit_price=price, units=1)
+                if i + 1 < len(lines):
+                    nxt = lines[i + 1].strip()
+                    nxt_qty = _QUANTITY_LINE.match(nxt)
+                    nxt_weight = _WEIGHT_LINE.search(nxt)
+                    if nxt_qty:
+                        product.units = int(nxt_qty.group("qty"))
+                        product.unit_price = _parse_price(nxt_qty.group("unit_price"))
+                        i += 1
+                    elif nxt_weight:
+                        product.unit_price = _parse_price(nxt_weight.group("unit_price"))
+                        i += 1
+                _flush_pending(product.name, product.unit_price, units=product.units)
+                pending_name = None
+                i += 1
+                continue
+
+            # Candidate product name (no price on this line).
+            if self._is_plausible_product_name(stripped) and not _STANDALONE_PRICE.match(
+                stripped
+            ):
+                pending_name = stripped
+            else:
+                pending_name = None
+
             i += 1
 
         return products
@@ -398,6 +542,8 @@ class ReceiptParser:
     def _is_plausible_product_name(name: str) -> bool:
         """Reject names that are clearly not products (mostly digits, too short)."""
         if len(name) < 2:
+            return False
+        if _PRICE_PER_KG_LINE.match(name) or _STANDALONE_PRICE.match(name):
             return False
         letters = sum(c.isalpha() for c in name)
         return letters >= 2

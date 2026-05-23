@@ -11,11 +11,12 @@ from receipt_ocr.exceptions import (
     ReceiptOcrError,
     ReceiptParseError,
 )
-from receipt_ocr.extract_receipt import extract_receipt
+from receipt_ocr.extract_receipt import extract_receipt, reset_default_backend
 from receipt_ocr.parser import ReceiptParser
 
 __all__ = [
     "extract_receipt",
+    "reset_default_backend",
     "ReceiptParser",
     "OcrBackendError",
     "ReceiptParseError",

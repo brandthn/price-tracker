@@ -3,18 +3,17 @@
 Extract structured data from photos of **French supermarket receipts**
 (*tickets de caisse*) using OCR.
 
-The package is built around the **Strategy pattern** so that different
-OCR backends (PaddleOCR, Tesseract, EasyOCR, vision-language models, …)
-can be swapped in with zero code changes.
+The package uses the **Strategy pattern**: OCR backends (PaddleOCR today;
+Tesseract, EasyOCR, VLM stubs) are interchangeable; parsing is
+backend-agnostic.
 
 ```python
 from receipt_ocr import extract_receipt
 
-data = extract_receipt("data/raw/images_tickets_caisse/IMG_0001.jpg")
+data = extract_receipt("data/raw/images_tickets_caisse/4PQOWWaPoa.jpg")
 ```
 
-The returned dict matches the schema described in
-[`project_guidelines.md`](project_guidelines.md):
+Output schema ([`project_guidelines.md`](project_guidelines.md)):
 
 ```json
 {
@@ -33,27 +32,47 @@ The returned dict matches the schema described in
 }
 ```
 
+Implementation history and performance notes: [`documentation.md`](documentation.md).
+
 ---
 
 ## Project layout
 
 ```
 src/receipt_ocr/
-├── __init__.py
-├── extract_receipt.py        # public entry point + backend factory
-├── parser.py                 # ReceiptParser: raw text → structured dict
-├── constants.py              # field names, env-variable name, date format
-├── exceptions.py             # custom exception hierarchy
+├── __init__.py               # extract_receipt, reset_default_backend, …
+├── extract_receipt.py        # public API + cached backend factory
+├── parser.py                 # ReceiptParser (multi-line French receipts)
+├── constants.py              # schema enums, env var names
+├── exceptions.py             # OcrBackendError, ReceiptParseError, …
 └── backends/
     ├── base.py               # OcrBackend ABC
-    ├── paddle_backend.py     # working PaddleOCR implementation
+    ├── paddle_backend.py     # PaddleOCR 3.x (default, production-ready)
     ├── tesseract_backend.py  # stub
     ├── easyocr_backend.py    # stub
     └── vlm_backend.py        # stub
 
-tests/                        # pytest unit + integration tests
-scripts/download_datasets.py  # idempotent dataset downloader
-data/raw/                     # real receipt images (gitignored by default)
+tests/
+├── test_parser.py
+├── test_extract_receipt.py
+├── test_paddle_backend.py
+├── test_integration_real_images.py
+└── fixtures/
+    ├── sample_texts.py       # synthetic OCR strings (fast unit tests)
+    └── super_u_ocr_text.py   # real OCR layout from 4PQOWWaPoa.jpg
+
+scripts/
+├── download_datasets.py      # HuggingFace + Kaggle (idempotent)
+└── smoke_test_ocr.py         # one-image OCR smoke test with timings
+
+data/raw/
+├── images_tickets_caisse/    # local receipt photos
+└── ocr_testing/              # dataset references
+
+conftest.py                   # pytest: integration markers, image limits
+pyproject.toml
+requirements.txt
+documentation.md              # versioned changelog / design notes
 ```
 
 ---
@@ -61,125 +80,197 @@ data/raw/                     # real receipt images (gitignored by default)
 ## Installation
 
 ```bash
-# (Recommended) create a virtual environment first
-python -m venv .venv && source .venv/bin/activate     # Linux/macOS
-# .venv\Scripts\Activate.ps1                          # Windows PowerShell
+python -m venv .venv
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# Linux / macOS
+# source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
-> **Heads-up:** PaddleOCR drags in `paddlepaddle`, which is a large
-> wheel. If you only want to run the unit tests, no OCR library is
-> required at all — `pip install pytest` is enough.
+| Package | Role |
+|---------|------|
+| `paddleocr` + `paddlepaddle` | Default OCR backend |
+| `Pillow` | Image downscaling before OCR |
+| `pytest` | Tests |
+| `huggingface_hub`, `kagglehub` | Optional dataset download |
 
-For development without any OCR engine installed:
+**Unit tests only** (no OCR installed):
 
 ```bash
 pip install pytest
-pytest
+pytest --no-integration
 ```
 
 ---
 
 ## Usage
 
-### Default (PaddleOCR)
+### Single image (recommended first try)
+
+```bash
+# From repo root — set PYTHONPATH so the package imports without pip install -e .
+$env:PYTHONPATH = "src"                                    # PowerShell
+# export PYTHONPATH=src                                     # bash
+
+python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg
+```
+
+Options:
+
+| Flag / env | Effect |
+|------------|--------|
+| `--raw-only` | Print OCR text only (skip parser) |
+| `RECEIPT_OCR_CPU_THREADS` | Max CPU threads (default `2`) |
+| `RECEIPT_OCR_MAX_IMAGE_SIDE` | Resize longest side in px (default `1280`) |
+| `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` | Skip slow PaddleX host check (set automatically in code) |
+
+**Expect ~30–40 s** for first model load, then **~1–2 min per large photo** on CPU. That is normal; the machine should stay responsive (no full freeze) with default settings.
+
+### Python API
 
 ```python
 from receipt_ocr import extract_receipt
 
+# Default backend (PaddleOCR) is created once and cached.
 data = extract_receipt("ticket.jpg")
 ```
 
-### Switching backends
-
-#### …via constructor
+**Batch processing** — create the backend once:
 
 ```python
-from receipt_ocr import extract_receipt
 from receipt_ocr.backends import PaddleOcrBackend
+from receipt_ocr import extract_receipt
 
-backend = PaddleOcrBackend(lang="fr", use_angle_cls=True)
+backend = PaddleOcrBackend()
+for path in image_paths:
+    data = extract_receipt(path, backend=backend)
+```
+
+### Backend selection
+
+```python
+from receipt_ocr.backends import PaddleOcrBackend
+from receipt_ocr import extract_receipt
+
+backend = PaddleOcrBackend(lang="fr")
 data = extract_receipt("ticket.jpg", backend=backend)
 ```
 
-#### …via the `RECEIPT_OCR_BACKEND` environment variable
+Or via environment variable:
 
 ```bash
-RECEIPT_OCR_BACKEND=tesseract python my_script.py
+RECEIPT_OCR_BACKEND=paddle python my_script.py
 ```
 
-Valid values: `paddle` (default), `tesseract`, `easyocr`, `vlm`.
+Valid values: `paddle` (default), `tesseract`, `easyocr`, `vlm` (last three are stubs).
+
+### Reset cached backend (tests)
+
+```python
+from receipt_ocr import reset_default_backend
+
+reset_default_backend()
+```
 
 ---
 
-## Downloading the test datasets
+## PaddleOCR backend (defaults)
 
-The datasets used to validate real-world performance are referenced in
-[`data/raw/ocr_testing/datasets_to_use_for_testing.txt`](data/raw/ocr_testing/datasets_to_use_for_testing.txt).
-The helper script is idempotent — it will skip anything already on
-disk:
+Tuned for **Windows laptops** without freezing the system:
+
+| Default | Value | Reason |
+|---------|-------|--------|
+| Engine | `paddle_dynamic` | `paddle_static` + oneDNN often crashes on Windows |
+| Mobile det models | **off** | Mobile weights require `paddle_static` |
+| Max image side | `1280` px | Faster OCR on phone photos |
+| CPU threads | `2` | Avoid pegging all cores |
+| MKL-DNN | off | Stability on Windows |
+| Preprocessing | doc orientation / unwarping / textline orientation **off** | Speed |
+
+Optional lighter detection (Linux / when `paddle_static` works):
+
+```python
+PaddleOcrBackend(use_mobile_models=True)  # PP-OCRv4_mobile_det + paddle_static
+```
+
+---
+
+## Parser capabilities
+
+`ReceiptParser` handles typical French ticket quirks:
+
+- Header: chain + address (no hardcoded brand list)
+- Date: `DD/MM/YYYY HH:MM` and **split lines** (`15/10/24` then `12:40`)
+- Products: same-line `NAME 1,20 €`, or **multi-line** (name → unit price → total → `2 x`)
+- Weight: `0,452 kg x 5,98 €/kg` and multi-line per-kg blocks
+- Footer: totals, TVA, payment lines ignored
+
+---
+
+## Downloading test datasets
 
 ```bash
 python scripts/download_datasets.py
 ```
 
-Options:
+Reads [`data/raw/ocr_testing/datasets_to_use_for_testing.txt`](data/raw/ocr_testing/datasets_to_use_for_testing.txt):
 
-| Flag             | Effect                                                  |
-|------------------|---------------------------------------------------------|
-| `--source-list`  | Override the path to the list file.                      |
-| `--target`       | Override the destination root (default `data/raw/`).     |
-| `--force`        | Re-download even if the target folder already exists.    |
-| `-v / --verbose` | Verbose logging.                                         |
+- HuggingFace: `shirastromer/supermarket-receipts`
+- Kaggle: `sushmithanarayan/expenses-receipt-ocr`
+
+| Flag | Effect |
+|------|--------|
+| `--source-list` | Override list file path |
+| `--target` | Override download root |
+| `--force` | Re-download even if present |
+| `-v` | Verbose logging |
 
 ---
 
-## Running the tests
+## Running tests
 
 ```bash
-# Fast unit tests only — no network, no real images required
-pytest
+# Fast unit tests — no network, no OCR, no real images (~1 s)
+pytest --no-integration
 
-# Include integration tests over real images on disk
+# Integration: OCR up to 3 images in images_tickets_caisse/ (slow)
 pytest -m integration
 
-# Force-skip integration tests even if images are present
+# More local images
+pytest -m integration --integration-max-images 10
+
+# Include Kaggle cache (hundreds of images — not for laptops)
+pytest -m integration --integration-all-data --integration-max-images 0
+
+# Skip integration entirely
 pytest --no-integration
 ```
 
-Integration tests are **auto-skipped** when `data/raw/` is empty, so the
-default `pytest` run is always green.
+Integration tests use a **session-scoped** `PaddleOcrBackend` (one model load per run).
 
 ---
 
 ## Adding a new backend
 
-1. Create `src/receipt_ocr/backends/<my_backend>.py`.
-2. Subclass `OcrBackend` and implement `extract_text(self, image_path) -> str`.
-   * Import any third-party dependency **inside the class**.
-   * Wrap engine errors in `OcrBackendError`.
-3. Register it in `extract_receipt.py`:
+1. Create `src/receipt_ocr/backends/<name>_backend.py`.
+2. Subclass `OcrBackend`, implement `extract_text(self, image_path) -> str`.
+   - Import third-party libs **inside** `__init__`.
+   - Wrap errors in `OcrBackendError`.
+3. Register in `extract_receipt.py` → `_BACKEND_REGISTRY`.
+4. Add mocked unit tests (see `tests/test_paddle_backend.py`).
 
-   ```python
-   _BACKEND_REGISTRY[BackendName.MY_BACKEND] = MyBackend
-   ```
-
-4. Add a unit test that mocks the third-party library (see
-   `tests/test_paddle_backend.py` for a template).
-
-That's it — the parser, public API, env-variable switch and CLI all
-work unchanged.
+The parser and `extract_receipt()` API stay unchanged.
 
 ---
 
 ## Design notes
 
-* **No hardcoded chain names.** The parser infers the supermarket
-  name from the first non-noise header line, so any chain works.
-* **Custom exceptions** (`OcrBackendError`, `ReceiptParseError`) hide
-  the third-party library a user happens to be running behind.
-* **Lazy backend imports** mean `import receipt_ocr` succeeds even
-  when no OCR library is installed.
-* **Unit tests** use string fixtures so the suite runs in milliseconds
-  with zero network and zero file-system dependencies.
+- **No hardcoded supermarket names** — chain inferred from OCR header.
+- **Custom exceptions** — `OcrBackendError`, `ReceiptParseError`.
+- **Lazy OCR imports** — `import receipt_ocr` works without Paddle installed.
+- **Cached default backend** — avoids reloading multi-GB models on every call.
+- **Changelog** — see [`documentation.md`](documentation.md) for versioned entries (initial build, performance work, real-receipt validation).
