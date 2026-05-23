@@ -42,3 +42,15 @@ class BackendName(str, Enum):
 
 ENV_BACKEND = "RECEIPT_OCR_BACKEND"
 """Name of the environment variable selecting the default backend."""
+
+ENV_MAX_IMAGE_SIDE = "RECEIPT_OCR_MAX_IMAGE_SIDE"
+"""Max longest image side (px) before OCR. Set ``0`` to disable resizing."""
+
+ENV_CPU_THREADS = "RECEIPT_OCR_CPU_THREADS"
+"""Max CPU threads for Paddle/BLAS (default ``2``). Lower = less system freeze."""
+
+DEFAULT_MAX_IMAGE_SIDE = 1280
+DEFAULT_CPU_THREADS = 2
+
+# Lighter PaddleOCR 3.x models (much faster than the server variants).
+PADDLE_MOBILE_DET_MODEL = "PP-OCRv4_mobile_det"

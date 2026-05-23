@@ -14,6 +14,7 @@ from receipt_ocr.backends.base import OcrBackend
 from receipt_ocr.exceptions import OcrBackendError, ReceiptParseError
 from receipt_ocr.parser import ReceiptParser
 from tests.fixtures import sample_texts
+from tests.fixtures.super_u_ocr_text import SUPER_U_OCR
 
 
 def _make_backend(text: str = "") -> MagicMock:
@@ -144,6 +145,21 @@ def test_product_prices_are_rounded_to_two_decimals():
     for product in parser.parse("any.jpg")["ticket"]["produits"]:
         price = product["prix_unitaire_ou_kg"]
         assert round(price, 2) == price
+
+
+def test_parse_super_u_multiline_layout():
+    """Real OCR layout: product name and price on separate lines."""
+    parser = ReceiptParser(_make_backend())
+    ticket = parser.parse_text(SUPER_U_OCR)["ticket"]
+
+    assert ticket["date"] == "20241015 12:40"
+    assert "SUPER" in ticket["chaine_supermarche"].upper()
+    names = [p["nom_produit"] for p in ticket["produits"]]
+    assert any("TORSADES" in n for n in names)
+    assert any("BOISSON SOJA" in n for n in names)
+    assert any("CHOCO" in n for n in names)
+    assert any("RAISIN" in n for n in names)
+    assert len(ticket["produits"]) >= 5
 
 
 def test_date_format_yyyyMMdd_HHmm():

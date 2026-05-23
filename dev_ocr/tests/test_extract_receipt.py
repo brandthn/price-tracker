@@ -13,8 +13,15 @@ import pytest
 from receipt_ocr import extract_receipt
 from receipt_ocr.backends.base import OcrBackend
 from receipt_ocr.constants import ENV_BACKEND, BackendName
-from receipt_ocr.extract_receipt import build_backend
+from receipt_ocr.extract_receipt import build_backend, reset_default_backend
 from tests.fixtures import sample_texts
+
+
+@pytest.fixture(autouse=True)
+def _clear_backend_cache():
+    reset_default_backend()
+    yield
+    reset_default_backend()
 
 
 class _FakeBackend(OcrBackend):
@@ -71,10 +78,24 @@ def test_build_backend_defaults_to_paddle_class(monkeypatch):
         sentinel.return_value = MagicMock(spec=OcrBackend)
         registry.__getitem__.return_value = sentinel
 
-        build_backend()
+        build_backend(force_new=True)
 
         registry.__getitem__.assert_called_once_with(BackendName.PADDLE)
         sentinel.assert_called_once_with()
+
+
+def test_build_backend_reuses_cached_instance(monkeypatch):
+    monkeypatch.delenv(ENV_BACKEND, raising=False)
+    with patch("receipt_ocr.extract_receipt._BACKEND_REGISTRY") as registry:
+        instance = MagicMock(spec=OcrBackend)
+        sentinel = MagicMock(return_value=instance)
+        registry.__getitem__.return_value = sentinel
+
+        first = build_backend()
+        second = build_backend()
+
+        assert first is second
+        sentinel.assert_called_once()
 
 
 def test_build_backend_honours_env_variable(monkeypatch):

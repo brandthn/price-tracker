@@ -6,6 +6,7 @@ auto-skips integration tests when the real receipt data is missing.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,24 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         default=False,
         help="Skip tests marked as integration even if data is available.",
+    )
+    parser.addoption(
+        "--integration-max-images",
+        type=int,
+        default=int(os.environ.get("INTEGRATION_MAX_IMAGES", "3")),
+        help=(
+            "Max number of receipt images to OCR in integration tests "
+            "(default 3). Set 0 for no limit."
+        ),
+    )
+    parser.addoption(
+        "--integration-all-data",
+        action="store_true",
+        default=False,
+        help=(
+            "Also include Kaggle-cached images in integration tests "
+            "(can be hundreds of files and very slow)."
+        ),
     )
 
 
