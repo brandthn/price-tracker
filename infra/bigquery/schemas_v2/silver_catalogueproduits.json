@@ -1,0 +1,80 @@
+[
+  {
+    "name": "ean",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "EAN/barcode produit. PK et clé de MERGE."
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Libellé OFF (product_name_fr, fallback product_name)."
+  },
+  {
+    "name": "brand",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Marque principale (ex: Danone, Nestlé)."
+  },
+  {
+    "name": "category_l1",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Catégorie OFF niveau 1 (ex: Produits laitiers)."
+  },
+  {
+    "name": "category_l2",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Catégorie OFF niveau 2 (ex: Yaourts)."
+  },
+  {
+    "name": "category_l3",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Catégorie OFF niveau 3 (ex: Yaourts nature)."
+  },
+  {
+    "name": "nutriscore",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Nutri-Score : A | B | C | D | E."
+  },
+  {
+    "name": "nova",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Groupe NOVA : 1 | 2 | 3 | 4."
+  },
+  {
+    "name": "ecoscore",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Eco-Score : A | B | C | D | E."
+  },
+  {
+    "name": "image_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "URL image produit face (OFF CDN)."
+  },
+  {
+    "name": "off_found",
+    "type": "BOOL",
+    "mode": "REQUIRED",
+    "description": "True si EAN trouvé dans Open Food Facts (status=1)."
+  },
+  {
+    "name": "enriched_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "UTC timestamp du run worker_off."
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Toujours openfoodfacts."
+  }
+]

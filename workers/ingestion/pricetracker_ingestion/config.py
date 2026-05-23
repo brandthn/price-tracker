@@ -27,13 +27,19 @@ class Settings(BaseSettings):
     prt_bronze_bucket: str = Field(default="price-tracker-prod-01-bronze")
     prt_bq_dataset_silver: str = Field(default="prt_prod_silver")
     prt_bq_table_open_prices: str = Field(default="open_prices_clean")
+    prt_bq_table_rejections: str = Field(default="open_prices_rejections")
 
     prt_hf_dataset: str = Field(default="openfoodfacts/open-prices")
     prt_hf_filename: str = Field(default="prices.parquet")
     prt_hf_revision: str = Field(default="main")
     hf_token: str | None = Field(default=None)
 
-    prt_filter_country_code: str = Field(default="FR")
+    # CSV de pays acceptés (FR + DOM-TOM par défaut). Le worker convertit en
+    # frozenset au load via `allowed_countries`. Format CSV pour rester simple
+    # côté pydantic-settings (pas de JSON env var à parser).
+    prt_filter_country_codes: str = Field(
+        default="FR,GP,GF,MQ,RE,YT,PM,MF,BL,WF,NC,PF"
+    )
 
     # OIDC verification ---------------------------------------------------
     prt_oidc_disable: bool = Field(
@@ -52,6 +58,14 @@ class Settings(BaseSettings):
         default="",
         description="Emails SA autorisés à invoquer /run (CSV). Vide = tout SA Google passé l'audience.",
     )
+
+    @property
+    def allowed_countries(self) -> frozenset[str]:
+        return frozenset(
+            s.strip().upper()
+            for s in self.prt_filter_country_codes.split(",")
+            if s.strip()
+        )
 
     @property
     def allowed_issuers(self) -> list[str]:

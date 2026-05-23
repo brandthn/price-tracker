@@ -22,13 +22,26 @@ locals {
   bq_silver_labels = merge(var.labels, { component = "silver" })
 }
 
-# --- open_prices_clean (Phase 6.1) ---------------------------------------
+# --- open_prices_clean (Phase 6.5 — schema v2) ---------------------------
+# Migration du schéma v1 (13 colonnes, partition `date`, clustering kind+product_code)
+# vers v2 (25 colonnes enrichies, partition `price_date`, clustering pays+enseigne+EAN).
+#
+# Partition `price_date` plutôt que `pipeline_run_date` : les requêtes analytiques
+# Gold filtrent toutes par fenêtre de prix (`WHERE price_date BETWEEN ... AND ...`),
+# c'est l'axe le plus pruning-efficient.
+#
+# Clustering (country_code, store_brand_normalized, product_code) couvre les trois
+# accès dominants : filtre pays → group par enseigne → join par EAN sur catalogue.
+#
+# ⚠️ MIGRATION DESTRUCTIVE : changement de partition_field = drop+recreate obligatoire
+# côté BQ. La table est vide (0 rows vérifié 2026-05-21) donc safe. Si la table
+# n'est plus vide au moment de l'apply, suspendre et vider à la main d'abord.
 resource "google_bigquery_table" "open_prices_clean" {
   project    = var.project_id
   dataset_id = local.bq_silver_dataset
   table_id   = "open_prices_clean"
 
-  description         = "Open Prices nettoye (France) — worker-ingestion (cron 03h UTC)."
+  description         = "Open Prices nettoyé + enrichi (FR + DOM-TOM) — worker-ingestion (cron 03h UTC)."
   deletion_protection = false
   labels              = local.bq_silver_labels
 
@@ -36,10 +49,41 @@ resource "google_bigquery_table" "open_prices_clean" {
 
   time_partitioning {
     type  = "DAY"
-    field = "date"
+    field = "price_date"
   }
 
-  clustering = ["kind", "product_code"]
+  clustering = ["country_code", "store_brand_normalized", "product_code"]
+
+  depends_on = [module.bigquery]
+}
+
+# --- open_prices_rejections (Phase 6.5) ----------------------------------
+# Audit qualité : chaque ligne du snapshot HF qui échoue à la validation cleaner
+# ou EAN est écrite ici avec son code de rejet et son JSON brut.
+#
+# Partition `pipeline_run_date` (≠ open_prices_clean) car on consomme cette table
+# par run de cron, pas par date du prix observé. Permet aussi la stratégie
+# d'idempotence "TRUNCATE partition du jour avant insert" du worker.
+#
+# Clustering `reason` car les queries d'audit filtrent quasi-systématiquement
+# par code de rejet (`WHERE reason = 'INVALID_EAN' GROUP BY pipeline_run_date`).
+resource "google_bigquery_table" "open_prices_rejections" {
+  project    = var.project_id
+  dataset_id = local.bq_silver_dataset
+  table_id   = "open_prices_rejections"
+
+  description         = "Lignes rejetées par worker-ingestion (audit qualité). Partition par date de run."
+  deletion_protection = false
+  labels              = local.bq_silver_labels
+
+  schema = file("${path.module}/../../bigquery/schemas/silver_open_prices_rejections.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "pipeline_run_date"
+  }
+
+  clustering = ["reason"]
 
   depends_on = [module.bigquery]
 }

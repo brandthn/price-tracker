@@ -17,7 +17,7 @@ COPY pyproject.toml uv.lock* ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
-COPY src ./src
+COPY pricetracker_off ./pricetracker_off
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -33,10 +33,10 @@ RUN useradd --create-home --uid 1000 app
 
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --chown=app:app src ./src
+COPY --chown=app:app pricetracker_off ./pricetracker_off
 
 USER app
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "exec uvicorn pricetracker_off.main:app --host 0.0.0.0 --port ${PORT}"]

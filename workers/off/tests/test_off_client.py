@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pytest_httpx import HTTPXMock
 
-from src.off_client import OFFClient, _to_off_product
+from pricetracker_off.off_client import OFFClient, _to_off_product
 
 _BASE = "https://world.openfoodfacts.org"
 _UA = "pricetracker-test/0.1"
@@ -115,6 +115,6 @@ async def test_fetch_product_retries_on_5xx_then_succeeds(
 def _fields_param() -> str:
     # Reflète l'ordre des champs `_FIELDS` du module — pytest-httpx matche
     # l'URL exacte query string incluse.
-    from src import off_client
+    from pricetracker_off import off_client
 
     return off_client._FIELDS  # noqa: SLF001

@@ -6,75 +6,147 @@
     "description": "PK Open Prices, cle de MERGE."
   },
   {
-    "name": "date",
+    "name": "pipeline_run_date",
     "type": "DATE",
     "mode": "REQUIRED",
-    "description": "Date du prix observe. Colonne de partition."
+    "description": "Date UTC du run worker qui a produit la ligne. Tracabilite (quel cron a ingere)."
+  },
+  {
+    "name": "price_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date du releve de prix. Colonne de PARTITION (analytique par fenetre temporelle)."
+  },
+  {
+    "name": "week_start_date",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "Lundi de la semaine ISO contenant price_date. Cle d'agregation Gold (indices hebdo)."
   },
   {
     "name": "product_code",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "EAN/barcode. NULL pour les kind=CATEGORY."
+    "description": "EAN-13 ou EAN-8 valide (checksum verifie en Silver). NULL si rejete avant validation."
   },
   {
-    "name": "product_name",
+    "name": "price_eur",
+    "type": "FLOAT64",
+    "mode": "REQUIRED",
+    "description": "Prix unitaire en euros (validation: 0.01 EUR <= price <= 500 EUR)."
+  },
+  {
+    "name": "price_eur_decimal",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Libelle brut tel que saisi par le contributeur."
+    "description": "Meme prix au format Decimal string (precision comptable, evite la perte de precision float)."
   },
   {
-    "name": "price",
+    "name": "price_without_discount_eur",
     "type": "FLOAT64",
     "mode": "NULLABLE",
-    "description": "Prix unitaire dans currency."
+    "description": "Prix avant remise. NULL si non remise ou non renseigne par l'enseigne."
+  },
+  {
+    "name": "price_is_discounted",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "True si le releve correspond a une promotion. Utile pour filtrer les indices d'inflation."
   },
   {
     "name": "currency",
     "type": "STRING",
-    "mode": "NULLABLE",
-    "description": "ISO-4217 (EUR pour la France)."
+    "mode": "REQUIRED",
+    "description": "ISO-4217. Toujours EUR (autres devises rejetees)."
   },
   {
-    "name": "location_id",
-    "type": "INT64",
-    "mode": "NULLABLE",
-    "description": "Open Prices location id."
-  },
-  {
-    "name": "location_osm_name",
+    "name": "proof_type",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Nom OSM du magasin."
+    "description": "RECEIPT | PRICE_TAG | SHOP_IMPORT. Indicateur de fiabilite de la source."
   },
   {
     "name": "country_code",
     "type": "STRING",
-    "mode": "NULLABLE",
-    "description": "ISO-3166 alpha-2."
-  },
-  {
-    "name": "category_tag",
-    "type": "STRING",
-    "mode": "NULLABLE",
-    "description": "OFF category tag (ex: fr:oeufs)."
-  },
-  {
-    "name": "kind",
-    "type": "STRING",
     "mode": "REQUIRED",
-    "description": "PRODUCT | CATEGORY."
+    "description": "ISO-3166 alpha-2. FR + DOM-TOM (GP, MQ, GF, RE, YT, PM, MF, BL, WF, NC, PF). Clustering."
+  },
+  {
+    "name": "store_brand",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Adresse OSM brute du magasin (tracabilite avant normalisation)."
+  },
+  {
+    "name": "store_brand_normalized",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Enseigne canonique extraite (Carrefour, E.Leclerc, Lidl...). Clustering. Cle d'agregation Gold."
+  },
+  {
+    "name": "location_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Open Prices location id (stringifie pour preserver les zeros initiaux)."
+  },
+  {
+    "name": "location_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Nom OSM du magasin (avant normalisation enseigne)."
+  },
+  {
+    "name": "location_osm_display_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Adresse affichable complete OSM (pour affichage UI)."
+  },
+  {
+    "name": "city",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Ville normalisee (title-case, arrondissements supprimes : Paris, Lyon, Marseille)."
+  },
+  {
+    "name": "postcode",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Code postal (stringifie : preserver les zeros initiaux des DOM)."
+  },
+  {
+    "name": "latitude",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latitude GPS OSM. Utile pour la carte choropletheche par departement (jointure geo)."
+  },
+  {
+    "name": "longitude",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Longitude GPS OSM."
+  },
+  {
+    "name": "iqr_outlier",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "Flag IQR (Q3 + 3*IQR par produit). True = prix statistiquement aberrant (exclure des indices)."
   },
   {
     "name": "source",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Provenance, toujours hf-open-prices."
+    "description": "Provenance. Toujours 'hf-open-prices' pour cette source."
   },
   {
     "name": "ingested_at",
     "type": "TIMESTAMP",
     "mode": "REQUIRED",
-    "description": "UTC timestamp du run worker."
+    "description": "UTC timestamp precis du run worker."
+  },
+  {
+    "name": "raw_payload",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "JSON brut de la ligne HF (audit + retraitement sans re-telecharger HF)."
   }
 ]

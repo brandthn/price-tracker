@@ -6,13 +6,14 @@ from datetime import date
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 from fastapi.testclient import TestClient
 
 
 @pytest.fixture
 def client() -> TestClient:
-    from src.main import app
+    from pricetracker_ingestion.main import app
 
     return TestClient(app)
 
@@ -28,29 +29,26 @@ def test_run_orchestrates_pipeline(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Mock chaque étape externe — on valide juste l'orchestration et la
-    réponse JSON."""
+    """Mock chaque étape externe (HF, GCS, BQ) — on valide juste que l'app
+    appelle les bonnes fonctions et renvoie la réponse JSON attendue."""
     fake_raw_path = tmp_path / "raw.parquet"
-    pa.parquet.write_table(  # type: ignore[attr-defined]
+    pq.write_table(
         pa.table(
             {
                 "id": ["a"],
                 "date": [date(2026, 5, 17)],
-                "code": ["1"],
-                "product_name": ["X"],
-                "price": [1.0],
+                "product_code": ["3017620422003"],  # Nutella, EAN valide
+                "price": [3.49],
                 "currency": ["EUR"],
-                "location_id": [1],
-                "location_osm_name": ["x"],
-                "location_osm_address_country_code": ["FR"],
-                "category_tag": [None],
-                "kind": ["product"],
+                "location_osm_address_country": ["France"],
+                "proof_type": ["RECEIPT"],
+                "location_osm_display_name": ["Lidl, Paris"],
             }
         ),
         str(fake_raw_path),
     )
 
-    from src import main as main_mod
+    from pricetracker_ingestion import main as main_mod
 
     monkeypatch.setattr(main_mod, "download_snapshot", lambda **kwargs: fake_raw_path)
     monkeypatch.setattr(
@@ -58,12 +56,19 @@ def test_run_orchestrates_pipeline(
         "upload_snapshot",
         lambda **kwargs: f"gs://{kwargs['bucket']}/open-prices/dt={kwargs['snapshot_date']}/snapshot.parquet",
     )
-    monkeypatch.setattr(main_mod, "load_and_merge", lambda **kwargs: 1)
+    monkeypatch.setattr(main_mod, "load_and_merge_clean", lambda **kwargs: 1)
+    monkeypatch.setattr(main_mod, "load_rejections", lambda **kwargs: 0)
 
     r = client.post("/run")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["rows_inserted"] == 1
+    assert body["rows_merged_clean"] == 1
+    assert body["rows_loaded_rejections"] == 0
     assert body["gcs_uri"].startswith("gs://price-tracker-prod-01-bronze/open-prices/dt=")
-    assert "snapshot_date" in body
-    assert isinstance(body["duration_s"], (int, float))
+    assert "pipeline_run_date" in body
+    assert isinstance(body["duration_s"], int | float)
+    # Metrics propagées : on vérifie au moins la présence des clés.
+    metrics = body["metrics"]
+    assert metrics["rows_input"] == 1
+    assert metrics["rows_clean"] == 1
+    assert metrics["rows_rejected"] == 0

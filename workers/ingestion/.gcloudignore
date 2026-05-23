@@ -1,0 +1,23 @@
+# Patterns ignorés par `gcloud builds submit` (≠ .dockerignore).
+# Sans ce fichier, gcloud upload tout le dossier — y compris .venv/ (~370 Mo).
+
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Le repo .git est à la racine, pas dans workers/ingestion/ — pas besoin de l'exclure
+# explicitement ici, mais on garde pour robustesse si la commande est lancée depuis un autre cwd.
+.git/
+.gitignore
+
+# Notes / docs locales : pas nécessaires au build (Dockerfile les ignore aussi).
+README.md
+*.md
+
+# Tests : ne vont pas dans l'image runtime (cf. Dockerfile COPY pricetracker_ingestion).
+tests/

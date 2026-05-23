@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 # 2) projet — couche invalidée à chaque changement de code.
-COPY src ./src
+COPY pricetracker_ingestion ./pricetracker_ingestion
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -39,11 +39,11 @@ RUN useradd --create-home --uid 1000 app
 
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --chown=app:app src ./src
+COPY --chown=app:app pricetracker_ingestion ./pricetracker_ingestion
 
 USER app
 
 EXPOSE 8080
 
 # Cloud Run lit $PORT. uvicorn écoute toutes les interfaces.
-CMD ["sh", "-c", "exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "exec uvicorn pricetracker_ingestion.main:app --host 0.0.0.0 --port ${PORT}"]

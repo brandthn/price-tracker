@@ -1,0 +1,74 @@
+[
+  {
+    "name": "pipeline_run_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date UTC du run qui a rejete la ligne. Colonne de PARTITION (audit par run)."
+  },
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "PK Open Prices, si parsing a reussi. NULL si rejet avant tout parsing."
+  },
+  {
+    "name": "product_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "EAN brut tel que recu (potentiellement invalide, c'est la raison du rejet)."
+  },
+  {
+    "name": "reason",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Code de rejet (CLUSTERING). Valeurs: MISSING_REQUIRED_FIELD | INVALID_CURRENCY | INVALID_COUNTRY | INVALID_PROOF_TYPE | INVALID_PRICE | OUT_OF_RANGE_PRICE | INVALID_DATE | FUTURE_DATE | INVALID_EAN | INCOHERENT_DISCOUNT."
+  },
+  {
+    "name": "details",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Message explicatif (ex: 'Unsupported currency: USD' ou 'checksum EAN-13 invalide')."
+  },
+  {
+    "name": "currency",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Devise brute de la ligne rejetee (avant validation)."
+  },
+  {
+    "name": "raw_price",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Prix brut stringifie (peut etre non parsable, c'est parfois la raison du rejet)."
+  },
+  {
+    "name": "raw_price_date",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Date brute stringifiee (peut etre invalide)."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Code pays brut (peut etre non standard)."
+  },
+  {
+    "name": "proof_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Type de preuve brut."
+  },
+  {
+    "name": "rejected_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "UTC timestamp du rejet."
+  },
+  {
+    "name": "raw_payload",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "JSON brut complet de la ligne (audit qualite)."
+  }
+]

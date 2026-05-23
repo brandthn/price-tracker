@@ -1,0 +1,32 @@
+[
+  {
+    "name": "reference_week",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Semaine de référence du calcul."
+  },
+  {
+    "name": "product_code",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "EAN-13 du produit."
+  },
+  {
+    "name": "prev_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix médian de la semaine précédente."
+  },
+  {
+    "name": "curr_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix médian de la semaine courante."
+  },
+  {
+    "name": "pct_change",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Variation relative : (curr - prev) / prev. Top 500 hausses."
+  }
+]

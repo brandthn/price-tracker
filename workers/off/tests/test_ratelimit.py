@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from src.ratelimit import TokenBucket
+from pricetracker_off.ratelimit import TokenBucket
 
 
 async def test_bucket_allows_initial_burst() -> None:

@@ -78,7 +78,7 @@ export PRT_PG_HOST=127.0.0.1
 export PRT_PG_PASSWORD=$(gcloud secrets versions access latest --secret=prt-prod-cloudsql-password --project=price-tracker-prod-01)
 # Démarrer le proxy en parallèle :
 # ./cloud-sql-proxy --private-ip price-tracker-prod-01:europe-west1:prt-prod-sql-main &
-uv run uvicorn src.main:app --reload --port 8080
+uv run uvicorn pricetracker_off.main:app --reload --port 8080
 curl -X POST http://localhost:8080/run
 ```
 

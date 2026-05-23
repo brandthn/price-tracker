@@ -1,0 +1,19 @@
+# Patterns ignorés par `gcloud builds submit` (≠ .dockerignore).
+# Sans ce fichier, gcloud upload tout le dossier — y compris .venv/ (~370 Mo).
+
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+.git/
+.gitignore
+
+README.md
+*.md
+
+tests/

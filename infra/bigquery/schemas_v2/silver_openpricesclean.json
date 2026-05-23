@@ -1,0 +1,146 @@
+[
+  {
+    "name": "pipeline_run_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date du run du pipeline. Colonne de partition."
+  },
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "PK Open Prices, clé de MERGE."
+  },
+  {
+    "name": "product_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "EAN-13 ou EAN-8 validé (checksum vérifié en Silver)."
+  },
+  {
+    "name": "price_eur",
+    "type": "FLOAT64",
+    "mode": "REQUIRED",
+    "description": "Prix en euros (float)."
+  },
+  {
+    "name": "price_eur_decimal",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Prix en euros format Decimal string (précision comptable)."
+  },
+  {
+    "name": "price_without_discount_eur",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix avant remise en euros. NULL si non remisé ou non renseigné."
+  },
+  {
+    "name": "price_is_discounted",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "True si le produit est en promotion."
+  },
+  {
+    "name": "currency",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "ISO-4217. Toujours EUR pour la France."
+  },
+  {
+    "name": "price_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date du relevé de prix (ISO 8601)."
+  },
+  {
+    "name": "week_start_date",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "Lundi de la semaine ISO contenant price_date. Clé d'agrégation Gold."
+  },
+  {
+    "name": "proof_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "RECEIPT | PRICE_TAG | SHOP_IMPORT."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "ISO-3166 alpha-2. FR, GP, GF, MQ, RE, YT..."
+  },
+  {
+    "name": "store_brand",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Adresse OSM complète du magasin (traçabilité)."
+  },
+  {
+    "name": "store_brand_normalized",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Enseigne extraite et normalisée (ex: E.Leclerc, Carrefour). Clé d'agrégation Gold."
+  },
+  {
+    "name": "location_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Open Prices location id."
+  },
+  {
+    "name": "location_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Nom OSM du magasin."
+  },
+  {
+    "name": "location_osm_display_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Adresse affichable complète (OSM)."
+  },
+  {
+    "name": "city",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Ville standardisée (ex: Paris, Lyon). Arrondissements normalisés."
+  },
+  {
+    "name": "postcode",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Code postal."
+  },
+  {
+    "name": "latitude",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latitude GPS du magasin."
+  },
+  {
+    "name": "longitude",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Longitude GPS du magasin."
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Toujours openfoodfacts_open_prices."
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "UTC timestamp d'ingestion par le worker."
+  },
+  {
+    "name": "raw_payload",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "JSON brut de la ligne Bronze (traçabilité complète)."
+  }
+]

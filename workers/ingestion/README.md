@@ -54,7 +54,7 @@ export HF_TOKEN=$(gcloud secrets versions access latest --secret=prt-prod-hf-tok
 export GOOGLE_CLOUD_PROJECT=price-tracker-prod-01
 # Le check OIDC peut être désactivé en dev :
 export PRT_OIDC_DISABLE=1
-uv run uvicorn src.main:app --reload --port 8080
+uv run uvicorn pricetracker_ingestion.main:app --reload --port 8080
 curl -X POST http://localhost:8080/run
 ```
 

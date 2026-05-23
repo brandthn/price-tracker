@@ -117,9 +117,12 @@ module "run_worker_ingestion" {
     PRT_BRONZE_BUCKET        = "${var.project_id}-bronze"
     PRT_BQ_DATASET_SILVER    = local.bq_silver_dataset
     PRT_BQ_TABLE_OPEN_PRICES = google_bigquery_table.open_prices_clean.table_id
+    PRT_BQ_TABLE_REJECTIONS  = google_bigquery_table.open_prices_rejections.table_id
     PRT_HF_DATASET           = "openfoodfacts/open-prices"
     PRT_HF_FILENAME          = "prices.parquet"
-    PRT_FILTER_COUNTRY_CODE  = "FR"
+    # Pays acceptés par le cleaner : FR métropole + DOM-TOM. CSV pour rester simple
+    # côté pydantic-settings. Le worker convertit en set() au load.
+    PRT_FILTER_COUNTRY_CODES = "FR,GP,GF,MQ,RE,YT,PM,MF,BL,WF,NC,PF"
 
     # OIDC : on laisse l'audience vide → le code fallback sur l'URL résolue
     # depuis `x-forwarded-host` (cf. auth.py). Évite le cycle TF

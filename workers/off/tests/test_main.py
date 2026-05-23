@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client() -> TestClient:
-    from src.main import app
+    from pricetracker_off.main import app
 
     return TestClient(app)
 
@@ -24,7 +24,7 @@ def test_run_empty_eans_short_circuits(
 ) -> None:
     """Si discover_eans_to_enrich renvoie [], le run ne tente ni OFF ni
     Vertex ni pg — juste un payload zéro."""
-    from src import main as main_mod
+    from pricetracker_off import main as main_mod
 
     monkeypatch.setattr(main_mod, "discover_eans_to_enrich", lambda **kwargs: [])
 

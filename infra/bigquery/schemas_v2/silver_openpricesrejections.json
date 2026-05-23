@@ -1,0 +1,74 @@
+[
+  {
+    "name": "pipeline_run_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date du run. Colonne de partition."
+  },
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "PK Open Prices (peut être NULL si rejet avant parsing)."
+  },
+  {
+    "name": "product_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "EAN brut (non validé — la ligne est rejetée)."
+  },
+  {
+    "name": "reason",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Code de rejet. Valeurs: INVALID_CURRENCY | INVALID_COUNTRY | INVALID_PROOF_TYPE | MISSING_REQUIRED_FIELD | INVALID_EAN | OUT_OF_RANGE_PRICE | FUTURE_DATE | INCOHERENT_DISCOUNT | SUSPICIOUS_PRICE_IQR."
+  },
+  {
+    "name": "details",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Message explicatif du rejet (ex: Unsupported currency: USD)."
+  },
+  {
+    "name": "currency",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Devise brute de la ligne rejetée."
+  },
+  {
+    "name": "raw_price",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Prix brut (string) tel que reçu de la source."
+  },
+  {
+    "name": "price_date",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Date brute du relevé (string, peut être invalide)."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Code pays brut."
+  },
+  {
+    "name": "proof_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Type de preuve brut."
+  },
+  {
+    "name": "rejected_at",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "UTC timestamp du rejet."
+  },
+  {
+    "name": "raw_payload",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "JSON brut complet de la ligne rejetée (audit)."
+  }
+]
