@@ -239,4 +239,31 @@ pytest -m integration
 - User guide: [`README.md`](README.md)
 - Specification: [`project_guidelines.md`](project_guidelines.md)
 
+### Entry 4 — 2026-05-23 16:30 (UTC+2)
+
+**Scope:** Add `PpOcrV4MobileBackend` (`RECEIPT_OCR_BACKEND=ppocrv4`) for faster inference.
+
+#### Implementation
+
+| Item | Detail |
+|------|--------|
+| New file | `src/receipt_ocr/backends/ppocr_v4_backend.py` |
+| Registry | `BackendName.PPOCRV4` → `build_backend("ppocrv4")` |
+| Defaults | `PP-OCRv4_mobile_det`, max side **640 px**, `paddle_static` first |
+| Fallback | `paddle_dynamic` + server models if static init fails |
+| Smoke script | `--backend ppocrv4` (now default in `smoke_test_ocr.py`) |
+
+#### Benchmark on `4PQOWWaPoa.jpg` (Windows, CPU)
+
+| Backend | Init | OCR+parse | Profile |
+|---------|------|-----------|---------|
+| `paddle` (v0.1 defaults) | ~35 s | ~104 s | `paddle_dynamic` + server det |
+| `ppocrv4` | ~29 s | **~54 s** | `ppocrv4-static-mobile` |
+
+Structured output: date + chain + 2 products (smaller image → fewer lines detected than full-res run; parser still valid).
+
+#### Note on ONNX
+
+`engine="onnxruntime"` is **not** accepted by PaddleOCR 3.5's pipeline constructor (only `paddle`, `paddle_static`, `paddle_dynamic`, `transformers`). True mobile ONNX deployment remains a future dedicated backend.
+
 ---

@@ -35,6 +35,7 @@ class BackendName(str, Enum):
     """Identifiers accepted by the backend factory / env variable."""
 
     PADDLE = "paddle"
+    PPOCRV4 = "ppocrv4"
     TESSERACT = "tesseract"
     EASYOCR = "easyocr"
     VLM = "vlm"
@@ -51,6 +52,10 @@ ENV_CPU_THREADS = "RECEIPT_OCR_CPU_THREADS"
 
 DEFAULT_MAX_IMAGE_SIDE = 1280
 DEFAULT_CPU_THREADS = 2
+
+# PP-OCRv4 mobile backend — smaller input for speed (mobile CPU target).
+DEFAULT_PPOCRV4_MAX_IMAGE_SIDE = 640
+ENV_PPOCRV4_MAX_IMAGE_SIDE = "RECEIPT_OCR_PPOCRV4_MAX_IMAGE_SIDE"
 
 # Lighter PaddleOCR 3.x models (much faster than the server variants).
 PADDLE_MOBILE_DET_MODEL = "PP-OCRv4_mobile_det"

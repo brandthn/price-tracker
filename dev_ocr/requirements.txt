@@ -9,6 +9,8 @@
 paddleocr>=2.7.0
 paddlepaddle>=2.6.0
 Pillow>=10.0.0
+# Preferred engine for PpOcrV4MobileBackend (pip install if ppocrv4 init fails)
+onnxruntime>=1.16.0
 
 # Stub backends — uncomment when their implementations land
 # pytesseract>=0.3.10

@@ -166,7 +166,11 @@ Or via environment variable:
 RECEIPT_OCR_BACKEND=paddle python my_script.py
 ```
 
-Valid values: `paddle` (default), `tesseract`, `easyocr`, `vlm` (last three are stubs).
+Valid values: `paddle` (default), `ppocrv4` (fast mobile PP-OCRv4 path), `tesseract`, `easyocr`, `vlm` (last three are stubs).
+
+```bash
+RECEIPT_OCR_BACKEND=ppocrv4 python scripts/smoke_test_ocr.py
+```
 
 ### Reset cached backend (tests)
 
