@@ -59,3 +59,23 @@ ENV_PPOCRV4_MAX_IMAGE_SIDE = "RECEIPT_OCR_PPOCRV4_MAX_IMAGE_SIDE"
 
 # Lighter PaddleOCR 3.x models (much faster than the server variants).
 PADDLE_MOBILE_DET_MODEL = "PP-OCRv4_mobile_det"
+
+# VLM backend — model selection inside BackendName.VLM
+class VlmModelName(str, Enum):
+    """Registry ids for :func:`receipt_ocr.backends.vlm.build_vlm_provider`."""
+
+    MOONDREAM_0_5B = "moondream-0.5b"
+
+
+ENV_VLM_MODEL = "RECEIPT_VLM_MODEL"
+ENV_VLM_MODEL_PATH = "RECEIPT_VLM_MODEL_PATH"
+ENV_VLM_MAX_IMAGE_SIDE = "RECEIPT_VLM_MAX_IMAGE_SIDE"
+
+DEFAULT_VLM_MODEL = VlmModelName.MOONDREAM_0_5B.value
+DEFAULT_VLM_MAX_IMAGE_SIDE = 1024
+
+MOONDREAM_0_5B_FILENAMES = (
+    "moondream-0_5b-int8.mf",
+    "moondream-0.5b-int8.mf",
+    "moondream_0_5b_int8.mf",
+)

@@ -16,6 +16,9 @@ onnxruntime>=1.16.0
 # pytesseract>=0.3.10
 # easyocr>=1.7.1
 
+# VLM backend (optional) — pip install -r requirements-vlm.txt
+# moondream==0.0.6
+
 # --- Dataset download helpers ---------------------------------------------
 huggingface_hub>=0.23.0
 kagglehub>=0.2.0

@@ -129,12 +129,25 @@ def test_build_backend_unknown_name_raises(monkeypatch):
 
 
 def test_stub_backends_raise_not_implemented():
-    from receipt_ocr.backends import (
-        EasyOcrBackend,
-        TesseractBackend,
-        VlmBackend,
-    )
+    from receipt_ocr.backends import EasyOcrBackend, TesseractBackend
 
-    for stub_cls in (TesseractBackend, EasyOcrBackend, VlmBackend):
+    for stub_cls in (TesseractBackend, EasyOcrBackend):
         with pytest.raises(NotImplementedError):
             stub_cls()
+
+
+def test_vlm_backend_with_injected_provider(tmp_path):
+    from receipt_ocr.backends.vlm_backend import VlmBackend
+    from tests.fixtures import vlm_json
+
+    class _Provider:
+        model_id = "moondream-0.5b"
+
+        def analyze(self, image_path: str, prompt: str) -> str:
+            return vlm_json.VALID_VLM_JSON
+
+    image = tmp_path / "x.jpg"
+    image.write_bytes(b"x")
+    backend = VlmBackend(provider=_Provider())
+    result = extract_receipt(str(image), backend=backend)
+    assert result["ticket"]["chaine_supermarche"] == "CARREFOUR MARKET"

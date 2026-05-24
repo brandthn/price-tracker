@@ -14,7 +14,10 @@ Usage (from the ``dev_ocr`` repo root)::
 Environment (optional)::
 
     PYTHONPATH=src
-    RECEIPT_OCR_BACKEND=ppocrv4|paddle
+    RECEIPT_OCR_BACKEND=ppocrv4|paddle|vlm
+    RECEIPT_VLM_MODEL=moondream-0.5b
+    RECEIPT_VLM_MODEL_PATH=/path/to/moondream-0_5b-int8.mf
+    MOONDREAM_API_KEY=...   # cloud fallback if no local weights
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 """
 
@@ -80,9 +83,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--backend",
-        choices=("paddle", "ppocrv4"),
+        choices=("paddle", "ppocrv4", "vlm"),
         default="ppocrv4",
-        help="OCR backend (default: RECEIPT_OCR_BACKEND or paddle).",
+        help="OCR backend (default: ppocrv4).",
     )
     args = parser.parse_args()
 
