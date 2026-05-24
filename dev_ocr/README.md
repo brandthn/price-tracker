@@ -215,22 +215,28 @@ PaddleOcrBackend(use_mobile_models=True)  # PP-OCRv4_mobile_det + paddle_static
 
 ## VLM backend (Moondream 0.5B)
 
-Vision-Language backend for experimentation. Switch models via `RECEIPT_VLM_MODEL` without changing application code.
+Local Moondream 0.5B with three extraction modes. Default **`transcribe`** asks the VLM for line-by-line text, then uses `ReceiptParser`.
 
 ```bash
 pip install -r requirements-vlm.txt
-# Download moondream-0_5b-int8.mf (~593 MiB) from https://moondream.ai/
-# Place in data/models/ or set RECEIPT_VLM_MODEL_PATH
+python scripts/download_moondream_weights.py   # -> data/models/ (gitignored)
 
-RECEIPT_OCR_BACKEND=vlm python scripts/test_extract_receipt.py ticket.jpg --backend vlm
+$env:RECEIPT_OCR_BACKEND = "vlm"
+$env:RECEIPT_VLM_MODE = "transcribe"   # transcribe | json | multipass
+python scripts/run_vlm_test.py data/raw/images_tickets_caisse/IMG_20260206_142131.jpg
+python scripts/benchmark_vlm.py        # compare modes on reference images
 ```
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `RECEIPT_VLM_MODE` | `transcribe` | `transcribe`, `json`, or `multipass` |
 | `RECEIPT_VLM_MODEL` | `moondream-0.5b` | Provider registry id |
-| `RECEIPT_VLM_MODEL_PATH` | — | Path to local `.mf` weights |
-| `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1024` | Resize before inference |
-| `MOONDREAM_API_KEY` | — | Disabled during dev (local weights only) |
+| `RECEIPT_VLM_MODEL_PATH` | `data/models/...` | Local `.mf` weights |
+| `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1536` | Resize before inference (`0` = off) |
+| `RECEIPT_VLM_CROP` | `auto` | `auto`, `center`, or `off` |
+| `RECEIPT_VLM_MAX_RETRIES` | `2` | Retry on chatty/invalid output |
+| `RECEIPT_VLM_TEMPERATURE` | `0.1` | Moondream generation temperature |
+| `RECEIPT_VLM_MAX_TOKENS` | `1024` | Max tokens per query |
 
 Inject a custom provider in code:
 

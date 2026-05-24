@@ -40,6 +40,15 @@ def test_try_parse_vlm_json_returns_none_for_ocr_text():
     assert try_parse_vlm_json("CARREFOUR MARKET\n15/03/2024") is None
 
 
+def test_extract_json_candidate_finds_embedded_object():
+    from receipt_ocr.vlm_parse import extract_json_candidate
+
+    text = 'Here is data {"ticket":{"date":"","chaine_supermarche":"A","adresse":"","produits":[]}}'
+    candidate = extract_json_candidate(text)
+    assert candidate.startswith("{")
+    assert "ticket" in candidate
+
+
 def test_normalize_vlm_ticket_rejects_bad_date():
     payload = {
         "ticket": {

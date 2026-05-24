@@ -206,6 +206,8 @@ class ReceiptParser:
             text = self._backend.extract_text(image_path)
         except OcrBackendError:
             raise
+        except ReceiptParseError:
+            raise
         except FileNotFoundError:
             raise
         except Exception as exc:  # noqa: BLE001
