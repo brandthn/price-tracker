@@ -4,7 +4,7 @@ Extract structured data from photos of **French supermarket receipts**
 (*tickets de caisse*) using OCR.
 
 The package uses the **Strategy pattern**: OCR backends (PaddleOCR today;
-Tesseract, EasyOCR, VLM stubs) are interchangeable; parsing is
+Tesseract, EasyOCR stubs; Paddle, ppocrv4, and VLM backends) are interchangeable; parsing is
 backend-agnostic.
 
 ```python
@@ -176,7 +176,7 @@ Or via environment variable:
 RECEIPT_OCR_BACKEND=paddle python my_script.py
 ```
 
-Valid values: `paddle` (default), `ppocrv4` (fast mobile PP-OCRv4 path), `tesseract`, `easyocr`, `vlm` (last three are stubs).
+Valid values: `paddle` (default), `ppocrv4` (fast mobile PP-OCRv4 path), `vlm` (Moondream VLM), `tesseract`, `easyocr` (last two are stubs).
 
 ```bash
 RECEIPT_OCR_BACKEND=ppocrv4 python scripts/smoke_test_ocr.py
@@ -209,6 +209,36 @@ Optional lighter detection (Linux / when `paddle_static` works):
 
 ```python
 PaddleOcrBackend(use_mobile_models=True)  # PP-OCRv4_mobile_det + paddle_static
+```
+
+---
+
+## VLM backend (Moondream 0.5B)
+
+Vision-Language backend for experimentation. Switch models via `RECEIPT_VLM_MODEL` without changing application code.
+
+```bash
+pip install -r requirements-vlm.txt
+# Download moondream-0_5b-int8.mf (~593 MiB) from https://moondream.ai/
+# Place in data/models/ or set RECEIPT_VLM_MODEL_PATH
+
+RECEIPT_OCR_BACKEND=vlm python scripts/test_extract_receipt.py ticket.jpg --backend vlm
+```
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RECEIPT_VLM_MODEL` | `moondream-0.5b` | Provider registry id |
+| `RECEIPT_VLM_MODEL_PATH` | — | Path to local `.mf` weights |
+| `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1024` | Resize before inference |
+| `MOONDREAM_API_KEY` | — | Cloud API if no local weights |
+
+Inject a custom provider in code:
+
+```python
+from receipt_ocr.backends.vlm import build_vlm_provider
+from receipt_ocr.backends.vlm_backend import VlmBackend
+
+backend = VlmBackend(provider=build_vlm_provider("moondream-0.5b"))
 ```
 
 ---

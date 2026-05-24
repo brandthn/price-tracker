@@ -39,7 +39,11 @@ def _create_backend(name: str):
         from receipt_ocr.backends.paddle_backend import PaddleOcrBackend
 
         return PaddleOcrBackend()
-    raise ValueError(f"Unknown backend {name!r}. Use 'paddle' or 'ppocrv4'.")
+    if name == "vlm":
+        from receipt_ocr.backends.vlm_backend import VlmBackend
+
+        return VlmBackend()
+    raise ValueError(f"Unknown backend {name!r}. Use 'paddle', 'ppocrv4', or 'vlm'.")
 
 
 def main() -> int:
@@ -52,7 +56,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--backend",
-        choices=("paddle", "ppocrv4"),
+        choices=("paddle", "ppocrv4", "vlm"),
         default="ppocrv4",
         help="OCR backend to use (default: ppocrv4).",
     )

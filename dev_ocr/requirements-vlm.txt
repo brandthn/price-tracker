@@ -1,0 +1,4 @@
+# Optional VLM backend (Moondream 0.5B local or cloud)
+# Install when using RECEIPT_OCR_BACKEND=vlm
+moondream==0.0.6
+Pillow>=10.0.0

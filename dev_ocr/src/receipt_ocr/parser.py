@@ -20,6 +20,7 @@ from receipt_ocr.constants import (
     TicketField,
 )
 from receipt_ocr.exceptions import OcrBackendError, ReceiptParseError
+from receipt_ocr.vlm_parse import try_parse_vlm_json
 
 logger = logging.getLogger(__name__)
 
@@ -215,9 +216,17 @@ class ReceiptParser:
         return self.parse_text(text)
 
     def parse_text(self, text: str) -> dict:
-        """Parse already-OCR'd ``text`` (useful for testing without a backend)."""
+        """Parse already-OCR'd ``text`` (useful for testing without a backend).
+
+        If ``text`` is JSON from a VLM (object with a ``ticket`` key), it is
+        validated and returned directly. Otherwise the heuristic OCR parser runs.
+        """
         if not text or not text.strip():
             raise ReceiptParseError("OCR returned an empty string.")
+
+        vlm_result = try_parse_vlm_json(text)
+        if vlm_result is not None:
+            return vlm_result
 
         lines = self._clean_lines(text)
         if not lines:

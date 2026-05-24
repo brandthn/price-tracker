@@ -267,3 +267,31 @@ Structured output: date + chain + 2 products (smaller image → fewer lines dete
 `engine="onnxruntime"` is **not** accepted by PaddleOCR 3.5's pipeline constructor (only `paddle`, `paddle_static`, `paddle_dynamic`, `transformers`). True mobile ONNX deployment remains a future dedicated backend.
 
 ---
+
+### Entry 5 — 2026-05-23 (UTC+2)
+
+**Scope:** First VLM backend with pluggable providers; Moondream 0.5B as default.
+
+#### Architecture
+
+| Layer | Role |
+|-------|------|
+| `VlmBackend` | Implements `OcrBackend`; delegates to a `VlmProvider` |
+| `VlmProvider` | ABC in `backends/vlm/base.py` |
+| `build_vlm_provider()` | Registry — swap models via `RECEIPT_VLM_MODEL` |
+| `MoondreamProvider` | Local `.mf` weights or Moondream Cloud API |
+| `vlm_parse.py` | JSON-first parsing in `ReceiptParser.parse_text` |
+
+#### Env vars
+
+- `RECEIPT_OCR_BACKEND=vlm`
+- `RECEIPT_VLM_MODEL=moondream-0.5b` (default)
+- `RECEIPT_VLM_MODEL_PATH`, `RECEIPT_VLM_MAX_IMAGE_SIDE`, `MOONDREAM_API_KEY`
+
+#### Adding another VLM
+
+1. New file `backends/vlm/<name>_provider.py` implementing `VlmProvider`
+2. Register id in `VlmModelName` + `build_vlm_provider()`
+3. Mocked unit test — no changes to `extract_receipt` or public API
+
+---
