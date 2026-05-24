@@ -17,7 +17,7 @@ Environment (optional)::
     RECEIPT_OCR_BACKEND=ppocrv4|paddle|vlm
     RECEIPT_VLM_MODEL=moondream-0.5b
     RECEIPT_VLM_MODEL_PATH=/path/to/moondream-0_5b-int8.mf
-    MOONDREAM_API_KEY=...   # cloud fallback if no local weights
+    RECEIPT_VLM_MODEL_PATH=/path/to/moondream-0_5b-int8.mf  # required (local only)
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 """
 

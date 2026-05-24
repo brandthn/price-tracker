@@ -1,4 +1,4 @@
-"""Moondream local / cloud provider (0.5B int8 by default)."""
+"""Moondream local provider (0.5B int8 by default)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,9 @@ from receipt_ocr.constants import (
 from receipt_ocr.exceptions import OcrBackendError
 from receipt_ocr.image_utils import resize_image_to_max_side
 
-_ENV_MOONDREAM_API_KEY = "MOONDREAM_API_KEY"
+# Set to True to allow Moondream Cloud (MOONDREAM_API_KEY) when no local .mf file.
+_ENABLE_MOONDREAM_CLOUD = False
+
 _DEFAULT_MODEL_DIRS = (
     Path("data/models"),
     Path.home() / ".cache" / "receipt_ocr" / "models",
@@ -37,7 +39,7 @@ def _env_int(name: str, default: int) -> int:
 
 
 def resolve_moondream_model_path(explicit: str | Path | None = None) -> Path | None:
-    """Locate a local ``.mf`` weights file, or return ``None`` for cloud mode."""
+    """Locate a local ``.mf`` weights file, or return ``None`` if not found."""
     if explicit:
         path = Path(explicit)
         if path.is_file():
@@ -64,16 +66,13 @@ def resolve_moondream_model_path(explicit: str | Path | None = None) -> Path | N
 
 
 class MoondreamProvider(VlmProvider):
-    """Moondream VLM — local ``.mf`` weights or Moondream Cloud API.
+    """Moondream VLM — local ``.mf`` weights only (cloud fallback disabled).
 
     Parameters
     ----------
     model_path:
         Path to ``moondream-0_5b-int8.mf`` (or similar). Falls back to
         :envvar:`RECEIPT_VLM_MODEL_PATH` and common cache directories.
-    api_key:
-        Moondream Cloud API key. Falls back to :envvar:`MOONDREAM_API_KEY`.
-        Used when no local weights file is found.
     max_image_side:
         Resize longest image side before inference.
     """
@@ -81,7 +80,6 @@ class MoondreamProvider(VlmProvider):
     def __init__(
         self,
         model_path: str | Path | None = None,
-        api_key: str | None = None,
         max_image_side: int | None = None,
     ) -> None:
         self._model_id = VlmModelName.MOONDREAM_0_5B.value
@@ -91,7 +89,6 @@ class MoondreamProvider(VlmProvider):
             else _env_int(ENV_VLM_MAX_IMAGE_SIDE, DEFAULT_VLM_MAX_IMAGE_SIDE)
         )
         self._local_path = resolve_moondream_model_path(model_path)
-        self._api_key = api_key or os.environ.get(_ENV_MOONDREAM_API_KEY)
         self._model: Any = None
         self._init_model()
 
@@ -115,20 +112,28 @@ class MoondreamProvider(VlmProvider):
         try:
             if self._local_path is not None:
                 self._model = md.vl(model=str(self._local_path))
-            elif self._api_key:
-                self._model = md.vl(api_key=self._api_key)
+            elif _ENABLE_MOONDREAM_CLOUD:
+                api_key = os.environ.get("MOONDREAM_API_KEY")
+                if api_key:
+                    self._model = md.vl(api_key=api_key)
+                else:
+                    raise OcrBackendError(self._missing_local_weights_message())
             else:
-                raise OcrBackendError(
-                    "Moondream is not configured. Either:\n"
-                    f"  1. Download moondream-0_5b-int8.mf and set {ENV_VLM_MODEL_PATH}, or\n"
-                    "  2. Place the file in data/models/ or ~/.cache/receipt_ocr/models/, or\n"
-                    f"  3. Set {_ENV_MOONDREAM_API_KEY} for Moondream Cloud.\n"
-                    "See README (VLM backend section) for download links."
-                )
+                raise OcrBackendError(self._missing_local_weights_message())
         except OcrBackendError:
             raise
         except Exception as exc:
             raise OcrBackendError(f"Failed to load Moondream model: {exc}") from exc
+
+    @staticmethod
+    def _missing_local_weights_message() -> str:
+        return (
+            "Moondream local weights not found. During development only local "
+            "inference is enabled (cloud API fallback is off).\n"
+            f"  1. Download moondream-0_5b-int8.mf and set {ENV_VLM_MODEL_PATH}, or\n"
+            "  2. Place the file in data/models/ or ~/.cache/receipt_ocr/models/.\n"
+            "See README (VLM backend section) for download links."
+        )
 
     def analyze(self, image_path: str, prompt: str) -> str:
         path = OcrBackend._validate_image_path(image_path)
