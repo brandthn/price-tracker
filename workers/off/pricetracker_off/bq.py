@@ -33,8 +33,10 @@ def discover_eans_to_enrich(
     """Renvoie au plus `limit` EAN à enrichir, ordre déterministe.
 
     Critères :
-    - `kind = 'PRODUCT'` (les CATEGORY n'ont pas d'EAN exploitable)
-    - `product_code IS NOT NULL` ET longueur >= 8 (EAN-8 / EAN-13)
+    - `product_code IS NOT NULL` ET longueur >= 8 (EAN-8 / EAN-13).
+      Le cleaner v2 rejette déjà toute ligne sans `product_code` valide,
+      donc toutes les rows de `open_prices_clean` sont de type PRODUCT
+      (les CATEGORY HF sont filtrées en amont).
     - absent de `catalogue_produits` (`LEFT JOIN ... WHERE c.ean IS NULL`)
     - tri par `product_code` pour rendre le picking idempotent sur re-runs.
     """
@@ -44,8 +46,7 @@ def discover_eans_to_enrich(
     FROM `{project_id}.{dataset}.{table_open_prices}` op
     LEFT JOIN `{project_id}.{dataset}.{table_catalogue}` c
       ON c.ean = op.product_code
-    WHERE op.kind = 'PRODUCT'
-      AND op.product_code IS NOT NULL
+    WHERE op.product_code IS NOT NULL
       AND LENGTH(op.product_code) >= 8
       AND c.ean IS NULL
     GROUP BY ean

@@ -42,11 +42,11 @@ variable "labels" {
 variable "worker_ingestion_image_tag" {
   description = "Tag de l'image worker-ingestion en AR. Doit exister dans le repo prt-prod-docker."
   type        = string
-  default     = "2585913-r2"
+  default     = "6d4c0d2"
 }
 
 variable "worker_off_image_tag" {
   description = "Tag de l'image worker-off en AR. Doit exister dans le repo prt-prod-docker."
   type        = string
-  default     = "2585913-r2"
+  default     = "6d4c0d2"
 }
