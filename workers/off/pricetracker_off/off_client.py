@@ -122,11 +122,26 @@ class OFFClient:
         rate_limit_rpm: int,
         timeout_s: float = 20.0,
         max_retries: int = 4,
+        burst_capacity: int = 1,
+        retry_wait_min_s: float = 30.0,
+        retry_wait_max_s: float = 300.0,
+        retry_wait_multiplier: float = 30.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        self._bucket = TokenBucket(rpm=rate_limit_rpm)
+        # capacity=1 par défaut : OFF rate-limit est anti-burst, pas seulement
+        # anti-débit-moyen. Un bucket plein (15 tokens) déclenche 429 dès la
+        # 7-8e requête en rafale. Forcer capacity=1 = strict 1 req tous les
+        # 60/rpm secondes, pas de burst possible.
+        self._bucket = TokenBucket(rpm=rate_limit_rpm, capacity=burst_capacity)
         self._max_retries = max_retries
+        # Backoff aligné sur la reco officielle OFF (60s/120s/240s sur 429/503).
+        # Cf. docs/OFF_API_Specification_PriceTracker.md §4 : "Si ces limites
+        # sont dépassées, l'IP peut être bannie". Tests : override à 0 pour
+        # ne pas patienter.
+        self._retry_wait_min_s = retry_wait_min_s
+        self._retry_wait_max_s = retry_wait_max_s
+        self._retry_wait_multiplier = retry_wait_multiplier
         self._client = client or httpx.AsyncClient(
             base_url=self._base_url,
             headers={"User-Agent": user_agent, "Accept": "application/json"},
@@ -141,16 +156,23 @@ class OFFClient:
         await self._client.aclose()
 
     async def fetch_product(self, ean: str) -> OFFProduct:
-        await self._bucket.acquire(1)
         path = f"/api/v2/product/{ean}.json"
         retrying = AsyncRetrying(
             stop=stop_after_attempt(self._max_retries),
-            wait=wait_exponential(multiplier=1, min=2, max=32),
+            wait=wait_exponential(
+                multiplier=self._retry_wait_multiplier,
+                min=self._retry_wait_min_s,
+                max=self._retry_wait_max_s,
+            ),
             retry=retry_if_exception_type((httpx.TransportError, _RetryableStatus)),
             reraise=True,
         )
         async for attempt in retrying:
             with attempt:
+                # Acquire DANS la boucle retry : sinon un retry sur 429 repart
+                # immédiatement sans consommer de token, ce qui aggrave le
+                # rate-limit côté OFF (vu en prod : 4 tentatives en rafale).
+                await self._bucket.acquire(1)
                 resp = await self._client.get(path, params={"fields": _FIELDS})
                 if resp.status_code == 404:
                     # OFF retourne parfois 404 HTTP au lieu de status:0 — on

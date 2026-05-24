@@ -13,13 +13,16 @@ _UA = "pricetracker-test/0.1"
 
 @pytest.fixture
 def client() -> OFFClient:
-    # rate-limit très haut → ne pas ralentir les tests
+    # rate-limit très haut + backoff zéro → ne pas ralentir les tests
     return OFFClient(
         base_url=_BASE,
         user_agent=_UA,
         rate_limit_rpm=6000,
         timeout_s=5.0,
         max_retries=3,
+        retry_wait_min_s=0.0,
+        retry_wait_max_s=0.0,
+        retry_wait_multiplier=0.0,
     )
 
 

@@ -184,9 +184,14 @@ module "run_worker_off" {
     PRT_BQ_TABLE_OPEN_PRICES = google_bigquery_table.open_prices_clean.table_id
     PRT_BQ_TABLE_CATALOGUE   = google_bigquery_table.catalogue_produits.table_id
 
-    PRT_OFF_BASE_URL         = "https://world.openfoodfacts.org"
-    PRT_OFF_RATE_RPM         = "15"
-    PRT_OFF_MAX_EANS_PER_RUN = "2000"
+    PRT_OFF_BASE_URL = "https://world.openfoodfacts.org"
+    # 13 rpm = 4.6s/req : marge anti-ban vs la limite officielle 15 rpm/IP.
+    # Cf. docs/OFF_API_Specification_PriceTracker.md §4 (reco "4.5s entre
+    # chaque requête, ≈13 req/min sous la limite").
+    PRT_OFF_RATE_RPM = "13"
+    # TEMP: 50 EANs pour valider l'E2E Phase 6 en ~4 min (13 rpm strict =
+    # 4.6s/req). À remettre à "2000" après validation OK.
+    PRT_OFF_MAX_EANS_PER_RUN = "50"
     PRT_OFF_RUN_TIMEOUT_S    = "3500"
     PRT_OFF_HTTP_TIMEOUT_S   = "20"
     PRT_OFF_MAX_RETRIES      = "4"
