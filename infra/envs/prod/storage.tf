@@ -1,5 +1,7 @@
-# Bucket BRONZE — tickets bruts uploadés par les utilisateurs.
-# Backend signe les URLs PUT (objectAdmin). Worker OCR lit les images (viewer).
+# Bucket BRONZE — données brutes : tickets users (Backend signe PUT) +
+# snapshots HuggingFace open-prices archivés par worker-ingestion.
+# Backend et workers ont objectAdmin (lecture/écriture/suppression). Convention
+# alignée avec Silver pour éviter d'ajuster les rôles à chaque nouveau pipeline.
 module "bucket_bronze" {
   source = "../../modules/storage"
 
@@ -10,8 +12,7 @@ module "bucket_bronze" {
   lifecycle_rules    = local.data_lake_lifecycle
   labels             = merge(var.labels, { component = "bronze" })
 
-  object_admins  = [local.backend_sa]
-  object_viewers = [local.worker_sa]
+  object_admins = [local.backend_sa, local.worker_sa]
 }
 
 # Bucket SILVER — données nettoyées (parquet OpenPrices, OFF, etc.).

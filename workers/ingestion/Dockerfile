@@ -22,6 +22,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 # 2) projet — couche invalidée à chaque changement de code.
+# README.md nécessaire au build : pyproject.toml déclare `readme = "README.md"`,
+# hatchling lit le fichier pour assembler la wheel locale (étape `uv sync` ci-dessous).
+COPY README.md ./
 COPY pricetracker_ingestion ./pricetracker_ingestion
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev

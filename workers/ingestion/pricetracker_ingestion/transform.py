@@ -100,7 +100,11 @@ SILVER_SCHEMA = pa.schema(
 
 REJECTIONS_SCHEMA = pa.schema(
     [
-        ("pipeline_run_date", pa.date32()),
+        # nullable=False obligatoire : la table BQ déclare cette colonne REQUIRED
+        # (partition key). Sans ça, pyarrow crée un field nullable, BQ rejette
+        # le load_table_from_file avec "Field has changed mode from REQUIRED to
+        # NULLABLE" (load direct sur partition$YYYYMMDD avec CREATE_NEVER).
+        pa.field("pipeline_run_date", pa.date32(), nullable=False),
         ("id", pa.string()),
         ("product_code", pa.string()),
         ("reason", pa.string()),

@@ -15,9 +15,9 @@ __pycache__/
 .git/
 .gitignore
 
-# Notes / docs locales : pas nécessaires au build (Dockerfile les ignore aussi).
-README.md
-*.md
+# README.md NÉCESSAIRE : pyproject.toml déclare `readme = "README.md"` →
+# hatchling échoue à builder la wheel si le fichier est absent au build context.
+# On garde donc tous les .md.
 
 # Tests : ne vont pas dans l'image runtime (cf. Dockerfile COPY pricetracker_ingestion).
 tests/

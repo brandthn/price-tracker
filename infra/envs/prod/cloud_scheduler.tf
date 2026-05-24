@@ -24,12 +24,14 @@ module "cloud_scheduler_jobs" {
     "${var.name_prefix}-trigger-ingestion" = {
       schedule                   = "0 3 * * *"
       target_url                 = module.run_worker_ingestion.uri
+      target_path                = "/run"
       oidc_service_account_email = module.iam.emails["worker"]
       description                = "Phase 6.1 — pull du snapshot HuggingFace open-prices puis load BQ Silver."
     }
     "${var.name_prefix}-trigger-off" = {
       schedule                   = "0 4 * * *"
       target_url                 = module.run_worker_off.uri
+      target_path                = "/run"
       oidc_service_account_email = module.iam.emails["worker"]
       description                = "Phase 6.2 — enrichissement EAN via OpenFoodFacts + embeddings Vertex AI."
     }

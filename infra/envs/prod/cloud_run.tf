@@ -83,10 +83,13 @@ module "run_worker_ocr" {
 # upload Bronze parquet, MERGE BQ `silver.open_prices_clean`.
 #
 # Tailles ajustées Phase 6.1 :
-# - timeout 1800s : parquet HF ~150MB → transform pyarrow → upload GCS → BQ MERGE.
+# - timeout 1800s : parquet HF ~25MB compressé → transform pyarrow → upload GCS → BQ MERGE.
 #   30 min est suffisant en steady state ; reste large vs cold start HF.
-# - memory 2Gi : pyarrow peut materialiser tout le parquet en RAM lors de la
-#   normalisation. 1Gi est trop juste si OFF étoffe le dataset.
+# - memory 4Gi : observé OOM kill à 2Gi le 2026-05-23 sur un parquet de 25MB on-disk —
+#   le pipeline maintient en parallèle raw_table + intermediate pandas (cleaner +
+#   enrichments + IQR numpy) + clean_table + rejections_table ; après overhead
+#   sandbox Cloud Run + uvicorn + libs (~500-700MB), 2Gi laissait ≈1.3Gi pour data,
+#   insuffisant. 4Gi donne ≈3× de marge et anticipe la croissance du dataset HF.
 # - cpu 2 : transform pyarrow CPU-bound, le doublement raccourcit le run et
 #   ne coûte que sur la durée de cold-start (scale-to-zero entre runs).
 #
@@ -98,13 +101,13 @@ module "run_worker_ingestion" {
   project_id            = var.project_id
   region                = var.region
   name                  = "${var.name_prefix}-worker-ingestion"
-  image                 = local.cloud_run_skeleton_image
+  image                 = "${module.artifact_registry.docker_registry_url}/worker-ingestion:${var.worker_ingestion_image_tag}"
   service_account_email = module.iam.emails["worker"]
 
   min_instances   = 0
   max_instances   = 1
   cpu             = "2"
-  memory          = "2Gi"
+  memory          = "4Gi"
   timeout_seconds = 1800
 
   vpc_subnet = local.cloud_run_subnet
@@ -161,7 +164,7 @@ module "run_worker_off" {
   project_id            = var.project_id
   region                = var.region
   name                  = "${var.name_prefix}-worker-off"
-  image                 = local.cloud_run_skeleton_image
+  image                 = "${module.artifact_registry.docker_registry_url}/worker-off:${var.worker_off_image_tag}"
   service_account_email = module.iam.emails["worker"]
 
   min_instances   = 0

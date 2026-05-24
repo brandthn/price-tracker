@@ -13,7 +13,7 @@ __pycache__/
 .git/
 .gitignore
 
-README.md
-*.md
+# README.md NÉCESSAIRE : pyproject.toml déclare `readme = "README.md"` →
+# hatchling échoue à builder la wheel si le fichier est absent.
 
 tests/

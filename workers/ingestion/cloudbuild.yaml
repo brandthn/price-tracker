@@ -1,0 +1,38 @@
+# Build config Cloud Build pour worker-ingestion.
+#
+# Pourquoi un cloudbuild.yaml plutôt qu'un simple `--tag` ?
+# Le Dockerfile utilise `RUN --mount=type=cache,target=/root/.cache/uv` qui
+# requiert BuildKit. Le step Cloud Build par défaut (gcb-internal) n'active
+# pas BuildKit. On force DOCKER_BUILDKIT=1 via env sur le step docker.
+#
+# `options.logging: CLOUD_LOGGING_ONLY` : requis quand on n'a pas configuré
+# un bucket GCS pour les logs Cloud Build (sinon le builder tente d'y écrire
+# et plante). Les logs partent uniquement vers Cloud Logging.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ingestion:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ingestion:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ingestion:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+# `_SHORT_SHA` : substitution user-définie, passée via --substitutions.
+# Auto-set (SHORT_SHA sans préfixe `_`) n'est dispo que pour les triggers.
+substitutions:
+  _SHORT_SHA: 'latest'

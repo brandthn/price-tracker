@@ -15,16 +15,15 @@ resource "google_cloud_scheduler_job" "this" {
 
   http_target {
     http_method = each.value.http_method
-    uri         = each.value.target_url
-    body        = each.value.body_base64
+    # uri = service root URL + optional path (where the request actually goes).
+    # audience = service root URL only (Cloud Run OIDC checks `aud` against the
+    # service URL stripped of any path). Hence the two are kept distinct.
+    uri  = "${each.value.target_url}${each.value.target_path}"
+    body = each.value.body_base64
 
     oidc_token {
       service_account_email = each.value.oidc_service_account_email
-      # OIDC audience MUST equal the root URL of the Cloud Run service for
-      # signature verification to pass (Cloud Run checks aud claim against the
-      # service URL). Stripping any path from target_url isn't needed when the
-      # target already IS the root; we pass target_url as-is per Google docs.
-      audience = each.value.target_url
+      audience              = each.value.target_url
     }
   }
 }

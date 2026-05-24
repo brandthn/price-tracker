@@ -17,6 +17,9 @@ COPY pyproject.toml uv.lock* ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
+# README.md nécessaire au build : pyproject.toml déclare `readme = "README.md"`,
+# hatchling lit le fichier pour assembler la wheel locale (étape `uv sync` ci-dessous).
+COPY README.md ./
 COPY pricetracker_off ./pricetracker_off
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev

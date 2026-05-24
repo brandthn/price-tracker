@@ -31,3 +31,22 @@ variable "labels" {
     managed_by = "terraform"
   }
 }
+
+# --- Worker image tags ----------------------------------------------------
+# Tag (généralement SHORT_SHA git) de l'image Docker poussée en Artifact
+# Registry par `gcloud builds submit`. Bumper après chaque rebuild :
+# `git diff variables.tf` devient la timeline des déploiements workers.
+# Tag immuable obligatoire (pas de `:latest`) — sinon Cloud Run ne voit
+# pas le diff terraform et ne redéploie pas.
+
+variable "worker_ingestion_image_tag" {
+  description = "Tag de l'image worker-ingestion en AR. Doit exister dans le repo prt-prod-docker."
+  type        = string
+  default     = "2585913-r2"
+}
+
+variable "worker_off_image_tag" {
+  description = "Tag de l'image worker-off en AR. Doit exister dans le repo prt-prod-docker."
+  type        = string
+  default     = "2585913-r2"
+}
