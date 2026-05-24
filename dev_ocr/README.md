@@ -230,7 +230,7 @@ RECEIPT_OCR_BACKEND=vlm python scripts/test_extract_receipt.py ticket.jpg --back
 | `RECEIPT_VLM_MODEL` | `moondream-0.5b` | Provider registry id |
 | `RECEIPT_VLM_MODEL_PATH` | — | Path to local `.mf` weights |
 | `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1024` | Resize before inference |
-| `MOONDREAM_API_KEY` | — | Cloud API if no local weights |
+| `MOONDREAM_API_KEY` | — | Disabled during dev (local weights only) |
 
 Inject a custom provider in code:
 

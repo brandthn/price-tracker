@@ -63,5 +63,16 @@ def test_moondream_provider_missing_config_raises():
         return_value=None,
     ):
         with patch.dict("sys.modules", {"moondream": MagicMock()}):
-            with pytest.raises(OcrBackendError, match="Moondream is not configured"):
-                MoondreamProvider(api_key=None)
+            with pytest.raises(OcrBackendError, match="local weights not found"):
+                MoondreamProvider()
+
+
+def test_moondream_provider_ignores_cloud_api_key(monkeypatch):
+    monkeypatch.setenv("MOONDREAM_API_KEY", "fake-key-should-not-be-used")
+    with patch(
+        "receipt_ocr.backends.vlm.moondream_provider.resolve_moondream_model_path",
+        return_value=None,
+    ):
+        with patch.dict("sys.modules", {"moondream": MagicMock()}):
+            with pytest.raises(OcrBackendError, match="local weights not found"):
+                MoondreamProvider()

@@ -286,7 +286,8 @@ Structured output: date + chain + 2 products (smaller image → fewer lines dete
 
 - `RECEIPT_OCR_BACKEND=vlm`
 - `RECEIPT_VLM_MODEL=moondream-0.5b` (default)
-- `RECEIPT_VLM_MODEL_PATH`, `RECEIPT_VLM_MAX_IMAGE_SIDE`, `MOONDREAM_API_KEY`
+- `RECEIPT_VLM_MODEL_PATH`, `RECEIPT_VLM_MAX_IMAGE_SIDE`
+- Moondream Cloud API fallback **disabled** during dev (`_ENABLE_MOONDREAM_CLOUD = False` in `moondream_provider.py`)
 
 #### Adding another VLM
 
