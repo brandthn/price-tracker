@@ -1,0 +1,5 @@
+# Moondream VLM weights (large binaries — never commit)
+data/models/
+data/benchmarks/
+*.mf
+*.mf.gz

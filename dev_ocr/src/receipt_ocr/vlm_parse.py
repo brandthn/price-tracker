@@ -23,20 +23,77 @@ def strip_markdown_json_fence(text: str) -> str:
     return stripped.strip()
 
 
-def try_parse_vlm_json(text: str) -> dict | None:
-    """Return a normalized receipt dict if ``text`` is VLM JSON, else ``None``."""
-    candidate = strip_markdown_json_fence(text)
-    if not candidate.startswith("{"):
-        return None
+_JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def extract_json_candidate(text: str) -> str:
+    """Best-effort extraction of a JSON object from noisy VLM output."""
+    candidate = strip_markdown_json_fence(text.strip())
+    if candidate.startswith("{"):
+        return candidate
+    match = _JSON_OBJECT.search(candidate)
+    if match:
+        return match.group(0)
+    return candidate
+
+
+def loads_vlm_payload(text: str) -> dict | None:
+    """Parse JSON object from VLM output without full schema normalization."""
+    return _loads_json(text)
+
+
+def _loads_json(text: str) -> dict | None:
+    candidate = extract_json_candidate(text)
     try:
         payload = json.loads(candidate)
     except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict):
+        try:
+            from json_repair import repair_json  # type: ignore[import-not-found]
+
+            repaired = repair_json(candidate)
+            payload = json.loads(repaired)
+        except Exception:
+            return None
+    return payload if isinstance(payload, dict) else None
+
+
+def merge_partial_tickets(parts: list[dict[str, Any]]) -> dict:
+    """Merge header/date/products partial dicts into a full ticket payload."""
+    merged: dict[str, Any] = {
+        TicketField.DATE.value: "",
+        TicketField.CHAINE.value: "",
+        TicketField.ADRESSE.value: "",
+        TicketField.PRODUITS.value: [],
+    }
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        if TicketField.TICKET.value in part and isinstance(part[TicketField.TICKET.value], dict):
+            part = part[TicketField.TICKET.value]
+        for key in (TicketField.DATE.value, TicketField.CHAINE.value, TicketField.ADRESSE.value):
+            value = part.get(key)
+            if isinstance(value, str) and value.strip() and not merged[key]:
+                merged[key] = value.strip()
+        products = part.get(TicketField.PRODUITS.value)
+        if isinstance(products, list) and products:
+            merged[TicketField.PRODUITS.value] = products
+    return {TicketField.TICKET.value: merged}
+
+
+def try_parse_vlm_json(text: str) -> dict | None:
+    """Return a normalized receipt dict if ``text`` is VLM JSON, else ``None``."""
+    payload = _loads_json(text)
+    if payload is None:
         return None
     if TicketField.TICKET.value not in payload:
+        if any(k in payload for k in (TicketField.DATE.value, TicketField.CHAINE.value, TicketField.PRODUITS.value)):
+            payload = merge_partial_tickets([payload])
+        else:
+            return None
+    try:
+        return normalize_vlm_ticket(payload)
+    except ReceiptParseError:
         return None
-    return normalize_vlm_ticket(payload)
 
 
 def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
@@ -52,6 +109,8 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
         )
 
     chain = _as_str(ticket_raw.get(TicketField.CHAINE.value, ""))
+    if chain and not _looks_like_store_name(chain):
+        raise ReceiptParseError(f"VLM JSON: invalid chaine_supermarche {chain!r}.")
     address = _as_str(ticket_raw.get(TicketField.ADRESSE.value, ""))
     products_raw = ticket_raw.get(TicketField.PRODUITS.value, [])
     if products_raw is None:
@@ -122,3 +181,9 @@ def _as_units(value: Any) -> int:
 
 def _looks_like_output_date(value: str) -> bool:
     return bool(re.fullmatch(r"\d{8}\s+\d{2}:\d{2}", value.strip()))
+
+
+def _looks_like_store_name(value: str) -> bool:
+    from receipt_ocr.vlm_validate import looks_like_store_name
+
+    return looks_like_store_name(value)

@@ -28,8 +28,10 @@ def test_resolve_moondream_model_path_env(monkeypatch, tmp_path):
 
 
 def test_moondream_provider_local_query(tmp_path):
+    from PIL import Image
+
     image = tmp_path / "receipt.jpg"
-    image.write_bytes(b"fake-image")
+    Image.new("RGB", (20, 20), "white").save(image)
 
     model_file = tmp_path / "moondream-0_5b-int8.mf"
     model_file.write_bytes(b"weights")
@@ -40,15 +42,10 @@ def test_moondream_provider_local_query(tmp_path):
     fake_model.encode_image.return_value = "encoded"
     fake_model.query.return_value = {"answer": '{"ticket": {"date": "", "chaine_supermarche": "A", "adresse": "", "produits": []}}'}
 
-    fake_pil_module = MagicMock()
-    fake_image = MagicMock()
-    fake_image.convert.return_value = fake_image
-    fake_pil_module.Image.open.return_value.__enter__.return_value = fake_image
-
     with patch.dict("sys.modules", {"moondream": fake_md}):
         with patch(
-            "receipt_ocr.backends.vlm.moondream_provider.Image",
-            fake_pil_module.Image,
+            "receipt_ocr.backends.vlm.moondream_provider.prepare_vlm_image",
+            return_value=(str(image), []),
         ):
             provider = MoondreamProvider(model_path=model_file, max_image_side=0)
             answer = provider.analyze(str(image), "prompt")

@@ -279,7 +279,7 @@ Structured output: date + chain + 2 products (smaller image → fewer lines dete
 | `VlmBackend` | Implements `OcrBackend`; delegates to a `VlmProvider` |
 | `VlmProvider` | ABC in `backends/vlm/base.py` |
 | `build_vlm_provider()` | Registry — swap models via `RECEIPT_VLM_MODEL` |
-| `MoondreamProvider` | Local `.mf` weights or Moondream Cloud API |
+| `MoondreamProvider` | Local `.mf` weights (cloud fallback disabled in dev) |
 | `vlm_parse.py` | JSON-first parsing in `ReceiptParser.parse_text` |
 
 #### Env vars
@@ -294,5 +294,234 @@ Structured output: date + chain + 2 products (smaller image → fewer lines dete
 1. New file `backends/vlm/<name>_provider.py` implementing `VlmProvider`
 2. Register id in `VlmModelName` + `build_vlm_provider()`
 3. Mocked unit test — no changes to `extract_receipt` or public API
+
+#### Scripts & data
+
+- **`scripts/download_moondream_weights.py`** — downloads `moondream-0_5b-int8.mf` into `data/models/` (gitignored)
+- **`scripts/run_vlm_test.py`** — single-image VLM smoke test
+- Weights path: `RECEIPT_VLM_MODEL_PATH` or auto-detect under `data/models/`
+
+---
+
+## Version 0.1.2
+
+### Entry 6 — 2026-05-23 (UTC+2)
+
+**Scope:** Improve local Moondream 0.5B extraction quality using VLM-only strategies (no 2B model, no OCR hybrid).
+
+#### Problem observed (before this entry)
+
+First VLM runs on real phone photos (`IMG_20260206_142131.jpg`) produced unusable JSON:
+
+- Empty `produits` list
+- Chatty `chaine_supermarche` values (e.g. `"Note: The image shows…"`)
+- Model treating the task as conversational VQA instead of structured extraction
+
+Root causes identified:
+
+| Factor | Impact |
+|--------|--------|
+| **0.5B model capacity** | Too weak for one-shot full JSON on long, angled receipt photos |
+| **Single JSON prompt** | Encourages explanatory text despite instructions |
+| **1024 px resize + JPEG q=85** | Small thermal-print text lost |
+| **Full photo with background** | Ticket occupies a fraction of the frame; model reads table/hands/floor |
+| **No output validation** | Bad JSON accepted as-is |
+
+#### Design decisions (explicit exclusions)
+
+- **Local Moondream 0.5B only** — no 2B weights, no cloud API during dev (`_ENABLE_MOONDREAM_CLOUD = False`)
+- **No OCR hybrid** — Paddle / ppocrv4 are not combined with VLM in the same pipeline
+- **Reuse existing parser** — transcribe mode feeds line text into `ReceiptParser` heuristics
+
+#### What was implemented
+
+| Component | File | Role |
+|-----------|------|------|
+| Image prep | `vlm_image_prep.py` | Auto/center/off crop; resize at JPEG q=95 (default side **1536**) |
+| Transcription cleanup | `vlm_text_cleanup.py` | Strip chatty lines, markdown fences |
+| Output validation | `vlm_validate.py` | Reject empty/chatty/invalid chain names; drive retries |
+| JSON parsing | `vlm_parse.py` | Fence stripping, embedded JSON extraction, `json-repair`, partial ticket merge |
+| Extraction orchestrator | `backends/vlm/extraction.py` | Mode selection, retries, strict prompt fallback |
+| Multi-pass mode | `backends/vlm/multipass.py` | 3 focused queries (header / date / products) merged into one ticket |
+| Prompts | `backends/vlm/prompts.py` | Transcribe, strict transcribe, JSON, strict JSON, multipass prompts |
+| Provider | `backends/vlm/moondream_provider.py` | `prepare_vlm_image`, `analyze_with_options`, `analyze_queries`, Moondream `settings` |
+| Backend | `backends/vlm_backend.py` | Delegates to `run_vlm_extraction()` |
+| Benchmark | `scripts/benchmark_vlm.py` | Compare `transcribe` / `json` / `multipass` on reference images |
+
+#### Extraction modes (`RECEIPT_VLM_MODE`)
+
+| Mode | Default | Flow |
+|------|---------|------|
+| **`transcribe`** | yes | VLM returns line-oriented text → `ReceiptParser` heuristics |
+| `json` | | One-shot JSON → `vlm_parse` validation |
+| `multipass` | | 3 small JSON queries; merge via `merge_partial_tickets()` |
+
+Retry policy (`RECEIPT_VLM_MAX_RETRIES`, default **2**):
+
+1. Normal prompt + default crop (`auto`)
+2. Strict prompt + center crop
+3. (if retries allow) repeat pattern
+
+Failed validation raises `ReceiptParseError` with a snippet of the last output (fail loud, not silent garbage).
+
+#### Environment variables (VLM)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RECEIPT_VLM_MODE` | `transcribe` | `transcribe` \| `json` \| `multipass` |
+| `RECEIPT_VLM_MODEL` | `moondream-0.5b` | Provider registry id |
+| `RECEIPT_VLM_MODEL_PATH` | `data/models/moondream-0_5b-int8.mf` | Local `.mf` weights |
+| `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1536` | Resize longest side (`0` = off) |
+| `RECEIPT_VLM_CROP` | `auto` | `auto` \| `center` \| `off` |
+| `RECEIPT_VLM_CROP_MARGIN` | `0.05` | Padding around auto-detected receipt box |
+| `RECEIPT_VLM_JPEG_QUALITY` | `95` | Temp image quality before inference |
+| `RECEIPT_VLM_MAX_RETRIES` | `2` | Retries after validation failure |
+| `RECEIPT_VLM_TEMPERATURE` | `0.1` | Moondream generation temperature |
+| `RECEIPT_VLM_MAX_TOKENS` | `1024` | Max tokens per query |
+
+#### How to test
+
+```powershell
+pip install -r requirements-vlm.txt
+python scripts/download_moondream_weights.py
+
+$env:PYTHONPATH = "src"
+$env:RECEIPT_OCR_BACKEND = "vlm"
+$env:RECEIPT_VLM_MODE = "transcribe"
+$env:RECEIPT_VLM_CROP = "auto"
+$env:RECEIPT_VLM_MAX_IMAGE_SIDE = "1536"
+
+python scripts/run_vlm_test.py data/raw/images_tickets_caisse/IMG_20260206_142131.jpg
+python scripts/benchmark_vlm.py
+pytest --no-integration   # 70 passed, no Moondream required
+```
+
+Benchmark outputs saved under `data/benchmarks/vlm/` (gitignored).
+
+#### Observed results on real images (Windows, CPU, local 0.5B)
+
+| Image | Mode | Outcome |
+|-------|------|---------|
+| `IMG_20260206_142131.jpg` | `json` (v0.1.1) | Hallucinated chain, 0 products |
+| `IMG_20260206_142131.jpg` | `transcribe` (v0.1.2) | 3 retries → `"[Text is illegible]"` → `ReceiptParseError` |
+| `4PQOWWaPoa.jpg` | — | Not yet benchmarked post-v0.1.2; use `benchmark_vlm.py` |
+
+The v0.1.2 pipeline **fails explicitly** instead of returning fabricated JSON — intended behaviour until quality improves.
+
+#### Tests added
+
+| File | Coverage |
+|------|----------|
+| `test_vlm_image_prep.py` | Crop + resize |
+| `test_vlm_text_cleanup.py` | Chatty line removal |
+| `test_vlm_validate.py` | Validation rules |
+| `test_vlm_extraction.py` | Retry orchestration |
+| `test_vlm_multipass.py` | Partial merge |
+| Updated `test_vlm_backend.py`, `test_vlm_parse.py`, `test_extract_receipt.py` | Mode wiring |
+
+**Run results:** `70 passed`, `3 skipped` (`pytest --no-integration`).
+
+---
+
+#### Next steps for Moondream 0.5B (considerations)
+
+These are ordered by expected impact while staying on **local 0.5B only** and **VLM-only** (no Paddle hybrid, no 2B).
+
+##### 1. Tune image input per photo type (high priority, low effort)
+
+Phone photos vary widely. Before changing model code, sweep env vars on 5–10 reference tickets:
+
+```powershell
+# Full resolution (may help small text; slower, more RAM)
+$env:RECEIPT_VLM_MAX_IMAGE_SIDE = "0"
+
+# If auto-crop cuts the ticket, try:
+$env:RECEIPT_VLM_CROP = "center"   # or "off"
+
+python scripts/benchmark_vlm.py
+```
+
+Document winning defaults per image category (flat scan vs angled phone photo).
+
+##### 2. Improve receipt cropping (medium priority)
+
+Current auto-crop is Pillow-only contrast heuristics — fast but fragile on busy backgrounds.
+
+Possible improvements (still no OCR):
+
+- OpenCV contour + perspective warp (optional dependency)
+- Detect bright rectangular region (thermal paper on dark table)
+- Manual crop UI / CLI `--crop-box x,y,w,h` for dev dataset labelling
+- Upscale cropped region (`RECEIPT_VLM_MIN_IMAGE_SIDE`) when ticket is small in frame
+
+##### 3. Prompt & task decomposition (medium priority)
+
+0.5B handles **narrow tasks** better than full receipts:
+
+- Default to **`transcribe`**; use **`multipass`** when transcription is too short
+- Add a **two-step transcribe**: (a) “list header lines only”, (b) “list product lines only”, then concatenate for `ReceiptParser`
+- Few-shot prompt with a tiny fake ticket example (keep under token budget)
+- French-only, shorter strict prompts for retry (already started — refine wording from benchmark logs)
+
+##### 4. Validation & fallback between VLM modes (medium priority)
+
+Automatic mode escalation within VLM-only:
+
+```text
+transcribe → (fail validation) → multipass → (fail) → json strict → ReceiptParseError
+```
+
+Log which stage succeeded for benchmark analysis. Implement in `extraction.py` without touching public API.
+
+##### 5. Post-process transcription before parser (lower priority)
+
+When transcribe returns partial text:
+
+- Fix common 0.5B OCR-like errors (`|` → `I`, `0` vs `O` in prices)
+- Split merged lines if price pattern `\d+[.,]\d{2}` appears mid-line
+- Pass confidence hints: lines with `[illisible]` skipped, not parsed as products
+
+##### 6. Benchmark dataset & metrics (high priority for project)
+
+Build a small labelled set (10–20 local tickets) with expected product counts and chain names.
+
+Track per mode:
+
+- Product count vs ground truth
+- Date/chain match rate
+- Inference time (init + per image)
+- Failure rate (`ReceiptParseError` vs success)
+
+Use `scripts/benchmark_vlm.py` output in `data/benchmarks/vlm/` as regression history.
+
+##### 7. Performance on CPU (lower priority unless mobile target)
+
+0.5B local inference ~15–60 s/image on laptop CPU:
+
+- Cache encoded image within a batch script (already done for `multipass` via `analyze_queries`)
+- Keep model loaded (`build_backend()` cache already applies to `VlmBackend`)
+- Consider `RECEIPT_VLM_MAX_IMAGE_SIDE=1280` for speed once quality baseline exists
+
+##### 8. Explicit non-goals (for now)
+
+| Approach | Why deferred |
+|----------|--------------|
+| Moondream 2B | User constraint — quality vs speed trade-off reserved for later experiment |
+| Paddle + VLM hybrid | User constraint — keep backends independently evaluable |
+| Cloud API | Disabled during dev — would mix local/cloud results |
+| Fine-tuning 0.5B on receipts | School project scope — only if labelled dataset grows |
+
+##### 9. Success criteria before moving on
+
+- [ ] `IMG_20260206_142131.jpg` returns ≥ 1 product in **any** VLM mode, or documented as “unsupported angle/quality” with reason
+- [ ] `4PQOWWaPoa.jpg` and 2 other tickets extract ≥ 50 % of products vs manual count
+- [ ] `benchmark_vlm.py` run recorded in this doc with date and env snapshot
+- [ ] Default env vars updated in README from benchmark winners
+
+#### References
+
+- VLM install & env: [`README.md`](README.md) — section “VLM backend (Moondream 0.5B)”
+- Weights download: `scripts/download_moondream_weights.py`
+- Specification: [`project_guidelines.md`](project_guidelines.md)
 
 ---

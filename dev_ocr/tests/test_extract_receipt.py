@@ -136,15 +136,18 @@ def test_stub_backends_raise_not_implemented():
             stub_cls()
 
 
-def test_vlm_backend_with_injected_provider(tmp_path):
+def test_vlm_backend_with_injected_provider(tmp_path, monkeypatch):
     from receipt_ocr.backends.vlm_backend import VlmBackend
-    from tests.fixtures import vlm_json
+    from receipt_ocr.constants import ENV_VLM_MODE, VlmMode
+    from tests.fixtures import sample_texts
+
+    monkeypatch.setenv(ENV_VLM_MODE, VlmMode.TRANSCRIBE.value)
 
     class _Provider:
         model_id = "moondream-0.5b"
 
-        def analyze(self, image_path: str, prompt: str) -> str:
-            return vlm_json.VALID_VLM_JSON
+        def analyze_with_options(self, image_path: str, prompt: str, *, crop_mode=None) -> str:
+            return sample_texts.HAPPY_PATH
 
     image = tmp_path / "x.jpg"
     image.write_bytes(b"x")
