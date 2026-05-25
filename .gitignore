@@ -57,4 +57,5 @@ firebase-admin*.json
 gcp-key*.json
 =======
 images_tickets_caisse
->>>>>>> b5a1d0b (ajouté gitignore)
+
+src/receipt_ocr/__pycache__
