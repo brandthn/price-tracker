@@ -1,0 +1,22 @@
+# 📦 Bibliothèques nécessaires
+# Installe tout avec : pip install -r requirements.txt
+
+# Lecture des données Hugging Face
+datasets>=2.14.0
+huggingface-hub>=0.17.0
+
+# LLM Vision
+anthropic>=0.30.0
+
+# Matching approximatif (fuzzy)
+rapidfuzz>=3.0.0
+
+# Matching sémantique (compréhension du sens)
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+
+# Manipulation de données
+pandas>=2.0.0
+
+# Requêtes HTTP (téléchargement images)
+requests>=2.31.0
