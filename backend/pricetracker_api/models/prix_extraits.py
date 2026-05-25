@@ -35,6 +35,9 @@ class PrixExtrait(Base):
     produit_nom: Mapped[str | None] = mapped_column(String(300), nullable=True)
     quantity: Mapped[float | None] = mapped_column(Numeric(10, 3), nullable=True)
     price_eur: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    line_total: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    match_method: Mapped[str | None] = mapped_column(nullable=True)
 
     ocr_confidence: Mapped[float | None] = mapped_column(nullable=True)
     match_confidence: Mapped[float | None] = mapped_column(

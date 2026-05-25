@@ -78,7 +78,10 @@ cd backend
 uv sync
 
 # Démarrer cloud-sql-proxy (binaire dans infra/envs/prod/)
+# --private-ip OBLIGATOIRE : l'instance n'a pas d'IP publique. Le proxy tunnelise
+# via les APIs Google en TLS, donc pas besoin de VPN.
 ../infra/envs/prod/cloud-sql-proxy \
+  --private-ip \
   price-tracker-prod-01:europe-west1:prt-prod-sql-main --port=5432 &
 
 # Récupérer le password Cloud SQL

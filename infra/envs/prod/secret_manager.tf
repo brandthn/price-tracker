@@ -21,5 +21,9 @@ module "secrets" {
       description = "HuggingFace API token (worker ingestion lit le snapshot Open Prices)."
       accessors   = [local.worker_sa]
     }
+    "${var.name_prefix}-groq-api-key" = {
+      description = "Groq API key — worker OCR (LLaMA 4 Scout VLM). Alimenter manuellement : echo -n '<KEY>' | gcloud secrets versions add prt-prod-groq-api-key --data-file=- --project=price-tracker-prod-01"
+      accessors   = [local.worker_sa]
+    }
   }
 }

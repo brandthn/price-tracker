@@ -1,0 +1,13 @@
+{
+  "message": {
+    "attributes": {
+      "eventType": "OBJECT_FINALIZE",
+      "bucketId": "price-tracker-test-bronze",
+      "objectId": "tickets/raw/user-abc-123/550e8400-e29b-41d4-a716-446655440000.jpg"
+    },
+    "data": "eyJidWNrZXQiOiAicHJpY2UtdHJhY2tlci10ZXN0LWJyb256ZSIsICJuYW1lIjogInRpY2tldHMvcmF3L3VzZXItYWJjLTEyMy81NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAuanBnIn0=",
+    "messageId": "1234567890",
+    "publishTime": "2026-05-24T03:12:45.123Z"
+  },
+  "subscription": "projects/price-tracker-prod-01/subscriptions/ticket-uploaded-ocr-push"
+}

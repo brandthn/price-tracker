@@ -35,7 +35,10 @@ class PrixExtraitOut(BaseModel):
     ean: str | None
     produit_nom: str | None
     quantity: float | None
+    unit_price: float | None
+    line_total: float | None
     price_eur: float | None
+    match_method: str | None
     ocr_confidence: float | None
     match_confidence: float | None
     needs_validation: bool
@@ -51,6 +54,8 @@ class TicketOut(BaseModel):
     date_ticket: datetime.date | None
     total_eur: float | None
     ocr_confidence: float | None
+    ocr_engine: str | None
+    ocr_duration_ms: int | None
     ocr_error: str | None
     created_at: datetime.datetime
     updated_at: datetime.datetime

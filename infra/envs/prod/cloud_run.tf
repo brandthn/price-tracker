@@ -62,9 +62,15 @@ module "run_backend" {
   env = {
     GOOGLE_CLOUD_PROJECT = var.project_id
     PRT_GCP_REGION       = var.region
-    PRT_ENV              = "prod"
-    PRT_LOG_LEVEL        = "INFO"
-    PRT_OPENAPI_ENABLED  = "true"
+
+    # Mode démo — bypasse la vérification Firebase JWT.
+    # Maintenu jusqu'à Phase 10 (frontend Next.js + Firebase Web SDK).
+    # Revert : mettre PRT_ENV=prod + PRT_AUTH_DISABLE=0 (ou supprimer la ligne).
+    PRT_ENV          = "dev"
+    PRT_AUTH_DISABLE = "1"
+
+    PRT_LOG_LEVEL       = "INFO"
+    PRT_OPENAPI_ENABLED = "true"
 
     # CORS : wildcard temporaire jusqu'au domaine fixe frontend (Phase 10).
     # Credentials cookies désactivés côté FastAPI (allow_credentials=False) donc
@@ -102,23 +108,61 @@ module "run_backend" {
 # Déclenché par Pub/Sub push subscription sur `ticket-uploaded` (cf.
 # pubsub.tf). Ingress restreint au plan interne + GCP services.
 # Mémoire = 512Mi en skeleton ; à relever à 2Gi en Phase 8 (PaddleOCR / Gemini).
+# --- Worker OCR (Phase 8) -------------------------------------------------
+# Déclenché par Pub/Sub push (subscription ticket-uploaded-ocr-push).
+# Reçoit le chemin GCS du ticket, fait OCR via Groq LLaMA 4 Scout, écrit
+# dans Cloud SQL tickets + prix_extraits.
+#
+# Ressources :
+# - memory 2Gi : Groq SDK + structlog + asyncpg ; le modèle tourne côté Groq
+#   API (aucune inférence locale) → 2Gi suffit.
+# - cpu "2" : I/O bound sur l'appel Groq, mais 2 vCPU pour traiter plusieurs
+#   images en parallèle sans saturation.
+# - timeout 540s : < ack_deadline 600s (marge pour l'ACK Pub/Sub final).
 module "run_worker_ocr" {
   source = "../../modules/cloud_run"
 
   project_id            = var.project_id
   region                = var.region
   name                  = "${var.name_prefix}-worker-ocr"
-  image                 = local.cloud_run_skeleton_image
+  image                 = "${module.artifact_registry.docker_registry_url}/worker-ocr:${var.worker_ocr_image_tag}"
   service_account_email = module.iam.emails["worker"]
 
-  min_instances = 0
-  max_instances = 5
-  cpu           = "1"
-  memory        = "512Mi"
+  min_instances   = 0
+  max_instances   = 5
+  cpu             = "2"
+  memory          = "2Gi"
+  timeout_seconds = 540
 
   vpc_subnet = local.cloud_run_subnet
   vpc_egress = "PRIVATE_RANGES_ONLY"
   ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+    PRT_BRONZE_BUCKET    = module.bucket_bronze.name
+    PRT_OCR_ENGINE       = "groq"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+    GROQ_API_KEY = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-groq-api-key"]
+      version = "latest"
+    }
+  }
 
   labels = merge(var.labels, { component = "worker-ocr" })
 }

@@ -55,5 +55,11 @@ variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
   # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
-  default = "skeleton"
+  default = "e22463b"
+}
+
+variable "worker_ocr_image_tag" {
+  description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
+  type        = string
+  default     = "latest"
 }

@@ -41,6 +41,8 @@ class Ticket(Base):
     date_ticket: Mapped[datetime.date | None] = mapped_column(nullable=True)
     total_eur: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     ocr_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    ocr_engine: Mapped[str | None] = mapped_column(nullable=True)
+    ocr_duration_ms: Mapped[int | None] = mapped_column(nullable=True)
     ocr_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(

@@ -1,0 +1,33 @@
+# Build config Cloud Build pour worker-ocr.
+# Soumettre depuis la RACINE du monorepo (dev_ocr/ est dans le contexte) :
+#   gcloud builds submit . --config=workers/ocr/cloudbuild.yaml \
+#     --substitutions=_SHORT_SHA=$(git rev-parse --short HEAD) \
+#     --project=price-tracker-prod-01
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-f'
+      - 'workers/ocr/Dockerfile'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _SHORT_SHA: 'latest'

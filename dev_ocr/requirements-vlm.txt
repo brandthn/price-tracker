@@ -1,0 +1,5 @@
+# Optional VLM backend (Moondream 0.5B local)
+# Install when using RECEIPT_OCR_BACKEND=vlm
+moondream==0.0.6
+Pillow>=10.0.0
+json-repair>=0.30.0
