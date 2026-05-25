@@ -5,6 +5,7 @@ Cible : ce que le worker DOIT respecter pour s'intégrer au backend, à la DB
 et au reste du data-plane PriceTracker tel que déployé (Phase 6.5).
 
 Statut de l'infra autour de l'OCR :
+
 - `prt-prod-worker-ocr` (Cloud Run) → skeleton `hello` déployé, **prêt à recevoir l'image OCR**
 - Topic Pub/Sub `ticket-uploaded` → alimenté par GCS notification (`tickets/raw/` sur bucket bronze)
 - Push subscription `ticket-uploaded-ocr-push` → pointe `${run_worker_ocr.uri}/push`, OIDC, DLQ à 5 échecs
@@ -16,13 +17,15 @@ Statut de l'infra autour de l'OCR :
 ## 1. Périmètre
 
 **In scope** :
+
 1. Recevoir un événement `ticket-uploaded` (Pub/Sub push).
 2. Télécharger l'image depuis GCS bronze.
 3. OCR + parsing structuré (enseigne, date, lignes articles, total).
-4. Résolution EAN par ligne (embedding Vertex + pgvector + fallback fuzzy).
+4. Résolution EAN par ligne (embedding Vertex + pgvector + fallback fuzzy) (DO NOT IMPLEMENT THIS YET, GO DIRECTLY TO STEP 5 USING NULL AS EAN)
 5. Écrire le résultat en Cloud SQL (`tickets` UPDATE, `prix_extraits` INSERT, `product_aliases` candidates).
 
 **Out of scope** (explicitement délégué) :
+
 - ❌ Enrichissement catalogue (`products`, `catalogue_produits`) → **worker OFF**. L'OCR signale les EAN nouveaux ; OFF les pickera (cf. §8).
 - ❌ Calcul d'indices → **worker Indices**.
 - ❌ Envoi de notifications → **worker Alertes**.
@@ -37,10 +40,12 @@ Le worker est invoqué par **Pub/Sub push** sur la subscription `ticket-uploaded
 
 ### Endpoints exposés
 
-| Méthode | Path        | Auth     | Rôle                                      |
-|---------|-------------|----------|-------------------------------------------|
-| GET     | `/healthz`  | none     | Liveness Cloud Run                        |
-| POST    | `/push`     | OIDC     | Handler Pub/Sub push (1 message = 1 ticket) |
+
+| Méthode | Path       | Auth | Rôle                                        |
+| ------- | ---------- | ---- | ------------------------------------------- |
+| GET     | `/healthz` | none | Liveness Cloud Run                          |
+| POST    | `/push`    | OIDC | Handler Pub/Sub push (1 message = 1 ticket) |
+
 
 **Aucun autre endpoint.** Pas de `/run`, pas d'API métier — c'est event-driven only.
 
@@ -63,11 +68,13 @@ Le JSON décodé de `data` est un `storage#object` standard. Champs utiles :
 
 ### Réponses HTTP & sémantique Pub/Sub
 
-| Code     | Effet Pub/Sub                                            | Quand l'émettre                                  |
-|----------|----------------------------------------------------------|--------------------------------------------------|
-| `204`    | ACK (message consommé)                                   | Traitement OK **ou** échec définitif non-retryable (statut `ocr_failed` écrit) |
-| `5xx`    | NACK → retry (backoff 10s–600s, 5 essais max → DLQ)      | Erreur transitoire : Cloud SQL down, Vertex 5xx, GCS 5xx |
-| `400`    | ACK (Pub/Sub considère le message bad)                   | Payload Pub/Sub malformé (jamais retryable)      |
+
+| Code  | Effet Pub/Sub                                       | Quand l'émettre                                                                |
+| ----- | --------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `204` | ACK (message consommé)                              | Traitement OK **ou** échec définitif non-retryable (statut `ocr_failed` écrit) |
+| `5xx` | NACK → retry (backoff 10s–600s, 5 essais max → DLQ) | Erreur transitoire : Cloud SQL down, Vertex 5xx, GCS 5xx                       |
+| `400` | ACK (Pub/Sub considère le message bad)              | Payload Pub/Sub malformé (jamais retryable)                                    |
+
 
 **Règle d'or** : *ne jamais 500 sur un ticket "empoisonné"* (image corrompue, MIME non supporté, user_id introuvable). Marquer `tickets.status='ocr_failed'`, logger, répondre `204`. Le DLQ doit rester réservé aux pannes infra.
 
@@ -92,25 +99,27 @@ Réutiliser `verify_oidc` du worker OFF tel quel.
 
 À déclarer dans `infra/envs/prod/cloud_run.tf` module `run_worker_ocr` (à compléter).
 
-| Variable                              | Exemple / Valeur                                  | Source         |
-|---------------------------------------|---------------------------------------------------|----------------|
-| `GOOGLE_CLOUD_PROJECT`                | `price-tracker-prod-01`                           | env            |
-| `PRT_GCP_REGION`                      | `europe-west1`                                    | env            |
-| `PRT_BRONZE_BUCKET`                   | `price-tracker-prod-01-bronze`                    | env            |
-| `PRT_MODELS_BUCKET`                   | `price-tracker-prod-01-models`                    | env            |
-| `PRT_OCR_MODEL_URI`                   | `gs://price-tracker-prod-01-models/ocr/v1.0/`     | env            |
-| `PRT_OCR_ENGINE`                      | `paddleocr` \| `tesseract`                        | env            |
-| `PRT_OCR_CONFIDENCE_THRESHOLD`        | `0.55`                                            | env            |
-| `PRT_EAN_MATCH_COSINE_THRESHOLD`      | `0.78`                                            | env            |
-| `PRT_EAN_MATCH_TOP_K`                 | `5`                                               | env            |
-| `PRT_EAN_FUZZY_MIN_SCORE`             | `82`                                              | env            |
-| `PRT_VERTEX_MODEL`                    | `text-embedding-004` (**identique au worker OFF**)| env            |
-| `PRT_VERTEX_OUTPUT_DIM`               | `768`                                             | env            |
-| `PRT_VERTEX_TASK_TYPE`                | `RETRIEVAL_QUERY` (≠ OFF qui utilise `RETRIEVAL_DOCUMENT`) | env   |
-| `PRT_PG_HOST` / `_PORT` / `_DB` / `_USER` / `_POOL_SIZE` | private IP Cloud SQL, `5432`, `price_tracker`, `pt_app`, `4` | env |
-| `PRT_PG_PASSWORD`                     | (secret)                                          | Secret Manager `prt-prod-cloudsql-password` |
-| `PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS`   | worker-sa email                                   | env            |
-| `PRT_LOG_LEVEL`                       | `INFO`                                            | env            |
+
+| Variable                                                 | Exemple / Valeur                                             | Source                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------- |
+| `GOOGLE_CLOUD_PROJECT`                                   | `price-tracker-prod-01`                                      | env                                         |
+| `PRT_GCP_REGION`                                         | `europe-west1`                                               | env                                         |
+| `PRT_BRONZE_BUCKET`                                      | `price-tracker-prod-01-bronze`                               | env                                         |
+| `PRT_MODELS_BUCKET`                                      | `price-tracker-prod-01-models`                               | env                                         |
+| `PRT_OCR_MODEL_URI`                                      | `gs://price-tracker-prod-01-models/ocr/v1.0/`                | env                                         |
+| `PRT_OCR_ENGINE`                                         | `paddleocr` | `tesseract`                                    | env                                         |
+| `PRT_OCR_CONFIDENCE_THRESHOLD`                           | `0.55`                                                       | env                                         |
+| `PRT_EAN_MATCH_COSINE_THRESHOLD`                         | `0.78`                                                       | env                                         |
+| `PRT_EAN_MATCH_TOP_K`                                    | `5`                                                          | env                                         |
+| `PRT_EAN_FUZZY_MIN_SCORE`                                | `82`                                                         | env                                         |
+| `PRT_VERTEX_MODEL`                                       | `text-embedding-004` (**identique au worker OFF**)           | env                                         |
+| `PRT_VERTEX_OUTPUT_DIM`                                  | `768`                                                        | env                                         |
+| `PRT_VERTEX_TASK_TYPE`                                   | `RETRIEVAL_QUERY` (≠ OFF qui utilise `RETRIEVAL_DOCUMENT`)   | env                                         |
+| `PRT_PG_HOST` / `_PORT` / `_DB` / `_USER` / `_POOL_SIZE` | private IP Cloud SQL, `5432`, `price_tracker`, `pt_app`, `4` | env                                         |
+| `PRT_PG_PASSWORD`                                        | (secret)                                                     | Secret Manager `prt-prod-cloudsql-password` |
+| `PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS`                      | worker-sa email                                              | env                                         |
+| `PRT_LOG_LEVEL`                                          | `INFO`                                                       | env                                         |
+
 
 > ⚠️ `PRT_VERTEX_TASK_TYPE=RETRIEVAL_QUERY` côté OCR (texte de ligne de ticket = "requête") face à `RETRIEVAL_DOCUMENT` côté OFF (fiche produit = "document"). C'est ce que Vertex attend pour aligner les espaces vectoriels — ne pas inverser.
 
@@ -118,16 +127,18 @@ Réutiliser `verify_oidc` du worker OFF tel quel.
 
 ## 5. Accès data — qui lit/écrit quoi
 
-| Ressource                            | Mode | Comment                                          |
-|--------------------------------------|------|--------------------------------------------------|
-| `gs://…-bronze/tickets/raw/**`       | R    | Direct VPC egress + worker-sa `objectAdmin`     |
-| `gs://…-models/ocr/<version>/**`     | R    | worker-sa `objectViewer` (déjà OK)              |
-| Cloud SQL `tickets`                  | R/W  | UPDATE only (la row existe déjà, créée par backend) |
-| Cloud SQL `prix_extraits`            | W    | INSERT batch                                    |
-| Cloud SQL `product_aliases`          | W    | INSERT candidat (`validated_by_user=false`)     |
-| Cloud SQL `products`                 | R    | SELECT pgvector pour matching EAN               |
-| Vertex AI text-embedding-004         | R    | embed des libellés bruts OCR                    |
-| BigQuery                             | —    | **AUCUN accès** (OCR ne touche pas BQ)          |
+
+| Ressource                        | Mode | Comment                                             |
+| -------------------------------- | ---- | --------------------------------------------------- |
+| `gs://…-bronze/tickets/raw/`**   | R    | Direct VPC egress + worker-sa `objectAdmin`         |
+| `gs://…-models/ocr/<version>/**` | R    | worker-sa `objectViewer` (déjà OK)                  |
+| Cloud SQL `tickets`              | R/W  | UPDATE only (la row existe déjà, créée par backend) |
+| Cloud SQL `prix_extraits`        | W    | INSERT batch                                        |
+| Cloud SQL `product_aliases`      | W    | INSERT candidat (`validated_by_user=false`)         |
+| Cloud SQL `products`             | R    | SELECT pgvector pour matching EAN                   |
+| Vertex AI text-embedding-004     | R    | embed des libellés bruts OCR                        |
+| BigQuery                         | —    | **AUCUN accès** (OCR ne touche pas BQ)              |
+
 
 L'IAM est déjà posée pour `prt-prod-worker-sa` (cf. Phase 2 & 4).
 
@@ -254,16 +265,18 @@ WHERE ean IS NOT NULL
 
 À ajuster dans [infra/envs/prod/cloud_run.tf](../infra/envs/prod/cloud_run.tf) `module "run_worker_ocr"` :
 
-| Param           | Valeur cible Phase 8                          |
-|-----------------|-----------------------------------------------|
-| `memory`        | `2Gi` (PaddleOCR ~1.2Gi) — bench obligatoire avant bump |
-| `cpu`           | `2` (CPU-bound sur OCR inference)             |
-| `min_instances` | `0`                                           |
-| `max_instances` | `5` (cf. cloud_run.tf actuel)                 |
-| `timeout_seconds` | `540` (< ack_deadline 600s, marge pour ACK) |
-| `ingress`       | `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER` (déjà OK) |
-| `vpc_egress`    | `PRIVATE_RANGES_ONLY` (déjà OK pour Cloud SQL) |
-| `service_account_email` | `prt-prod-worker-sa`                  |
+
+| Param                   | Valeur cible Phase 8                                    |
+| ----------------------- | ------------------------------------------------------- |
+| `memory`                | `2Gi` (PaddleOCR ~1.2Gi) — bench obligatoire avant bump |
+| `cpu`                   | `2` (CPU-bound sur OCR inference)                       |
+| `min_instances`         | `0`                                                     |
+| `max_instances`         | `5` (cf. cloud_run.tf actuel)                           |
+| `timeout_seconds`       | `540` (< ack_deadline 600s, marge pour ACK)             |
+| `ingress`               | `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER` (déjà OK)      |
+| `vpc_egress`            | `PRIVATE_RANGES_ONLY` (déjà OK pour Cloud SQL)          |
+| `service_account_email` | `prt-prod-worker-sa`                                    |
+
 
 ---
 
@@ -328,14 +341,15 @@ Events nommés attendus : `push_received`, `ocr_start`, `ocr_done`, `ocr_failed`
 
 ## 14. Checklist intégration (à valider avant merge)
 
-- [ ] `POST /push` retourne `204` sur happy path et sur image corrompue (jamais 500 pour cause data)
-- [ ] OIDC vérifié (allowlist = worker-sa)
-- [ ] Idempotent sur `(ticket_id, line_index)` et sur replay Pub/Sub
-- [ ] P95 de bout en bout < 480s (sous l'ack_deadline 600s avec marge)
-- [ ] Embedding model = `text-embedding-004` dim 768, task_type=`RETRIEVAL_QUERY`
-- [ ] Aucun accès BigQuery
-- [ ] Aucune création SA, secret, IAM hardcodée — tout via Terraform
-- [ ] Pas de clé JSON SA (org policy `iam.disableServiceAccountKeyCreation`) — ADC uniquement
-- [ ] Logs JSON structurés avec `ticket_id` dans chaque event
-- [ ] Dockerfile + cloudbuild.yaml calqués sur `workers/off/`
-- [ ] Tag image piloté par `var.worker_ocr_image_tag` (Terraform)
+- `POST /push` retourne `204` sur happy path et sur image corrompue (jamais 500 pour cause data)
+- OIDC vérifié (allowlist = worker-sa)
+- Idempotent sur `(ticket_id, line_index)` et sur replay Pub/Sub
+- P95 de bout en bout < 480s (sous l'ack_deadline 600s avec marge)
+- Embedding model = `text-embedding-004` dim 768, task_type=`RETRIEVAL_QUERY`
+- Aucun accès BigQuery
+- Aucune création SA, secret, IAM hardcodée — tout via Terraform
+- Pas de clé JSON SA (org policy `iam.disableServiceAccountKeyCreation`) — ADC uniquement
+- Logs JSON structurés avec `ticket_id` dans chaque event
+- Dockerfile + cloudbuild.yaml calqués sur `workers/off/`
+- Tag image piloté par `var.worker_ocr_image_tag` (Terraform)
+
