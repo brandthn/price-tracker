@@ -1,0 +1,30 @@
+# Build config Cloud Build pour le backend FastAPI — pattern symétrique workers/.
+# DOCKER_BUILDKIT=1 indispensable pour les RUN --mount=type=cache.
+# logging=CLOUD_LOGGING_ONLY pour éviter l'erreur "logging bucket required"
+# quand le projet n'a pas de bucket par défaut.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/backend:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/backend:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/backend:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _SHORT_SHA: 'latest'

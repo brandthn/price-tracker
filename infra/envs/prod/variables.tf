@@ -48,5 +48,12 @@ variable "worker_ingestion_image_tag" {
 variable "worker_off_image_tag" {
   description = "Tag de l'image worker-off en AR. Doit exister dans le repo prt-prod-docker."
   type        = string
-  default     = "e1e475c"
+  default     = "13d832b"
+}
+
+variable "backend_image_tag" {
+  description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
+  type        = string
+  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
+  default = "skeleton"
 }

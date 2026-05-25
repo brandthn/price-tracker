@@ -26,29 +26,74 @@ locals {
 }
 
 # --- Backend FastAPI (Phase 7) -------------------------------------------
-# Ingress public (`all`) : sera durci en internal-and-cloud-load-balancing
-# en Phase 7 quand le Load Balancer + custom domain seront en place.
+# Ingress public (`all`) : le frontend Next.js (Vercel + clients mobiles) appelle
+# l'API par HTTPS. La sécurité repose sur :
+#   - Firebase Auth (JWT Bearer) côté code applicatif
+#   - CORS contrôlé par PRT_CORS_ORIGINS
+#   - Cloud SQL atteint en private IP via Direct VPC egress (RFC1918 only)
+# Durcissement Phase 11 : Load Balancer + Cloud Armor, ingress = INTERNAL_LOAD_BALANCER.
+#
+# memory=1Gi : asyncpg + SQLAlchemy + firebase-admin + BigQuery client. 512Mi est
+# tendu au cold-start. CPU=1 (workload I/O-bound).
+#
+# allow_unauthenticated=true : indispensable au frontend public (la JWT Auth se
+# fait au niveau applicatif, pas IAM Cloud Run). À garder true en prod.
 module "run_backend" {
   source = "../../modules/cloud_run"
 
   project_id            = var.project_id
   region                = var.region
   name                  = "${var.name_prefix}-backend"
-  image                 = local.cloud_run_skeleton_image
+  image                 = "${module.artifact_registry.docker_registry_url}/backend:${var.backend_image_tag}"
   service_account_email = module.iam.emails["backend"]
 
-  min_instances = 0
-  max_instances = 3
-  cpu           = "1"
-  memory        = "512Mi"
+  min_instances   = 0
+  max_instances   = 3
+  cpu             = "1"
+  memory          = "1Gi"
+  timeout_seconds = 60
 
   vpc_subnet = local.cloud_run_subnet
   vpc_egress = "PRIVATE_RANGES_ONLY"
   ingress    = "INGRESS_TRAFFIC_ALL"
 
-  # Skeleton hello accessible pour valider le déploiement de bout en bout.
-  # Phase 7 : passer à false dès que Firebase Auth est en place.
   allow_unauthenticated = true
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+    PRT_ENV              = "prod"
+    PRT_LOG_LEVEL        = "INFO"
+    PRT_OPENAPI_ENABLED  = "true"
+
+    # CORS : wildcard temporaire jusqu'au domaine fixe frontend (Phase 10).
+    # Credentials cookies désactivés côté FastAPI (allow_credentials=False) donc
+    # `*` est sûr.
+    PRT_CORS_ORIGINS = "*"
+
+    # BigQuery — observatoire (Gold) + catalogue (Silver)
+    PRT_BQ_DATASET_SILVER  = local.bq_silver_dataset
+    PRT_BQ_DATASET_GOLD    = "${replace(var.name_prefix, "-", "_")}_gold"
+    PRT_BQ_TABLE_CATALOGUE = google_bigquery_table.catalogue_produits.table_id
+
+    # GCS — Signed URL upload tickets (V4 PUT, 15 min TTL)
+    PRT_GCS_BUCKET_BRONZE  = module.bucket_bronze.name
+    PRT_SIGNED_URL_TTL_MIN = "15"
+
+    # Cloud SQL — Direct VPC egress vers private IP
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+  }
 
   labels = merge(var.labels, { component = "backend" })
 }
@@ -189,9 +234,10 @@ module "run_worker_off" {
     # Cf. docs/OFF_API_Specification_PriceTracker.md §4 (reco "4.5s entre
     # chaque requête, ≈13 req/min sous la limite").
     PRT_OFF_RATE_RPM = "13"
-    # TEMP: 50 EANs pour valider l'E2E Phase 6 en ~4 min (13 rpm strict =
-    # 4.6s/req). À remettre à "2000" après validation OK.
-    PRT_OFF_MAX_EANS_PER_RUN = "50"
+    # 200 EANs/run nominal = ~15min à 4.6s/req. Compromis entre vitesse de
+    # constitution catalogue et marge anti-ban. Reco OFF spec : tant qu'on
+    # reste < 500/jour, l'API est conforme (au-delà : bulk download).
+    PRT_OFF_MAX_EANS_PER_RUN = "200"
     PRT_OFF_RUN_TIMEOUT_S    = "3500"
     PRT_OFF_HTTP_TIMEOUT_S   = "20"
     PRT_OFF_MAX_RETRIES      = "4"
