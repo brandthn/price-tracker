@@ -1,3 +1,6 @@
+# Secrets
+.env
+
 # Moondream VLM weights (large binaries — never commit)
 data/models/
 data/benchmarks/

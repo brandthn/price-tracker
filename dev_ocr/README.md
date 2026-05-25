@@ -213,7 +213,39 @@ PaddleOcrBackend(use_mobile_models=True)  # PP-OCRv4_mobile_det + paddle_static
 
 ---
 
-## VLM backend (Moondream 0.5B)
+## VLM backend
+
+Vision-language backends share `RECEIPT_OCR_BACKEND=vlm`. Swap providers with `RECEIPT_VLM_MODEL`.
+
+### Groq vision (cloud, JSON receipts)
+
+Uses [Groq](https://console.groq.com/docs/vision) `meta-llama/llama-4-scout-17b-16e-instruct` to return structured JSON matching the schema above. **Requires** `RECEIPT_VLM_MODE=json` (other modes raise an error).
+
+```bash
+pip install -r requirements-groq.txt
+# Copy .env.example -> .env and set GROQ_API_KEY (or groq_key)
+
+$env:RECEIPT_OCR_BACKEND = "vlm"
+$env:RECEIPT_VLM_MODEL = "groq-llama4-scout"
+$env:RECEIPT_VLM_MODE = "json"
+python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/your_ticket.jpg
+```
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `GROQ_API_KEY` / `groq_key` | — | Groq API key (loaded from `.env`) |
+| `RECEIPT_GROQ_MODEL` | `meta-llama/llama-4-scout-17b-16e-instruct` | Groq API model id |
+| `RECEIPT_VLM_MODE` | — | Must be `json` for Groq |
+| `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1536` | Resize before upload (keep base64 under 4MB) |
+| `RECEIPT_VLM_MAX_RETRIES` | `2` | Retry on invalid JSON |
+
+Live API tests (not mocked):
+
+```bash
+pytest -m groq
+```
+
+### Moondream 0.5B (local)
 
 Local Moondream 0.5B with three extraction modes. Default **`transcribe`** asks the VLM for line-by-line text, then uses `ReceiptParser`.
 
@@ -230,7 +262,7 @@ python scripts/benchmark_vlm.py        # compare modes on reference images
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `RECEIPT_VLM_MODE` | `transcribe` | `transcribe`, `json`, or `multipass` |
-| `RECEIPT_VLM_MODEL` | `moondream-0.5b` | Provider registry id |
+| `RECEIPT_VLM_MODEL` | `moondream-0.5b` | Provider registry id (`moondream-0.5b`, `groq-llama4-scout`) |
 | `RECEIPT_VLM_MODEL_PATH` | `data/models/...` | Local `.mf` weights |
 | `RECEIPT_VLM_MAX_IMAGE_SIDE` | `1536` | Resize before inference (`0` = off) |
 | `RECEIPT_VLM_CROP` | `auto` | `auto`, `center`, or `off` |
@@ -289,6 +321,9 @@ pytest --no-integration
 
 # Integration: OCR up to 3 images in images_tickets_caisse/ (slow)
 pytest -m integration
+
+# Groq cloud VLM (live API + local receipt images)
+pytest -m groq
 
 # More local images
 pytest -m integration --integration-max-images 10

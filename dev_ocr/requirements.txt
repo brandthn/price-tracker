@@ -18,6 +18,7 @@ onnxruntime>=1.16.0
 
 # VLM backend (optional) — pip install -r requirements-vlm.txt
 # moondream==0.0.6
+# Groq cloud VLM — pip install -r requirements-groq.txt
 
 # --- Dataset download helpers ---------------------------------------------
 huggingface_hub>=0.23.0

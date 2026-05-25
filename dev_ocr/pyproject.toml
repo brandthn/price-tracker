@@ -22,5 +22,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "integration: marks tests that require real receipt images on disk.",
+    "groq: marks tests that call the live Groq vision API (requires API key).",
 ]
 addopts = "-ra"
