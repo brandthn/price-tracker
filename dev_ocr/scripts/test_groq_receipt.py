@@ -18,12 +18,12 @@ The script prints the parsed JSON; progress and timing go to stderr.
 PowerShell (repo root)::
 
     $env:PYTHONPATH = "src"
-    python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg
+    python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/image_2.jpg
 
 bash::
 
     export PYTHONPATH=src
-    python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg
+    python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/image_2.jpg
 
 Windows absolute path example::
 

@@ -1,4 +1,4 @@
-"""Raw OCR text from ``4PQOWWaPoa.jpg`` (Super U receipt) for parser tests."""
+"""Raw OCR text from ``image_2.jpg`` (ex-``4PQOWWaPoa.jpg``, Super U) for parser tests."""
 
 SUPER_U_OCR = """\
 SUPER(U

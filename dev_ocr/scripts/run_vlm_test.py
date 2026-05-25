@@ -14,7 +14,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-DEFAULT_IMAGE = ROOT / "data" / "raw" / "images_tickets_caisse" / "IMG_20260206_142131.jpg"
+DEFAULT_IMAGE = ROOT / "data" / "raw" / "images_tickets_caisse" / "image_12.jpg"
 DEFAULT_MODEL = ROOT / "data" / "models" / "moondream-0_5b-int8.mf"
 
 
