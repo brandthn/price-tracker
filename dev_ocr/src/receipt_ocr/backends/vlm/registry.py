@@ -27,5 +27,10 @@ def build_vlm_provider(
 
         return MoondreamProvider(**kwargs)
 
+    if resolved == VlmModelName.GROQ_LLAMA4_SCOUT.value:
+        from receipt_ocr.backends.vlm.groq_provider import GroqProvider
+
+        return GroqProvider(**kwargs)
+
     valid = ", ".join(v.value for v in VlmModelName)
     raise ValueError(f"Unknown VLM model {resolved!r}. Valid options: {valid}.")

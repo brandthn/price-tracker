@@ -65,6 +65,7 @@ class VlmModelName(str, Enum):
     """Registry ids for :func:`receipt_ocr.backends.vlm.build_vlm_provider`."""
 
     MOONDREAM_0_5B = "moondream-0.5b"
+    GROQ_LLAMA4_SCOUT = "groq-llama4-scout"
 
 
 ENV_VLM_MODEL = "RECEIPT_VLM_MODEL"
@@ -79,6 +80,13 @@ ENV_VLM_TEMPERATURE = "RECEIPT_VLM_TEMPERATURE"
 ENV_VLM_MAX_TOKENS = "RECEIPT_VLM_MAX_TOKENS"
 
 DEFAULT_VLM_MODEL = VlmModelName.MOONDREAM_0_5B.value
+
+# Groq cloud VLM provider
+ENV_GROQ_API_KEY = "GROQ_API_KEY"
+ENV_GROQ_API_KEY_LEGACY = "groq_key"
+ENV_GROQ_MODEL = "RECEIPT_GROQ_MODEL"
+DEFAULT_GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_BASE64_MAX_BYTES = 3_500_000
 DEFAULT_VLM_MAX_IMAGE_SIDE = 1536
 DEFAULT_VLM_MAX_RETRIES = 2
 DEFAULT_VLM_CROP_MARGIN = 0.05

@@ -1,0 +1,5 @@
+# Groq cloud VLM provider (RECEIPT_VLM_MODEL=groq-llama4-scout)
+groq>=0.13.0
+python-dotenv>=1.0.0
+Pillow>=10.0.0
+json-repair>=0.30.0

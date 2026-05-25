@@ -14,6 +14,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+from receipt_ocr.env import load_project_env
+
+load_project_env()
+
 from receipt_ocr.backends.base import OcrBackend
 from receipt_ocr.backends.easyocr_backend import EasyOcrBackend
 from receipt_ocr.backends.paddle_backend import PaddleOcrBackend

@@ -4,6 +4,23 @@ Changelog and implementation notes for the `dev_ocr` module. Each version groups
 
 ---
 
+## Version 0.1.1 (unreleased)
+
+### Entry — 2026-05-25 — Groq cloud VLM provider
+
+**Scope:** Add `GroqProvider` as a swappable VLM under `RECEIPT_OCR_BACKEND=vlm`.
+
+#### Summary
+
+- Registry id `groq-llama4-scout` → `GroqProvider` calling Groq vision API (`meta-llama/llama-4-scout-17b-16e-instruct` by default).
+- **Requires** `RECEIPT_VLM_MODE=json`; raises `OcrBackendError` for `transcribe` / `multipass`.
+- API key from `GROQ_API_KEY` or legacy `groq_key` in `.env` (loaded via `python-dotenv` in `extract_receipt` / `conftest`).
+- Reuses `prepare_vlm_image`, `run_vlm_extraction` retries, and `try_parse_vlm_json` for README schema output.
+- Live tests: `pytest -m groq` (`tests/test_groq_integration.py`); guardrail unit tests in `tests/test_groq_provider.py`.
+- Optional deps: `requirements-groq.txt`; smoke script `scripts/test_groq_receipt.py`.
+
+---
+
 ## Version 0.1.0
 
 ### Entry 1 — 2026-05-19 20:00 (UTC+2)

@@ -20,6 +20,10 @@ DATA_DIR = ROOT / "data" / "raw"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from receipt_ocr.env import load_project_env
+
+load_project_env()
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
@@ -53,6 +57,18 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "integration: marks tests that require real receipt images on disk.",
     )
+    config.addinivalue_line(
+        "markers",
+        "groq: marks tests that call the live Groq vision API (requires API key).",
+    )
+
+
+def _groq_api_key_available() -> bool:
+    for name in ("GROQ_API_KEY", "groq_key"):
+        value = os.environ.get(name)
+        if value and value.strip():
+            return True
+    return False
 
 
 def _data_available() -> bool:
@@ -79,10 +95,17 @@ def pytest_collection_modifyitems(
             "Run `python scripts/download_datasets.py` to populate it."
         )
 
-    if skip_reason is None:
+    if skip_reason is not None:
+        marker = pytest.mark.skip(reason=skip_reason)
+        for item in items:
+            if "integration" in item.keywords:
+                item.add_marker(marker)
         return
 
-    marker = pytest.mark.skip(reason=skip_reason)
-    for item in items:
-        if "integration" in item.keywords:
-            item.add_marker(marker)
+    if not _groq_api_key_available():
+        groq_skip = pytest.mark.skip(
+            reason="Groq API key not set (GROQ_API_KEY or groq_key in .env)."
+        )
+        for item in items:
+            if "groq" in item.keywords:
+                item.add_marker(groq_skip)
