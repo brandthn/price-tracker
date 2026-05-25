@@ -61,5 +61,5 @@ variable "backend_image_tag" {
 variable "worker_ocr_image_tag" {
   description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
   type        = string
-  default     = "latest"
+  default     = "3fbb86a"
 }

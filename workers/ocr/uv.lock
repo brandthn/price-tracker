@@ -549,7 +549,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "receipt-ocr", editable = "../../dev_ocr" },
+    { name = "receipt-ocr", directory = "../../dev_ocr" },
     { name = "structlog", specifier = ">=24.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]
@@ -795,7 +795,7 @@ wheels = [
 [[package]]
 name = "receipt-ocr"
 version = "0.1.0"
-source = { editable = "../../dev_ocr" }
+source = { directory = "../../dev_ocr" }
 
 [[package]]
 name = "requests"

@@ -13,16 +13,13 @@ COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-COPY dev_ocr /receipt_ocr_src
+COPY dev_ocr /app/dev_ocr
 COPY workers/ocr/pyproject.toml workers/ocr/README.md ./workers/ocr/
 COPY workers/ocr/pricetracker_ocr ./workers/ocr/pricetracker_ocr
 
 WORKDIR /app/workers/ocr
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache /receipt_ocr_src
 
 
 FROM python:3.11-slim-bookworm AS runtime
@@ -35,7 +32,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 RUN useradd --create-home --uid 1000 app
 
 WORKDIR /app
-COPY --from=builder --chown=app:app /app/workers/ocr/.venv /app/.venv
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app workers/ocr/pricetracker_ocr ./pricetracker_ocr
 
 USER app

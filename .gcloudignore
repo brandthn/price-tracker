@@ -1,0 +1,38 @@
+# Cloud Build source upload exclusions.
+# Only workers/, backend/, dev_ocr/ and infra/ are needed for builds.
+
+.git
+.claude/
+
+# Large data files — never needed at build time
+data/
+docs/
+
+# Python artifacts
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/*.egg-info/
+**/dist/
+**/build/
+**/.venv/
+
+# Terraform state / local overrides
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+
+# Node / frontend
+node_modules/
+.next/
+out/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
