@@ -1,0 +1,31 @@
+# Build config Cloud Build for worker-ocr.
+# Submit from monorepo root:
+#   gcloud builds submit . --config=workers/ocr/cloudbuild.yaml
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-f'
+      - 'workers/ocr/Dockerfile'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _SHORT_SHA: 'latest'
