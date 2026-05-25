@@ -10,8 +10,8 @@ from receipt_ocr.backends.base import OcrBackend
 from receipt_ocr.backends.vlm.base import VlmProvider
 from receipt_ocr.backends.vlm.extraction import load_vlm_mode
 from receipt_ocr.constants import (
+    DEFAULT_GROQ_MAX_TOKENS,
     DEFAULT_GROQ_MODEL,
-    DEFAULT_VLM_MAX_TOKENS,
     DEFAULT_VLM_TEMPERATURE,
     ENV_GROQ_API_KEY,
     ENV_GROQ_API_KEY_LEGACY,
@@ -105,7 +105,7 @@ class GroqProvider(VlmProvider):
         ).strip()
         self._image_config = image_config or load_vlm_image_config_from_env()
         self._temperature = _env_float(ENV_VLM_TEMPERATURE, DEFAULT_VLM_TEMPERATURE)
-        self._max_tokens = _env_int(ENV_VLM_MAX_TOKENS, DEFAULT_VLM_MAX_TOKENS)
+        self._max_tokens = _env_int(ENV_VLM_MAX_TOKENS, DEFAULT_GROQ_MAX_TOKENS)
         self._client: object | None = None
 
     @property
