@@ -23,18 +23,16 @@ def strip_markdown_json_fence(text: str) -> str:
     return stripped.strip()
 
 
-_JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
+_TICKET_MARKER = re.compile(r'\{\s*"ticket"\s*:', re.IGNORECASE)
+_WHITESPACE = re.compile(r"\s+")
 
 
 def extract_json_candidate(text: str) -> str:
-    """Best-effort extraction of a JSON object from noisy VLM output."""
-    candidate = strip_markdown_json_fence(text.strip())
-    if candidate.startswith("{"):
-        return candidate
-    match = _JSON_OBJECT.search(candidate)
-    if match:
-        return match.group(0)
-    return candidate
+    """Return the best JSON substring chosen by :func:`_loads_json`."""
+    payload = _loads_json(text)
+    if payload is None:
+        return strip_markdown_json_fence(text.strip())
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def loads_vlm_payload(text: str) -> dict | None:
@@ -42,8 +40,38 @@ def loads_vlm_payload(text: str) -> dict | None:
     return _loads_json(text)
 
 
-def _loads_json(text: str) -> dict | None:
-    candidate = extract_json_candidate(text)
+def _collect_json_candidates(text: str) -> list[str]:
+    """Build parse attempts from noisy VLM text (single blob or repeated JSON)."""
+    stripped = strip_markdown_json_fence(text.strip())
+    if not stripped:
+        return []
+
+    candidates: list[str] = [stripped]
+
+    for match in _TICKET_MARKER.finditer(stripped):
+        if match.start() > 0:
+            candidates.append(stripped[match.start() :])
+
+    parts = re.split(r"\}\s*\n\s*\{", stripped)
+    if len(parts) > 1:
+        for index, part in enumerate(parts):
+            chunk = part.strip()
+            if not chunk.startswith("{"):
+                chunk = "{" + chunk
+            if not chunk.endswith("}"):
+                chunk = chunk + "}"
+            candidates.append(chunk)
+
+    seen: set[str] = set()
+    unique: list[str] = []
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            unique.append(candidate)
+    return unique
+
+
+def _try_parse_json_string(candidate: str) -> dict | None:
     try:
         payload = json.loads(candidate)
     except json.JSONDecodeError:
@@ -55,6 +83,48 @@ def _loads_json(text: str) -> dict | None:
         except Exception:
             return None
     return payload if isinstance(payload, dict) else None
+
+
+def _score_vlm_payload(payload: dict[str, Any]) -> int:
+    """Prefer payloads with more real products and header fields."""
+    ticket = payload.get(TicketField.TICKET.value)
+    if not isinstance(ticket, dict):
+        if TicketField.PRODUITS.value in payload:
+            ticket = payload
+        else:
+            return 0
+
+    score = 0
+    if _as_str(ticket.get(TicketField.CHAINE.value, "")):
+        score += 5
+    if _as_str(ticket.get(TicketField.DATE.value, "")):
+        score += 3
+    if _as_str(ticket.get(TicketField.ADRESSE.value, "")):
+        score += 1
+
+    products = ticket.get(TicketField.PRODUITS.value)
+    if isinstance(products, list):
+        for item in products:
+            if not isinstance(item, dict):
+                continue
+            name = _as_str(item.get(ProductField.NOM.value, ""))
+            if name:
+                score += 10
+    return score
+
+
+def _loads_json(text: str) -> dict | None:
+    best: dict[str, Any] | None = None
+    best_score = -1
+    for candidate in _collect_json_candidates(text):
+        payload = _try_parse_json_string(candidate)
+        if payload is None:
+            continue
+        score = _score_vlm_payload(payload)
+        if score > best_score:
+            best_score = score
+            best = payload
+    return best
 
 
 def merge_partial_tickets(parts: list[dict[str, Any]]) -> dict:
@@ -102,7 +172,7 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
     if not isinstance(ticket_raw, dict):
         raise ReceiptParseError("VLM JSON: 'ticket' must be an object.")
 
-    date = _as_str(ticket_raw.get(TicketField.DATE.value, ""))
+    date = _coerce_vlm_date(_as_str(ticket_raw.get(TicketField.DATE.value, "")))
     if date and not _looks_like_output_date(date):
         raise ReceiptParseError(
             f"VLM JSON: invalid date {date!r} (expected {OUTPUT_DATE_FORMAT!r})."
@@ -121,19 +191,21 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
     products: list[dict[str, Any]] = []
     for index, item in enumerate(products_raw):
         if not isinstance(item, dict):
-            raise ReceiptParseError(f"VLM JSON: produits[{index}] must be an object.")
-        name = _as_str(item.get(ProductField.NOM.value, ""))
-        if not name.strip():
             continue
-        price = _as_price(item.get(ProductField.PRIX.value))
+        name = _normalize_product_name(_as_str(item.get(ProductField.NOM.value, "")))
+        if not name:
+            continue
+        price = _round_price(_as_price(item.get(ProductField.PRIX.value)))
         units = _as_units(item.get(ProductField.UNITES.value))
         products.append(
             {
-                ProductField.NOM.value: name.strip(),
+                ProductField.NOM.value: name,
                 ProductField.PRIX.value: price,
                 ProductField.UNITES.value: units,
             }
         )
+
+    products = _dedupe_vlm_products(products)
 
     return {
         TicketField.TICKET.value: {
@@ -143,6 +215,36 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
             TicketField.PRODUITS.value: products,
         }
     }
+
+
+def _normalize_product_name(name: str) -> str:
+    """Collapse whitespace for stable duplicate detection."""
+    return _WHITESPACE.sub(" ", name.strip())
+
+
+def _round_price(value: float) -> float:
+    return round(value, 2)
+
+
+def _product_dedup_key(product: dict[str, Any]) -> tuple[str, float, int]:
+    return (
+        product[ProductField.NOM.value],
+        product[ProductField.PRIX.value],
+        product[ProductField.UNITES.value],
+    )
+
+
+def _dedupe_vlm_products(products: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove exact duplicate line items (common VLM hallucination)."""
+    seen: set[tuple[str, float, int]] = set()
+    deduped: list[dict[str, Any]] = []
+    for product in products:
+        key = _product_dedup_key(product)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(product)
+    return deduped
 
 
 def _as_str(value: Any) -> str:
@@ -172,11 +274,52 @@ def _as_units(value: Any) -> int:
         raise ReceiptParseError("VLM JSON: 'unites' must be an integer.")
     if isinstance(value, int):
         return max(1, value)
-    if isinstance(value, float) and value.is_integer():
-        return max(1, int(value))
+    if isinstance(value, float):
+        if value <= 0:
+            return 1
+        return max(1, int(round(value)))
     if isinstance(value, str) and value.strip().isdigit():
         return max(1, int(value.strip()))
     raise ReceiptParseError(f"VLM JSON: invalid unites value {value!r}.")
+
+
+_VLM_DATE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"^(\d{2})[/\-.](\d{2})[/\-.](\d{4})\s+(\d{1,2})[:hH](\d{2})$"),
+        "{2}{1}{0} {3:0>2}:{4}",
+    ),
+    (
+        re.compile(r"^(\d{2})[/\-.](\d{2})[/\-.](\d{2})\s+(\d{1,2})[:hH](\d{2})$"),
+        "20{2}{1}{0} {3:0>2}:{4}",
+    ),
+    (
+        re.compile(r"^(\d{4})[/\-.](\d{2})[/\-.](\d{2})\s+(\d{1,2})[:hH](\d{2})$"),
+        "{0}{1}{2} {3:0>2}:{4}",
+    ),
+    (
+        re.compile(r"^(\d{2})[/\-.](\d{2})[/\-.](\d{4})$"),
+        "{2}{1}{0} 00:00",
+    ),
+    (
+        re.compile(r"^(\d{2})[/\-.](\d{2})[/\-.](\d{2})$"),
+        "20{2}{1}{0} 00:00",
+    ),
+)
+
+
+def _coerce_vlm_date(value: str) -> str:
+    """Normalize common receipt date strings to ``yyyyMMdd HH:mm``."""
+    stripped = value.strip()
+    if not stripped or _looks_like_output_date(stripped):
+        return stripped
+    for pattern, template in _VLM_DATE_PATTERNS:
+        match = pattern.match(stripped)
+        if match:
+            try:
+                return template.format(*match.groups())
+            except (ValueError, IndexError):
+                continue
+    return stripped
 
 
 def _looks_like_output_date(value: str) -> bool:

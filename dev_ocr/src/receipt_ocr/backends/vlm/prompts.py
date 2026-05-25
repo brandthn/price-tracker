@@ -29,10 +29,12 @@ Règles strictes :
 - date au format yyyyMMdd HH:mm (ex. 20240315 14:30). Chaîne vide si absente.
 - chaine_supermarche : enseigne en tête de ticket. Chaîne vide si absente.
 - adresse : lignes d'adresse du magasin. Chaîne vide si absente.
-- produits : une entrée par article (pas totaux, TVA, paiement).
+- produits : une entrée par article (pas totaux, TVA, paiement). Pas de doublon :
+  chaque ligne d'article une seule fois dans la liste.
 - prix_unitaire_ou_kg : nombre décimal (point comme séparateur).
-- unites : entier >= 1.
+- unites : entier >= 1 (quantité achetée, ou poids en kg achété si le prix est par kg).
 - N'invente pas : liste uniquement le texte lisible. Si doute, omets le produit.
+- Un seul objet JSON ``{"ticket": ...}`` dans la réponse (pas de répétition du JSON).
 """
 
 RECEIPT_EXTRACTION_STRICT_PROMPT = """\

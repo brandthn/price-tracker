@@ -49,6 +49,36 @@ def test_extract_json_candidate_finds_embedded_object():
     assert "ticket" in candidate
 
 
+def test_coerce_vlm_date_from_french_short_format():
+    payload = {
+        "ticket": {
+            "date": "15/10/24",
+            "chaine_supermarche": "SUPER U",
+            "adresse": "",
+            "produits": [
+                {"nom_produit": "LAIT", "prix_unitaire_ou_kg": 1.09, "unites": 1},
+            ],
+        }
+    }
+    result = normalize_vlm_ticket(payload)
+    assert result["ticket"]["date"] == "20241015 00:00"
+
+
+def test_normalize_vlm_ticket_coerces_fractional_unites():
+    payload = {
+        "ticket": {
+            "date": "",
+            "chaine_supermarche": "SUPER U",
+            "adresse": "",
+            "produits": [
+                {"nom_produit": "RAISIN", "prix_unitaire_ou_kg": 2.79, "unites": 0.972},
+            ],
+        }
+    }
+    result = normalize_vlm_ticket(payload)
+    assert result["ticket"]["produits"][0]["unites"] == 1
+
+
 def test_normalize_vlm_ticket_rejects_bad_date():
     payload = {
         "ticket": {
@@ -62,6 +92,41 @@ def test_normalize_vlm_ticket_rejects_bad_date():
         normalize_vlm_ticket(payload)
 
 
+def test_dedupe_vlm_products_removes_exact_duplicates():
+    payload = {
+        "ticket": {
+            "date": "20241015 12:40",
+            "chaine_supermarche": "SUPER U",
+            "adresse": "",
+            "produits": [
+                {"nom_produit": "RAISIN BLANC ITALIA", "prix_unitaire_ou_kg": 2.79, "unites": 1},
+                {"nom_produit": "RAISIN BLANC ITALIA", "prix_unitaire_ou_kg": 2.79, "unites": 1},
+                {"nom_produit": "RAISIN BLANC ITALIA", "prix_unitaire_ou_kg": 2.79, "unites": 1},
+                {"nom_produit": "LAIT", "prix_unitaire_ou_kg": 1.09, "unites": 1},
+            ],
+        }
+    }
+    result = normalize_vlm_ticket(payload)
+    names = [p["nom_produit"] for p in result["ticket"]["produits"]]
+    assert names.count("RAISIN BLANC ITALIA") == 1
+    assert len(result["ticket"]["produits"]) == 2
+
+
+def test_loads_json_picks_richest_when_multiple_ticket_blobs():
+    noisy = """\
+{"ticket":{"date":"","chaine_supermarche":"","adresse":"","produits":[]}}
+{"ticket":{"date":"20241015 12:40","chaine_supermarche":"SUPER U","adresse":"PARIS","produits":[{"nom_produit":"LAIT","prix_unitaire_ou_kg":1.09,"unites":1}]}}
+"""
+    from receipt_ocr.vlm_parse import loads_vlm_payload
+
+    payload = loads_vlm_payload(noisy)
+    assert payload is not None
+    result = try_parse_vlm_json(noisy)
+    assert result is not None
+    assert result["ticket"]["chaine_supermarche"] == "SUPER U"
+    assert len(result["ticket"]["produits"]) == 1
+
+
 def test_normalize_vlm_ticket_skips_empty_product_names():
     payload = {
         "ticket": {
@@ -70,6 +135,7 @@ def test_normalize_vlm_ticket_skips_empty_product_names():
             "adresse": "",
             "produits": [
                 {"nom_produit": "", "prix_unitaire_ou_kg": 1.0, "unites": 1},
+                "not-a-dict",
                 {"nom_produit": "OK", "prix_unitaire_ou_kg": 2.5, "unites": 1},
             ],
         }
