@@ -10,7 +10,7 @@ backend-agnostic.
 ```python
 from receipt_ocr import extract_receipt
 
-data = extract_receipt("data/raw/images_tickets_caisse/4PQOWWaPoa.jpg")
+data = extract_receipt("data/raw/images_tickets_caisse/image_2.jpg")
 ```
 
 Output schema ([`project_guidelines.md`](project_guidelines.md)):
@@ -59,14 +59,14 @@ tests/
 ├── test_integration_real_images.py
 └── fixtures/
     ├── sample_texts.py       # synthetic OCR strings (fast unit tests)
-    └── super_u_ocr_text.py   # real OCR layout from 4PQOWWaPoa.jpg
+    └── super_u_ocr_text.py   # real OCR layout from image_2.jpg (Super U)
 
 scripts/
 ├── download_datasets.py      # HuggingFace + Kaggle (idempotent)
 └── smoke_test_ocr.py         # one-image OCR smoke test with timings
 
 data/raw/
-├── images_tickets_caisse/    # local receipt photos
+├── images_tickets_caisse/    # local receipt photos (image_1 … image_N, see rename_manifest.json)
 └── ocr_testing/              # dataset references
 
 conftest.py                   # pytest: integration markers, image limits
@@ -116,7 +116,7 @@ pytest --no-integration
 $env:PYTHONPATH = "src"                                    # PowerShell
 # export PYTHONPATH=src                                     # bash
 
-python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg
+python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/image_2.jpg
 ```
 
 Options:
@@ -135,7 +135,7 @@ Options:
 ```bash
 $env:PYTHONPATH = "src"
 python scripts/test_extract_receipt.py
-python scripts/test_extract_receipt.py data/raw/images_tickets_caisse/4PQOWWaPoa.jpg --backend ppocrv4
+python scripts/test_extract_receipt.py data/raw/images_tickets_caisse/image_2.jpg --backend ppocrv4
 ```
 
 The script imports `extract_receipt` from `receipt_ocr`, runs it on one image, validates the JSON schema, and prints the result.
@@ -255,7 +255,7 @@ python scripts/download_moondream_weights.py   # -> data/models/ (gitignored)
 
 $env:RECEIPT_OCR_BACKEND = "vlm"
 $env:RECEIPT_VLM_MODE = "transcribe"   # transcribe | json | multipass
-python scripts/run_vlm_test.py data/raw/images_tickets_caisse/IMG_20260206_142131.jpg
+python scripts/run_vlm_test.py data/raw/images_tickets_caisse/image_12.jpg
 python scripts/benchmark_vlm.py        # compare modes on reference images
 ```
 

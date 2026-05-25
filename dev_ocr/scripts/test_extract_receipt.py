@@ -37,7 +37,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-DEFAULT_IMAGE = ROOT / "data" / "raw" / "images_tickets_caisse" / "4PQOWWaPoa.jpg"
+DEFAULT_IMAGE = ROOT / "data" / "raw" / "images_tickets_caisse" / "image_2.jpg"
 
 
 def _validate_schema(result: dict) -> list[str]:

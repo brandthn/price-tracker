@@ -16,9 +16,9 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 DEFAULT_IMAGES = [
-    ROOT / "data/raw/images_tickets_caisse/IMG_20260206_142131.jpg",
-    ROOT / "data/raw/images_tickets_caisse/4PQOWWaPoa.jpg",
-    ROOT / "data/raw/images_tickets_caisse/IMG_20260203_140902.jpg",
+    ROOT / "data/raw/images_tickets_caisse/image_12.jpg",
+    ROOT / "data/raw/images_tickets_caisse/image_2.jpg",
+    ROOT / "data/raw/images_tickets_caisse/image_5.jpg",
 ]
 MODES = ("transcribe", "json", "multipass")
 OUT_DIR = ROOT / "data" / "benchmarks" / "vlm"
