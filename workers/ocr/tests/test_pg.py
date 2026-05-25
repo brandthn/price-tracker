@@ -11,15 +11,19 @@ from pricetracker_ocr import pg
 from pricetracker_ocr.config import Settings
 
 DDL = """
-CREATE TYPE ticket_status AS ENUM (
-  'pending', 'uploaded', 'ocr_processing', 'ocr_done', 'ocr_failed', 'validated'
-);
+DO $$ BEGIN
+    CREATE TYPE ticket_status AS ENUM (
+      'pending', 'uploaded', 'ocr_processing', 'ocr_done', 'ocr_failed', 'validated'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY
 );
 
-CREATE TABLE tickets (
+CREATE TABLE IF NOT EXISTS tickets (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES users(id),
   gcs_object_path text NOT NULL UNIQUE,
@@ -35,7 +39,7 @@ CREATE TABLE tickets (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE prix_extraits (
+CREATE TABLE IF NOT EXISTS prix_extraits (
   ticket_id uuid NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
   line_index smallint NOT NULL,
   raw_text text NOT NULL,
