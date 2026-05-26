@@ -30,6 +30,12 @@ def test_extract_ticket_id_valid():
     assert pubsub.extract_ticket_id(path) == "550e8400-e29b-41d4-a716-446655440000"
 
 
+def test_extract_ticket_id_hex_no_hyphens():
+    """Legacy backend bug: ticket_id.hex produces 32-char no-hyphen string."""
+    path = "tickets/raw/user-abc-123/550e8400e29b41d4a716446655440000.jpg"
+    assert pubsub.extract_ticket_id(path) == "550e8400-e29b-41d4-a716-446655440000"
+
+
 def test_extract_ticket_id_malformed():
     with pytest.raises(ValueError):
         pubsub.extract_ticket_id("wrong/path/file.jpg")

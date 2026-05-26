@@ -26,7 +26,8 @@ docs/
 *.tfplan
 *.tfvars
 
-# Node / frontend
+# Node / frontend (templates et node_modules non nécessaires au build)
+nextjs-admin-dashboard-main/
 node_modules/
 .next/
 out/

@@ -7,8 +7,11 @@ import json
 import re
 from pathlib import PurePosixPath
 
+# Accepts both formats:
+# - 36-char UUID with hyphens: 550e8400-e29b-41d4-a716-446655440000
+# - 32-char hex without hyphens: 550e8400e29b41d4a716446655440000 (legacy backend bug)
 _TICKET_PATH_RE = re.compile(
-    r"^tickets/raw/[^/]+/([0-9a-fA-F-]{36})\.[a-zA-Z0-9]+$",
+    r"^tickets/raw/[^/]+/([0-9a-fA-F]{32}|[0-9a-fA-F-]{36})\.[a-zA-Z0-9]+$",
 )
 
 
@@ -45,7 +48,12 @@ def parse_pubsub_envelope(body: bytes) -> tuple[str, str]:
 
 
 def extract_ticket_id(gcs_object_path: str) -> str:
-    """Return ticket UUID from ``tickets/raw/{user_id}/{uuid}.ext``."""
+    """Return ticket UUID from ``tickets/raw/{user_id}/{uuid}.ext``.
+
+    Normalises 32-char hex (no hyphens) to standard UUID format so downstream
+    PostgreSQL queries and logs are consistent regardless of which backend
+    version generated the GCS path.
+    """
     normalized = PurePosixPath(gcs_object_path).as_posix()
     match = _TICKET_PATH_RE.match(normalized)
     if not match:
@@ -53,7 +61,10 @@ def extract_ticket_id(gcs_object_path: str) -> str:
             f"GCS object path does not match tickets/raw/{{user_id}}/{{uuid}}.ext: "
             f"{gcs_object_path!r}"
         )
-    return match.group(1).lower()
+    raw = match.group(1).lower()
+    if len(raw) == 32:
+        return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"
+    return raw
 
 
 def extract_user_id(gcs_object_path: str) -> str:

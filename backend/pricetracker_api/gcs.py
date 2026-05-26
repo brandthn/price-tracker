@@ -88,7 +88,7 @@ def generate_ticket_upload_url(
             "Run with a service account (Cloud Run) or impersonate one locally."
         )
 
-    object_uuid = ticket_uuid or uuid.uuid4().hex
+    object_uuid = ticket_uuid or str(uuid.uuid4())
     object_name = f"tickets/raw/{user_id}/{object_uuid}.jpg"
 
     bucket = _storage_client().bucket(settings.prt_gcs_bucket_bronze)

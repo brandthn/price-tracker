@@ -59,7 +59,7 @@ async def request_upload_url(
             generate_ticket_upload_url,
             user_id=str(db_user.id),
             content_type=body.content_type,
-            ticket_uuid=ticket_id.hex,
+            ticket_uuid=str(ticket_id),
         )
     except RuntimeError as exc:
         logger.error("signed_url_generation_failed", error=str(exc))
