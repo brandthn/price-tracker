@@ -311,24 +311,63 @@ module "run_worker_off" {
 }
 
 # --- Worker Indices (Phase 9.1) ------------------------------------------
-# Cron quotidien (05h UTC) — calcul Laspeyres + détection anomalies.
+# Cron quotidien (05h UTC) — TRUNCATE + INSERT sur les 4 tables BQ Gold à
+# partir de prt_prod_silver.open_prices_clean :
+#   - aggregats_enseignes (fenêtre 12 semaines)
+#   - indices_inflation   (fenêtre 12 semaines, base 100)
+#   - rankings_produits   (fenêtre 8 semaines, top 500 hausses)
+#   - anomalies_detected  (fenêtre 8 semaines, |z| >= 3)
+#
+# Tailles :
+# - memory 1Gi : BQ client + structlog ; les requêtes tournent côté BQ donc
+#   pas de mémoire métier. 1Gi laisse marge pour cold start.
+# - cpu 1 : workload I/O-bound (waiting BQ jobs).
+# - timeout 900s : les 4 requêtes BQ sur ~5-30M lignes Silver finissent en
+#   < 60s en steady state ; 900s laisse marge pour les pics + relectures
+#   COUNT(*) post-INSERT.
+#
+# Image reste skeleton hello tant que worker_indices_image_tag n'est pas
+# remplacé par un SHA réel (var phase9-skeleton → bumper après gcloud builds submit).
 module "run_worker_indices" {
   source = "../../modules/cloud_run"
 
   project_id            = var.project_id
   region                = var.region
   name                  = "${var.name_prefix}-worker-indices"
-  image                 = local.cloud_run_skeleton_image
+  image                 = var.worker_indices_image_tag == "phase9-skeleton" ? local.cloud_run_skeleton_image : "${module.artifact_registry.docker_registry_url}/worker-indices:${var.worker_indices_image_tag}"
   service_account_email = module.iam.emails["worker"]
 
-  min_instances = 0
-  max_instances = 1
-  cpu           = "1"
-  memory        = "512Mi"
+  min_instances   = 0
+  max_instances   = 1
+  cpu             = "1"
+  memory          = "1Gi"
+  timeout_seconds = 900
 
   vpc_subnet = local.cloud_run_subnet
   vpc_egress = "PRIVATE_RANGES_ONLY"
   ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT     = var.project_id
+    PRT_GCP_REGION           = var.region
+    PRT_BQ_DATASET_SILVER    = local.bq_silver_dataset
+    PRT_BQ_DATASET_GOLD      = local.bq_gold_dataset
+    PRT_BQ_TABLE_OPEN_PRICES = google_bigquery_table.open_prices_clean.table_id
+    PRT_BQ_TABLE_AGGREGATS   = google_bigquery_table.aggregats_enseignes.table_id
+    PRT_BQ_TABLE_INDICES     = google_bigquery_table.indices_inflation.table_id
+    PRT_BQ_TABLE_RANKINGS    = google_bigquery_table.rankings_produits.table_id
+    PRT_BQ_TABLE_ANOMALIES   = google_bigquery_table.anomalies_detected.table_id
+    PRT_BQ_LOCATION          = "EU"
+
+    # Paramètres métier (cf. workers/indices/pricetracker_indices/config.py).
+    PRT_INDICES_MIN_OBSERVATIONS       = "3"
+    PRT_INDICES_WINDOW_WEEKS_AGGREGATS = "12"
+    PRT_INDICES_WINDOW_WEEKS_RANKINGS  = "8"
+    PRT_INDICES_Z_THRESHOLD            = "3.0"
+    PRT_INDICES_TOP_N_RANKINGS         = "500"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
 
   labels = merge(var.labels, { component = "worker-indices" })
 }
@@ -381,24 +420,55 @@ module "run_frontend" {
 }
 
 # --- Worker Alertes (Phase 9.2) ------------------------------------------
-# Cron quotidien (07h UTC) — push FCM sur produits en hausse.
+# Cron quotidien (07h UTC) — V1 SIMULATION : lit BQ Gold (rankings_produits +
+# anomalies_detected), agrège les top signaux, écrit un rapport JSON sur
+# gs://<bronze>/alerts/date=YYYY-MM-DD/report.json. PAS de FCM push réel
+# (frontend web only, pas de device tokens disponibles).
+#
+# Future itération (Phase 11) :
+# - Endpoint backend `GET /alerts/latest` qui lit le rapport.
+# - Email/push réel via Firebase Cloud Messaging + notifications_prefs.
 module "run_worker_alertes" {
   source = "../../modules/cloud_run"
 
   project_id            = var.project_id
   region                = var.region
   name                  = "${var.name_prefix}-worker-alertes"
-  image                 = local.cloud_run_skeleton_image
+  image                 = var.worker_alertes_image_tag == "phase9-skeleton" ? local.cloud_run_skeleton_image : "${module.artifact_registry.docker_registry_url}/worker-alertes:${var.worker_alertes_image_tag}"
   service_account_email = module.iam.emails["worker"]
 
-  min_instances = 0
-  max_instances = 1
-  cpu           = "1"
-  memory        = "512Mi"
+  min_instances   = 0
+  max_instances   = 1
+  cpu             = "1"
+  memory          = "512Mi"
+  timeout_seconds = 300
 
   vpc_subnet = local.cloud_run_subnet
   vpc_egress = "PRIVATE_RANGES_ONLY"
   ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT   = var.project_id
+    PRT_GCP_REGION         = var.region
+    PRT_BQ_DATASET_GOLD    = local.bq_gold_dataset
+    PRT_BQ_TABLE_RANKINGS  = google_bigquery_table.rankings_produits.table_id
+    PRT_BQ_TABLE_ANOMALIES = google_bigquery_table.anomalies_detected.table_id
+    PRT_BQ_LOCATION        = "EU"
+
+    # Bucket bronze réutilisé (worker-sa = objectAdmin). Pas de nouveau bucket
+    # dédié — les rapports sont peu nombreux (1/jour) et bénéficient du même
+    # lifecycle 30j NEARLINE / 90j delete.
+    PRT_ALERTS_BUCKET = module.bucket_bronze.name
+    PRT_ALERTS_PREFIX = "alerts"
+
+    # Paramètres métier (cf. workers/alertes/pricetracker_alertes/config.py).
+    PRT_ALERTES_TOP_RANKINGS   = "50"
+    PRT_ALERTES_MIN_PCT_CHANGE = "0.05"
+    PRT_ALERTES_TOP_ANOMALIES  = "100"
+    PRT_ALERTES_LOOKBACK_WEEKS = "2"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
 
   labels = merge(var.labels, { component = "worker-alertes" })
 }

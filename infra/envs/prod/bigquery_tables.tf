@@ -16,10 +16,12 @@
 
 locals {
   bq_silver_dataset = "${replace(var.name_prefix, "-", "_")}_silver"
+  bq_gold_dataset   = "${replace(var.name_prefix, "-", "_")}_gold"
 
   # Labels communs aux tables Silver. Le label `component=silver-<role>` permet
   # de filtrer côté Cloud Logging / cost reports.
   bq_silver_labels = merge(var.labels, { component = "silver" })
+  bq_gold_labels   = merge(var.labels, { component = "gold" })
 }
 
 # --- open_prices_clean (Phase 6.5 — schema v2) ---------------------------
@@ -104,6 +106,114 @@ resource "google_bigquery_table" "catalogue_produits" {
   # requêtes filtrent par `ean` (clustering) — un scan complet reste
   # cheap. Voir le DDL SQL (`infra/bigquery/sql/silver_catalogue_produits.sql`).
   clustering = ["ean"]
+
+  depends_on = [module.bigquery]
+}
+
+# =========================================================================
+# Tables BQ Gold — alimentées par worker-indices (Phase 9.1) cron 05h UTC.
+# =========================================================================
+#
+# Stratégie d'écriture : le worker-indices fait `CREATE OR REPLACE TABLE` à
+# chaque run sur les 4 tables. Comme Terraform crée ces tables avec partition
+# + clustering + labels + schéma, et que `CREATE OR REPLACE TABLE` recrée la
+# table SANS preserver ces options, on a deux possibilités :
+#   1. Worker fait `MERGE` ou `TRUNCATE + INSERT` pour préserver les options.
+#   2. Worker fait `CREATE OR REPLACE` avec les options inline dans le DDL.
+#
+# On choisit (1) : le SQL du worker fait `DELETE WHERE week_start_date >= ...`
+# puis `INSERT INTO` (recalcule la fenêtre glissante de 12 semaines). Les
+# options de partition/clustering Terraform sont préservées et la table reste
+# la source de vérité côté repo.
+#
+# Toutes partitionnées par la colonne temporelle dominante. Pas de clustering
+# par `country_code` seul car la France représente >99% des lignes (faible
+# gain de pruning) — on cluster sur les axes différenciants.
+
+# --- aggregats_enseignes -------------------------------------------------
+resource "google_bigquery_table" "aggregats_enseignes" {
+  project    = var.project_id
+  dataset_id = local.bq_gold_dataset
+  table_id   = "aggregats_enseignes"
+
+  description         = "Agrégats hebdomadaires par enseigne × pays — worker-indices (cron 05h UTC)."
+  deletion_protection = false
+  labels              = local.bq_gold_labels
+
+  schema = file("${path.module}/../../bigquery/schemas/gold_aggregats_enseignes.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "week_start_date"
+  }
+
+  clustering = ["country_code", "store_brand_normalized"]
+
+  depends_on = [module.bigquery]
+}
+
+# --- indices_inflation ---------------------------------------------------
+resource "google_bigquery_table" "indices_inflation" {
+  project    = var.project_id
+  dataset_id = local.bq_gold_dataset
+  table_id   = "indices_inflation"
+
+  description         = "Indice inflation base 100 par enseigne × pays — worker-indices (cron 05h UTC)."
+  deletion_protection = false
+  labels              = local.bq_gold_labels
+
+  schema = file("${path.module}/../../bigquery/schemas/gold_indices_inflation.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "week_start_date"
+  }
+
+  clustering = ["country_code", "store_brand_normalized"]
+
+  depends_on = [module.bigquery]
+}
+
+# --- rankings_produits ---------------------------------------------------
+resource "google_bigquery_table" "rankings_produits" {
+  project    = var.project_id
+  dataset_id = local.bq_gold_dataset
+  table_id   = "rankings_produits"
+
+  description         = "Top 500 hausses produits semaine sur semaine — worker-indices (cron 05h UTC)."
+  deletion_protection = false
+  labels              = local.bq_gold_labels
+
+  schema = file("${path.module}/../../bigquery/schemas/gold_rankings_produits.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "reference_week"
+  }
+
+  clustering = ["product_code"]
+
+  depends_on = [module.bigquery]
+}
+
+# --- anomalies_detected --------------------------------------------------
+resource "google_bigquery_table" "anomalies_detected" {
+  project    = var.project_id
+  dataset_id = local.bq_gold_dataset
+  table_id   = "anomalies_detected"
+
+  description         = "Anomalies prix (|z| >= 3) — worker-indices (cron 05h UTC), consommé par worker-alertes."
+  deletion_protection = false
+  labels              = local.bq_gold_labels
+
+  schema = file("${path.module}/../../bigquery/schemas/gold_anomalies_detected.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "week_start_date"
+  }
+
+  clustering = ["product_code", "store_brand_normalized"]
 
   depends_on = [module.bigquery]
 }

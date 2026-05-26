@@ -1,0 +1,18 @@
+# Patterns ignorés par `gcloud builds submit` (≠ .dockerignore).
+
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+.git/
+.gitignore
+
+# README.md NÉCESSAIRE : pyproject.toml déclare `readme = "README.md"` →
+# hatchling échoue à builder la wheel si le fichier est absent.
+
+tests/

@@ -1,0 +1,28 @@
+# Build config Cloud Build pour worker-indices.
+# Cf. workers/off/cloudbuild.yaml pour le rationnel.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-indices:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-indices:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-indices:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _SHORT_SHA: 'latest'
