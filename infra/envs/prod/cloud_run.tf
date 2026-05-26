@@ -333,6 +333,53 @@ module "run_worker_indices" {
   labels = merge(var.labels, { component = "worker-indices" })
 }
 
+# --- Frontend Next.js (Phase 10) -----------------------------------------
+# Ingress public : page consultable par n'importe qui via HTTPS.
+# Pas de VPC egress : le front ne parle qu'au backend Cloud Run public,
+# pas besoin de remonter dans le subnet privé.
+#
+# memory 512Mi : Next.js 16 standalone tourne autour de 200-300Mi RSS en
+# steady state ; 512Mi laisse marge pour les pics de RSC.
+# cpu "1" : I/O-bound (forward HTTP au backend), aucun calcul lourd côté front.
+# timeout 30s : RSC en mode no-store → un appel BQ peut prendre ~3s cold,
+# 30s couvre largement les cas pathologiques.
+#
+# Pas de VPC egress (vpc_subnet = null) : le front n'a aucune ressource
+# privée à atteindre. Tous les appels backend partent en internet egress
+# vers l'URL publique Cloud Run.
+module "run_frontend" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-frontend"
+  image                 = "${module.artifact_registry.docker_registry_url}/frontend:${var.frontend_image_tag}"
+  service_account_email = module.iam.emails["frontend"]
+
+  min_instances   = 0
+  max_instances   = 3
+  cpu             = "1"
+  memory          = "512Mi"
+  timeout_seconds = 30
+
+  vpc_subnet = null
+  ingress    = "INGRESS_TRAFFIC_ALL"
+
+  allow_unauthenticated = true
+
+  env = {
+    # Runtime vars consommées côté Node (RSC) — le bundle client a sa propre
+    # copie inlinée au moment de `next build` (cf. ARG dans frontend/Dockerfile).
+    NEXT_PUBLIC_API_BASE_URL = "https://prt-prod-backend-y5iagyfila-ew.a.run.app"
+    NEXT_PUBLIC_DEMO_BEARER  = "demo"
+
+    # Désactive la télémétrie Vercel — pas besoin sur Cloud Run.
+    NEXT_TELEMETRY_DISABLED = "1"
+  }
+
+  labels = merge(var.labels, { component = "frontend" })
+}
+
 # --- Worker Alertes (Phase 9.2) ------------------------------------------
 # Cron quotidien (07h UTC) — push FCM sur produits en hausse.
 module "run_worker_alertes" {

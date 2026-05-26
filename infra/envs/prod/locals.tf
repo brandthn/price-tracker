@@ -3,6 +3,7 @@ locals {
   backend_sa    = module.iam.service_accounts["backend"].member
   worker_sa     = module.iam.service_accounts["worker"].member
   gh_actions_sa = module.iam.service_accounts["gh-actions"].member
+  frontend_sa   = module.iam.service_accounts["frontend"].member
 
   # Default lifecycle rules for the data lake buckets (bronze, silver).
   # STANDARD -> NEARLINE @ 30d, delete @ 90d. Versioning rotation @ 90d.

@@ -63,3 +63,20 @@ variable "worker_ocr_image_tag" {
   type        = string
   default     = "63c5d4a"
 }
+
+variable "frontend_image_tag" {
+  description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
+  type        = string
+  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
+  default = "e55e973"
+}
+
+variable "frontend_cors_origins" {
+  description = <<-EOT
+    Origines autorisées par le bucket bronze pour les Signed URLs PUT/GET depuis
+    le navigateur. `["*"]` en mode démo Phase 10. À restreindre quand l'URL Cloud
+    Run du frontend est stable (ex: ["https://prt-prod-frontend-XXX-ew.a.run.app"]).
+  EOT
+  type        = list(string)
+  default     = ["*"]
+}

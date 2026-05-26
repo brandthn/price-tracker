@@ -4,9 +4,11 @@
 .git
 .claude/
 
-# Large data files — never needed at build time
-data/
-docs/
+# Large data files — never needed at build time.
+# IMPORTANT : leading slash = ancré à la racine du repo. Sans le slash, `data/`
+# matcherait aussi `frontend/src/components/Layouts/sidebar/data/` et autres.
+/data/
+/docs/
 
 # Python artifacts
 **/__pycache__
@@ -26,11 +28,11 @@ docs/
 *.tfplan
 *.tfvars
 
-# Node / frontend (templates et node_modules non nécessaires au build)
-nextjs-admin-dashboard-main/
-node_modules/
-.next/
-out/
+# Node / frontend — on garde frontend/ dans le contexte (Dockerfile s'y trouve)
+# mais on exclut node_modules et build artefacts (refait dans le builder stage).
+**/node_modules/
+**/.next/
+**/out/
 
 # OS / editors
 .DS_Store
