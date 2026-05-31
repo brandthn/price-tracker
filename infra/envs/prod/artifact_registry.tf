@@ -9,6 +9,6 @@ module "artifact_registry" {
   repository_id = "${var.name_prefix}-docker"
   labels        = merge(var.labels, { component = "artifact-registry" })
 
-  readers = [local.backend_sa, local.worker_sa]
+  readers = [local.backend_sa, local.worker_sa, local.frontend_sa]
   writers = [local.gh_actions_sa]
 }

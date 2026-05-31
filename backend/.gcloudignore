@@ -1,0 +1,15 @@
+# Patterns ignorés par `gcloud builds submit`.
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+.git/
+.gitignore
+
+# README.md NÉCESSAIRE : pyproject.toml déclare `readme = "README.md"`.
+tests/

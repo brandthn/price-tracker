@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 """Download receipt images from GCS bronze bucket."""
+=======
+"""Téléchargement des images tickets depuis GCS bronze."""
+>>>>>>> origin
 
 from __future__ import annotations
 
@@ -10,8 +14,11 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 
 class ImageTooLargeError(Exception):
+<<<<<<< HEAD
     """Raised when the GCS object exceeds the allowed download size."""
 
+=======
+>>>>>>> origin
     def __init__(self, path: str, size: int) -> None:
         self.path = path
         self.size = size

@@ -115,5 +115,14 @@ module "iam" {
       # d'impersonner prt-prod-terraform-sa pour les changements infra.
       project_roles = []
     }
+    frontend = {
+      display_name = "Frontend Next.js SA (Cloud Run)"
+      description  = "Runtime du service Cloud Run prt-prod-frontend (Phase 10). Aucun accès data : le front parle uniquement HTTPS au backend public."
+      project_roles = [
+        "roles/logging.logWriter",
+        "roles/monitoring.metricWriter",
+        "roles/cloudtrace.agent",
+      ]
+    }
   }
 }

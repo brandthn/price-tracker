@@ -1,0 +1,41 @@
+# Cloud Build source upload exclusions.
+# Only workers/, backend/, dev_ocr/ and infra/ are needed for builds.
+
+.git
+.claude/
+
+# Large data files — never needed at build time.
+# IMPORTANT : leading slash = ancré à la racine du repo. Sans le slash, `data/`
+# matcherait aussi `frontend/src/components/Layouts/sidebar/data/` et autres.
+/data/
+/docs/
+
+# Python artifacts
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/*.egg-info/
+**/dist/
+**/build/
+**/.venv/
+
+# Terraform state / local overrides
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+
+# Node / frontend — on garde frontend/ dans le contexte (Dockerfile s'y trouve)
+# mais on exclut node_modules et build artefacts (refait dans le builder stage).
+**/node_modules/
+**/.next/
+**/out/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # OCR -----------------------------------------------------------------
     prt_ocr_engine: str = Field(default="groq")
     prt_ocr_confidence_threshold: float = Field(default=0.55)
+<<<<<<< HEAD
+=======
+    prt_ocr_max_image_mb: int = Field(default=10)
+>>>>>>> origin
 
     # Cloud SQL -----------------------------------------------------------
     prt_pg_host: str = Field(default="")
@@ -43,7 +47,11 @@ class Settings(BaseSettings):
     # Logging -------------------------------------------------------------
     prt_log_level: str = Field(default="INFO")
 
+<<<<<<< HEAD
     # Future-phase (declared, unused) -------------------------------------
+=======
+    # Future-phase EAN matching (déclaré, non utilisé Phase 8) ------------
+>>>>>>> origin
     prt_models_bucket: str | None = None
     prt_ocr_model_uri: str | None = None
     prt_ean_match_cosine_threshold: float = Field(default=0.78)

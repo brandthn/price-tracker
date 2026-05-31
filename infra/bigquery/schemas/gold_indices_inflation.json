@@ -1,0 +1,44 @@
+[
+  {
+    "name": "week_start_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Lundi de la semaine ISO. Colonne de partition."
+  },
+  {
+    "name": "store_brand_normalized",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Enseigne normalisee."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "ISO-3166 alpha-2."
+  },
+  {
+    "name": "observations",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Nombre de releves utilises pour calculer la mediane."
+  },
+  {
+    "name": "median_price_eur",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix median de la semaine."
+  },
+  {
+    "name": "base_price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix median de la premiere semaine disponible (base 100)."
+  },
+  {
+    "name": "index_value",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Indice chaine base 100. 103.5 = +3.5% vs premiere semaine."
+  }
+]

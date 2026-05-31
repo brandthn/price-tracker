@@ -71,3 +71,18 @@ variable "object_creators" {
   type        = list(string)
   default     = []
 }
+
+variable "cors" {
+  description = <<-EOT
+    CORS rules applied to the bucket. Required for browser-initiated PUT/GET via Signed URLs
+    (e.g. ticket upload from the frontend). Each entry maps to a `cors` block on the bucket.
+    Leave empty to disable CORS.
+  EOT
+  type = list(object({
+    origin          = list(string)
+    method          = list(string)
+    response_header = list(string)
+    max_age_seconds = number
+  }))
+  default = []
+}

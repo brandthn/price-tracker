@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 """structlog → stdout JSON. Cf. worker-ingestion pour la justification."""
+=======
+"""structlog → stdout JSON."""
+>>>>>>> origin
 
 from __future__ import annotations
 
@@ -37,5 +41,9 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
+<<<<<<< HEAD
 def get_logger(name: str = "pricetracker_off") -> structlog.stdlib.BoundLogger:
+=======
+def get_logger(name: str = "pricetracker_ocr") -> structlog.stdlib.BoundLogger:
+>>>>>>> origin
     return structlog.get_logger(name)

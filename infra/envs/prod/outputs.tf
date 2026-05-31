@@ -82,6 +82,7 @@ output "cloud_run_services" {
     worker-off       = { name = module.run_worker_off.name, uri = module.run_worker_off.uri }
     worker-indices   = { name = module.run_worker_indices.name, uri = module.run_worker_indices.uri }
     worker-alertes   = { name = module.run_worker_alertes.name, uri = module.run_worker_alertes.uri }
+    frontend         = { name = module.run_frontend.name, uri = module.run_frontend.uri }
   }
 }
 

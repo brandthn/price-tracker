@@ -38,14 +38,16 @@ module "cloud_scheduler_jobs" {
     "${var.name_prefix}-trigger-indices" = {
       schedule                   = "0 5 * * *"
       target_url                 = module.run_worker_indices.uri
+      target_path                = "/run"
       oidc_service_account_email = module.iam.emails["worker"]
-      description                = "Phase 9.1 — calcul indice Laspeyres + détection anomalies → BQ Gold."
+      description                = "Phase 9.1 — recalcul des 4 tables BQ Gold (aggregats, indices, rankings, anomalies)."
     }
     "${var.name_prefix}-trigger-alertes" = {
       schedule                   = "0 7 * * *"
       target_url                 = module.run_worker_alertes.uri
+      target_path                = "/run"
       oidc_service_account_email = module.iam.emails["worker"]
-      description                = "Phase 9.2 — push FCM sur les produits en hausse pour chaque user."
+      description                = "Phase 9.2 V1 simulation — agrégation BQ Gold → rapport JSON sur GCS bronze/alerts/."
     }
   }
 

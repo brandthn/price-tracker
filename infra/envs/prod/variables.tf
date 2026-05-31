@@ -48,5 +48,49 @@ variable "worker_ingestion_image_tag" {
 variable "worker_off_image_tag" {
   description = "Tag de l'image worker-off en AR. Doit exister dans le repo prt-prod-docker."
   type        = string
-  default     = "e1e475c"
+  default     = "13d832b"
+}
+
+variable "backend_image_tag" {
+  description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
+  type        = string
+  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
+  default = "63c5d4a"
+}
+
+variable "worker_ocr_image_tag" {
+  description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
+  type        = string
+  default     = "63c5d4a"
+}
+
+variable "worker_indices_image_tag" {
+  description = "Tag de l'image worker-indices en AR. Bumper après chaque build (gcloud builds submit . --config=workers/indices/cloudbuild.yaml)."
+  type        = string
+  # Placeholder skeleton — Cloud Run garde l'image `us-docker.pkg.dev/cloudrun/container/hello`
+  # tant que ce default n'est pas remplacé par un SHA réel pushé en AR.
+  default = "phase9-skeleton"
+}
+
+variable "worker_alertes_image_tag" {
+  description = "Tag de l'image worker-alertes en AR. Bumper après chaque build (gcloud builds submit . --config=workers/alertes/cloudbuild.yaml)."
+  type        = string
+  default     = "phase9-skeleton"
+}
+
+variable "frontend_image_tag" {
+  description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
+  type        = string
+  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
+  default = "b518872"
+}
+
+variable "frontend_cors_origins" {
+  description = <<-EOT
+    Origines autorisées par le bucket bronze pour les Signed URLs PUT/GET depuis
+    le navigateur. `["*"]` en mode démo Phase 10. À restreindre quand l'URL Cloud
+    Run du frontend est stable (ex: ["https://prt-prod-frontend-XXX-ew.a.run.app"]).
+  EOT
+  type        = list(string)
+  default     = ["*"]
 }

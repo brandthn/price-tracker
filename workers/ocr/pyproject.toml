@@ -42,7 +42,11 @@ packages = ["pricetracker_ocr"]
 package = true
 
 [tool.uv.sources]
+<<<<<<< HEAD
 receipt-ocr = { path = "../../dev_ocr", editable = true }
+=======
+receipt-ocr = { path = "../../dev_ocr" }
+>>>>>>> origin
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

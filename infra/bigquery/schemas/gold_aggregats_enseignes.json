@@ -1,0 +1,38 @@
+[
+  {
+    "name": "week_start_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Lundi de la semaine ISO. Colonne de partition."
+  },
+  {
+    "name": "store_brand_normalized",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Enseigne normalisee (E.Leclerc, Carrefour Market, ...). Cle d'agregation."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "ISO-3166 alpha-2 (FR, GP, MQ, GF, RE, YT, ...)."
+  },
+  {
+    "name": "observations",
+    "type": "INT64",
+    "mode": "REQUIRED",
+    "description": "Nombre de releves de prix sur la semaine (proxy volume)."
+  },
+  {
+    "name": "avg_price_eur",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix moyen (sensible aux outliers, utile pour croiser)."
+  },
+  {
+    "name": "median_price_eur",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prix median APPROX_QUANTILES (robuste aux outliers). Reference principale."
+  }
+]

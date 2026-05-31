@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 """Vérif OIDC du JWT Cloud Scheduler. Cf. worker-ingestion."""
+=======
+"""Vérif OIDC du JWT Pub/Sub. Calqué sur workers/off/pricetracker_off/auth.py."""
+>>>>>>> origin
 
 from __future__ import annotations
 
