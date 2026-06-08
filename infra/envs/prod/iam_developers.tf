@@ -7,6 +7,7 @@ variable "developer_members" {
   default = [
     "user:giorgioesgi@gmail.com",
     "user:lomaty99@gmail.com",
+    "user:tongnia.chatelain@gmail.com"
   ]
 }
 
