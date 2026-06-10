@@ -1,0 +1,10 @@
+# Optional extra for the local hybrid receipt VLM provider
+# (RECEIPT_VLM_MODEL=receipt-vlm-500m). Never part of the base install.
+#
+# Also requires the model code package:
+#   pip install -e vlm_training
+torch>=2.2.0
+transformers>=4.40.0
+tokenizers>=0.19.0
+Pillow>=10.0.0
+numpy>=1.26.0

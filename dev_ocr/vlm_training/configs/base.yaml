@@ -1,0 +1,20 @@
+# Defaults shared by all phases; phase files overlay this.
+checkpoint_dir: checkpoints
+batch_size: 4      # fits an 8GB RTX 2070 in fp16; raise on T4/A100
+num_workers: 0     # Windows-safe; raise on Linux
+max_length: 896
+weight_decay: 0.01
+max_gen_samples: 16    # generation-based val metrics budget per epoch
+
+model:
+  lora_rank: 16
+  lora_alpha: 32.0
+  lora_dropout: 0.05
+
+data:
+  synthetic_dir: data/synthetic
+  sroie_dir: null                                   # local SROIE folder (optional)
+  cord_limit: 800
+  real_images_dir: ../data/raw/images_tickets_caisse
+  real_labels_dir: data/real_labels
+  synthetic_val_fraction: 0.05

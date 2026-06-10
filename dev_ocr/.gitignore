@@ -6,3 +6,11 @@ data/models/
 data/benchmarks/
 *.mf
 *.mf.gz
+
+# receipt_vlm training artefacts (large binaries / generated data — never commit)
+vlm_training/checkpoints/
+vlm_training/data/
+vlm_training/runs/
+vlm_training/.venv/
+*.pt
+*.ckpt

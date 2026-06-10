@@ -1,0 +1,207 @@
+"""Hand-rolled 3-phase training loop — no HuggingFace Trainer.
+
+Phases (adapted spec §6):
+    1. Projector warmup     — projector only, CORD+SROIE+synthetic
+    2. LoRA fine-tuning     — projector + LoRA, all sources
+    3. JSON alignment       — projector + LoRA, low LR, real photos + synthetic
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from pathlib import Path
+from typing import Any, Optional
+
+import torch
+import torch.nn as nn
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
+
+from receipt_vlm.data.schema import Ticket, ticket_from_json
+from receipt_vlm.utils.metrics import evaluate_tickets
+
+
+class ReceiptTrainer:
+    """Raw-PyTorch trainer with mixed precision, clipping and best-val checkpoints.
+
+    Args:
+        model: a :class:`~receipt_vlm.models.vlm.ReceiptVLM`.
+        train_loader / val_loader: dataloaders yielding the dict batches
+            produced by :func:`receipt_vlm.data.dataset.collate_receipts`.
+        config: arbitrary config dict; must contain ``checkpoint_dir``.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        config: dict[str, Any],
+    ) -> None:
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.config = config
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.use_bf16 = (
+            self.device.type == "cuda" and torch.cuda.is_bf16_supported()
+        )
+        self.amp_dtype = torch.bfloat16 if self.use_bf16 else torch.float16
+        # GradScaler is only needed for fp16 (bf16 has enough dynamic range).
+        self.scaler = torch.amp.GradScaler(
+            enabled=self.device.type == "cuda" and not self.use_bf16
+        )
+        self.model.to(self.device)
+
+    # ------------------------------------------------------------------
+
+    def train_phase(
+        self,
+        phase: int,
+        epochs: int,
+        lr: float,
+        trainable_patterns: tuple[str, ...] = ("projector", "lora_"),
+        weight_decay: float = 0.01,
+        max_gen_samples: int = 16,
+    ) -> dict[str, Any]:
+        """Run one curriculum phase; returns the best validation record."""
+        self._set_trainable(trainable_patterns)
+        trainable = [p for p in self.model.parameters() if p.requires_grad]
+        if not trainable:
+            raise ValueError(f"no trainable parameters match {trainable_patterns}")
+        print(
+            f"Phase {phase}: {sum(p.numel() for p in trainable):,} trainable params "
+            f"(patterns: {', '.join(trainable_patterns)})"
+        )
+
+        optimizer = AdamW(trainable, lr=lr, weight_decay=weight_decay)
+        scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
+
+        best: dict[str, Any] = {"val_loss": float("inf")}
+        for epoch in range(epochs):
+            start = time.time()
+            train_loss = self._train_epoch(optimizer)
+            val_loss, val_metrics = self._val_epoch(max_gen_samples)
+            scheduler.step()
+
+            elapsed = time.time() - start
+            f1 = val_metrics.get("field_f1", float("nan"))
+            print(
+                f"Phase {phase} | Epoch {epoch + 1}/{epochs} | "
+                f"train {train_loss:.4f} | val {val_loss:.4f} | "
+                f"F1 {f1:.3f} | {elapsed:.0f}s"
+            )
+
+            if val_loss < best["val_loss"]:
+                best = {
+                    "phase": phase,
+                    "epoch": epoch + 1,
+                    "val_loss": val_loss,
+                    **val_metrics,
+                }
+                self._save_checkpoint(f"phase{phase}_best.pt", best)
+        return best
+
+    # ------------------------------------------------------------------
+
+    def _set_trainable(self, patterns: tuple[str, ...]) -> None:
+        for name, param in self.model.named_parameters():
+            param.requires_grad = any(pattern in name for pattern in patterns)
+
+    def _autocast(self):
+        return torch.autocast(
+            device_type=self.device.type,
+            dtype=self.amp_dtype,
+            enabled=self.device.type == "cuda",
+        )
+
+    def _train_epoch(self, optimizer: torch.optim.Optimizer) -> float:
+        self.model.train()
+        total_loss, n_batches = 0.0, 0
+        for batch in self.train_loader:
+            pixel_values = batch["pixel_values"].to(self.device)
+            input_ids = batch["input_ids"].to(self.device)
+            attention_mask = batch["attention_mask"].to(self.device)
+            labels = batch["labels"].to(self.device)
+
+            optimizer.zero_grad(set_to_none=True)
+            with self._autocast():
+                _, loss = self.model(
+                    pixel_values, input_ids,
+                    attention_mask=attention_mask, labels=labels,
+                )
+
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(optimizer)
+            nn.utils.clip_grad_norm_(
+                [p for p in self.model.parameters() if p.requires_grad], 1.0
+            )
+            self.scaler.step(optimizer)
+            self.scaler.update()
+
+            total_loss += loss.item()
+            n_batches += 1
+        return total_loss / max(1, n_batches)
+
+    @torch.no_grad()
+    def _val_epoch(self, max_gen_samples: int) -> tuple[float, dict[str, float]]:
+        self.model.eval()
+        total_loss, n_batches = 0.0, 0
+        predictions: list[Ticket] = []
+        golds: list[Ticket] = []
+
+        for batch in self.val_loader:
+            pixel_values = batch["pixel_values"].to(self.device)
+            input_ids = batch["input_ids"].to(self.device)
+            attention_mask = batch["attention_mask"].to(self.device)
+            labels = batch["labels"].to(self.device)
+
+            with self._autocast():
+                _, loss = self.model(
+                    pixel_values, input_ids,
+                    attention_mask=attention_mask, labels=labels,
+                )
+            total_loss += loss.item()
+            n_batches += 1
+
+            # Generation-based metrics on a budget (constrained decoding is
+            # sequential and would dominate epoch time otherwise).
+            remaining = max_gen_samples - len(predictions)
+            if remaining > 0:
+                outputs = self.model.generate(
+                    pixel_values[:remaining], constrained=True
+                )
+                for output, target in zip(outputs, batch["target_texts"]):
+                    predictions.append(ticket_from_json(output))
+                    golds.append(ticket_from_json(target))
+
+        metrics = evaluate_tickets(predictions, golds) if predictions else {}
+        return total_loss / max(1, n_batches), metrics
+
+    def _save_checkpoint(self, name: str, record: dict[str, Any]) -> None:
+        checkpoint_dir = Path(self.config.get("checkpoint_dir", "checkpoints"))
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        path = checkpoint_dir / name
+        torch.save(
+            {
+                "model_state": self.model.state_dict(),
+                "config": self.config,
+                "record": record,
+            },
+            path,
+        )
+        (checkpoint_dir / (path.stem + ".json")).write_text(
+            json.dumps(record, indent=2), encoding="utf-8"
+        )
+        print(f"Checkpoint saved: {path}")
+
+
+def load_model_state(model: nn.Module, checkpoint_path: str | Path) -> None:
+    """Load a training checkpoint produced by :class:`ReceiptTrainer`."""
+    checkpoint = torch.load(
+        str(checkpoint_path), map_location="cpu", weights_only=False
+    )
+    model.load_state_dict(checkpoint["model_state"])

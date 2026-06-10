@@ -895,3 +895,190 @@ uv run pytest -v                   # full suite
 - Contract DDL: [`workers/ocr/ocr-worker-contract.md`](../../../workers/ocr/ocr-worker-contract.md) §6
 
 ---
+
+## Version 0.2.0 (unreleased)
+
+### Entry 11 — 2026-06-11 00:30 (UTC+2)
+
+**Scope:** Implement the hybrid **receipt VLM** (~457M params: frozen CLIP ViT-B/16 + from-scratch multimodal projector + frozen SmolLM2-360M with hand-rolled LoRA + grammar-constrained JSON decoding) per [`documentation/receipt_vlm_spec_adapted.md`](documentation/receipt_vlm_spec_adapted.md). Training package under `vlm_training/`; runtime integration as a third `VlmProvider` (`receipt-vlm-500m`). Phase 1 training launched.
+
+#### Motivation
+
+Academic deliverable (LLaVA-style architecture with original from-scratch components) that doubles as a potential local/dev extraction engine, benchmarked against the production Groq baseline. The adapted spec re-anchors the original draft to this codebase: the model is trained to emit the **canonical schema** directly (`{"ticket": {date, chaine_supermarche, adresse, produits[]}}`, date `yyyyMMdd HH:mm`), so `vlm_parse` / `vlm_validate` / the retry loop in `extraction.py` work unchanged, and `workers/ocr` needs zero changes.
+
+#### Architecture
+
+```text
+Receipt image (224×224, CLIP-normalized)
+  → CLIP ViT-B/16 (frozen, ~86M)                    → (B, 197, 768)
+  → MultimodalProjector (FROM SCRATCH, ~6.8M)       → (B, 32, 960)
+      cross-attention w/ 32 learned query tokens + residual MLP summary
+  → SmolLM2-360M-Instruct (frozen, ~360M)
+      + LoRA rank 16 on every q_proj/v_proj (FROM SCRATCH, ~4M, no peft)
+  → JSON-constrained decoding (FROM SCRATCH, 0 params)
+      character-level grammar acceptor + lazy token masking
+      → guaranteed-valid canonical JSON
+```
+
+Two deliberate deviations from the draft spec (justified in the adapted spec §1):
+
+- **SmolLM2-360M** (`lang_dim=960`) instead of SmolLM-1.7B — the draft's "~500M total" only holds with the smaller decoder.
+- **No trained `json_head.py`** — replaced by the constrained decoder: a trained head cannot *guarantee* valid JSON; the token-mask state machine does, deterministically.
+- Input is **224×224** (not the draft's 448) — 448 on ViT-B/16 would yield 785 patches and break the frozen positional embeddings.
+
+#### What was implemented — training side (`vlm_training/`, new)
+
+| Component | File | Role |
+|-----------|------|------|
+| LoRA | `receipt_vlm/models/lora.py` | `LoRALinear` (zero-init delta), `inject_lora`, `merge_lora`, `count_trainable_params` |
+| Projector | `receipt_vlm/models/projector.py` | `MultimodalProjector` 768→960, 32 query tokens |
+| Constrained decoding | `receipt_vlm/models/constrained.py` | `CanonicalJsonStateMachine` (char-level grammar: fixed key order, `%.2f` prices, `unites ≥ 1`, JSON escapes) + `pick_token` (top-k probe → vocab scan → forced continuation, provably terminating) |
+| Assembly | `receipt_vlm/models/vlm.py` | `ReceiptVLM`: forward w/ internal 32-token visual-prefix label masking, KV-cached constrained `generate`, merged-checkpoint export/load |
+| Schema | `receipt_vlm/data/schema.py` | `Ticket`/`Product` dataclasses keyed off `receipt_ocr.constants`; **deterministic serializer** (`json.dumps` would emit `1.1`; grammar + CE target require `1.10`) |
+| Synthetic data | `receipt_vlm/data/synthetic.py` | French receipt generator: 12 chains, ~50 products / 8 categories, price jitter, randomized thermal-printer layout; totals/TVA/payment **printed on image but absent from labels** (teaches the model to ignore them) |
+| Augmentation | `receipt_vlm/data/augmentation.py` | Spec §4.3 pipeline (perspective, blur, elastic, shadow, JPEG) + 224×224 + CLIP normalize; `clip_normalize_pil` albumentations-free path for runtime |
+| Dataset | `receipt_vlm/data/dataset.py` | `ReceiptDataset` (prompt masked at −100, target = canonical JSON + EOS), right-padding collate |
+| CORD adapter | `receipt_vlm/data/cord_adapter.py` | `naver-clova-ix/cord-v2` → canonical (lossy, products only); lazy picklable image loader (no 800 decoded PILs in RAM) |
+| SROIE adapter | `receipt_vlm/data/sroie_adapter.py` | Local SROIE folder → header fields only (no product annotations) |
+| Real photos | `receipt_vlm/data/real_photos.py` | Pairs `data/raw/images_tickets_caisse/` with pseudo-labels; frozen `splits.json`; test split **requires** `"reviewed": true` |
+| Trainer | `receipt_vlm/training/trainer.py` | Raw-PyTorch 3-phase loop: bf16/fp16 AMP, grad clip, cosine LR, budgeted constrained-generation val metrics, best-val checkpoints |
+| Metrics | `receipt_vlm/utils/metrics.py` | Levenshtein/ANLS from scratch; field F1, product recall (greedy name matching, ANLS ≥ 0.7), price MAE, date EM |
+| Scripts | `scripts/` | `generate_synthetic.py`, `pseudo_label.py` (Groq + review flags + split freezing), `train.py` (`--config`/`--resume`), `export_checkpoint.py` (LoRA merge → single `.pt`), `evaluate.py` (side-by-side vs Groq, §7 acceptance table) |
+| Configs | `configs/` | `base.yaml` + `phase1/2/3.yaml` + `smoke.yaml` (3-phase curriculum: projector-only 3e-4×5 → +LoRA 1e-4×10 → low-LR 5e-5×5) |
+
+#### What was implemented — runtime side (3 touches in `src/receipt_ocr`)
+
+| File | Change |
+|------|--------|
+| `constants.py` | `VlmModelName.RECEIPT_VLM_500M = "receipt-vlm-500m"` |
+| `backends/vlm/registry.py` | One new branch in `build_vlm_provider()` |
+| `backends/vlm/receipt_vlm_provider.py` | New `ReceiptVlmProvider`: JSON-mode-only (raises `OcrBackendError` otherwise, like Groq), checkpoint from `RECEIPT_VLM_MODEL_PATH`, lazy `torch`/`receipt_vlm` imports, reuses `prepare_vlm_image`; `prompt` arg accepted but ignored (fixed-instruction model) |
+
+Optional deps in `requirements-receipt-vlm.txt` (+ `pip install -e vlm_training`) — the base `receipt_ocr` install stays lightweight. Selection:
+
+```bash
+RECEIPT_OCR_BACKEND=vlm
+RECEIPT_VLM_MODEL=receipt-vlm-500m
+RECEIPT_VLM_MODE=json
+RECEIPT_VLM_MODEL_PATH=/models/receipt_vlm_500m_merged.pt
+```
+
+#### Environment note (Windows dev machine)
+
+Global `tokenizers==0.20.3` (pinned by `moondream`) is incompatible with `transformers` 4.57. Training therefore runs in `vlm_training/.venv` (created with `--system-site-packages`, overlaying `tokenizers 0.22.2` + `albumentations`; `receipt_ocr` and `receipt_vlm` installed editable). The global env is untouched, so the Moondream provider keeps working.
+
+#### Tests
+
+| Suite | Result |
+|-------|--------|
+| `vlm_training/tests/` (lora, projector, schema, constrained, synthetic, metrics, adapters) | **57 passed** |
+| `vlm_training/tests/test_vlm.py` (`-m slow`, downloads CLIP + SmolLM2) | **4 passed** — incl. *untrained model emits valid canonical JSON under constrained decoding* |
+| `dev_ocr/tests/` full suite (incl. 10 new `test_receipt_vlm_provider.py`) | **86 passed** |
+
+Key grammar tests: rejects wrong key order / prose / 3-decimal prices / `unites=0` / trailing commas; accepts every canonical serialization regardless of token segmentation; forced continuation terminates from any prefix.
+
+#### Data & training runs executed tonight
+
+| Step | Result |
+|------|--------|
+| Synthetic generation | 5,000 image+label pairs in `vlm_training/data/synthetic/` (~2.5 min) |
+| Groq pseudo-labelling | **18/19** real photos labelled (`data/real_labels/`); `image_19.jpg` failed validation 3× (GIFI ticket, bad date `"6/03/2026"`) — needs a manual label |
+| Splits frozen | 10 train / 3 val / 5 test (locked `splits.json`) |
+| Pipeline smoke test (`configs/smoke.yaml`) | Full loop OK on RTX 2070 8GB, fp16 AMP, loss 1.61→checkpoint |
+| **Phase 1** (projector warmup, CORD+synthetic, 5,545 train / 314 val) | **Running** as detached process — log: `vlm_training/logs/phase1.log` |
+
+Operational lesson: the first phase-1 launch died because the hosting shell was terminated mid-epoch (truncated traceback in the log, initially mistaken for an albumentations crash; a 800-call augmentation stress test over CORD+synthetic images showed zero failures). Relaunched via `Start-Process` (detached, survives shell exit).
+
+#### Next steps
+
+1. **Manual review (blocking for evaluation):** check the 5 test-split labels in `vlm_training/data/real_labels/` against the photos, fix Groq mistakes, set `"reviewed": true` in `review_status.json`. Optionally hand-label `image_19.jpg`.
+2. **Phase 2** after phase 1 completes: `scripts/train.py --config configs/phase2.yaml --resume checkpoints/phase1_best.pt` (projector+LoRA, synthetic+real).
+3. **Phase 3:** same with `configs/phase3.yaml --resume checkpoints/phase2_best.pt`.
+4. **Export:** `scripts/export_checkpoint.py --checkpoint checkpoints/phase3_best.pt --output checkpoints/receipt_vlm_500m_merged.pt`.
+5. **Evaluate vs Groq** (the go/no-go table, spec §7): `scripts/evaluate.py --checkpoint … --split test --baseline`. Targets: field F1 > 0.85, product recall > 0.90, price MAE < 0.05 €, date EM > 0.90, `vlm_validate` pass-rate > 0.80, valid-JSON rate = 1.00 (guaranteed by construction).
+6. **Record results** in this file + decide production ambition (v1 recommendation: dev/eval engine only; Groq stays the production default — Cloud Run is CPU-only).
+7. Possible follow-ups: SROIE local download wiring (`data.sroie_dir`), more synthetic render variants (fonts/rotated crops), constrained-decoding speedup (precomputed token→grammar transition cache) if eval latency matters.
+
+#### Operational handbook (everything needed to resume work)
+
+All commands below run from `dev_ocr/vlm_training/` using the venv interpreter `.venv\Scripts\python` (never the global Python — see environment note above).
+
+##### Monitoring / restarting training
+
+Phase 1 runs as a **detached process** (survives shell/IDE exit). Monitor:
+
+```powershell
+Get-Content logs\phase1.log -Tail 5          # epoch lines appear here
+Get-Content logs\phase1.err -Tail 5          # stderr (warnings, tracebacks)
+```
+
+Expect lines like `Phase 1 | Epoch 2/5 | train 0.41 | val 0.39 | F1 0.12 | 2900s`. If the process is dead with no `Best: {...}` line at the end of the log, relaunch the same way (replace the config for later phases):
+
+```powershell
+Start-Process -FilePath "$PWD\.venv\Scripts\python.exe" `
+  -ArgumentList "-u","scripts/train.py","--config","configs/phase1.yaml" `
+  -WorkingDirectory $PWD -RedirectStandardOutput "$PWD\logs\phase1.log" `
+  -RedirectStandardError "$PWD\logs\phase1.err" -WindowStyle Hidden -PassThru
+```
+
+There is **no mid-phase resume**: `--resume <ckpt>` loads *model weights only* (no optimizer/epoch state) and is meant for phase-to-phase chaining. If a phase dies mid-way, restart the whole phase (optionally resuming from the previous phase's checkpoint).
+
+##### Checkpoints
+
+- `checkpoints/phase{N}_best.pt` — best-val-loss snapshot per phase (+ sidecar `phase{N}_best.json` with the metric record). Each phase *overwrites its own name only*; the smoke run also wrote `phase1_best.pt` and is being overwritten by the real phase 1.
+- Checkpoint contents: `{model_state, config, record}` (training format). The runtime provider does **not** read these — it needs the *merged* export (step 4 below).
+- Everything under `checkpoints/`, `data/`, `logs/`, `.venv/` is gitignored.
+
+##### Full command sequence (phases 2 → eval)
+
+```powershell
+# after phase 1 finishes (check "Best:" in logs\phase1.log)
+.venv\Scripts\python scripts/train.py --config configs/phase2.yaml --resume checkpoints/phase1_best.pt
+.venv\Scripts\python scripts/train.py --config configs/phase3.yaml --resume checkpoints/phase2_best.pt
+.venv\Scripts\python scripts/export_checkpoint.py --checkpoint checkpoints/phase3_best.pt --output checkpoints/receipt_vlm_500m_merged.pt
+.venv\Scripts\python scripts/evaluate.py --checkpoint checkpoints/receipt_vlm_500m_merged.pt `
+  --images ../data/raw/images_tickets_caisse --labels data/real_labels --split test --baseline `
+  --output logs/eval_results.json
+```
+
+(For long phases, prefer the `Start-Process` pattern above with `logs\phase2.log` etc.)
+
+##### Label review workflow (blocking for evaluation)
+
+Test split (from frozen `data/real_labels/splits.json`): `image_8, image_11, image_13, image_15, image_16`. For each:
+
+1. Open the photo in `../data/raw/images_tickets_caisse/` next to `data/real_labels/<stem>.json`.
+2. Fix any Groq mistakes directly in the JSON (keep the canonical shape: `date` as `yyyyMMdd HH:mm` or `""`, prices with 2 decimals, `unites` integer ≥ 1).
+3. In `data/real_labels/review_status.json`, set `"image_X.jpg": {"reviewed": true}`.
+
+`evaluate.py` (and `load_real_samples(split="test")`) silently drop unreviewed test images — an empty test set means flags were not set. Reviewing train/val labels is optional but improves phases 2–3.
+
+**`image_19.jpg` caveat:** it failed pseudo-labelling, so it is in **no split** (splits froze over the 18 labelled images). To use it: hand-write `data/real_labels/image_19.json`, add the filename to one split array in `splits.json` (test recommended — it is hand-labelled by definition), and add its review flag. Do not otherwise edit frozen splits.
+
+##### Config semantics & tuning knobs
+
+- `train.py` merges `configs/base.yaml` ← phase file (one level deep: nested dicts like `data:` are updated key-by-key, scalars replaced).
+- Current defaults are sized for the local **RTX 2070 8GB**: `batch_size: 4`, `num_workers: 0` (Windows), fp16 AMP via GradScaler (bf16 auto-selected where supported). On Colab T4/A100: raise `batch_size` to 8–16, `num_workers: 2`.
+- `max_gen_samples` caps the constrained-generation val metric (it is sequential and slow on an untrained model — keep small in phase 1, raise in phase 3).
+- `data.synthetic_limit` caps synthetic samples (used by `configs/smoke.yaml`); `data.sroie_dir: null` means SROIE is skipped (no local copy present).
+- `configs/smoke.yaml` re-validates the whole pipeline in ~6 min after any change to models/data code: `.venv\Scripts\python scripts/train.py --config configs/smoke.yaml`.
+
+##### Invariants to preserve when touching code
+
+- **Prompt coupling:** `ReceiptDataset` trains with `SYSTEM_PROMPT` from `receipt_vlm/models/vlm.py`; `ReceiptVLM.generate` and the runtime provider use the same constant. Changing the prompt invalidates trained checkpoints.
+- **Serializer ↔ grammar coupling:** `serialize_ticket` output must always be accepted by `CanonicalJsonStateMachine` (tested in `test_synthetic.py` / `test_constrained.py`). Any schema change must update both + the runtime `vlm_parse` expectations.
+- **Dependency direction:** `vlm_training` may import `receipt_ocr`; the only permitted reverse import is the lazy one inside `receipt_vlm_provider.py`.
+- Runtime tests: `python -m pytest tests -q` from `dev_ocr/` (86 incl. provider guardrails); training tests: `.venv\Scripts\python -m pytest tests -q -m "not slow"` from `vlm_training/` (57), `-m slow` for the 4 model-download smoke tests.
+
+##### Acceptance / go-no-go
+
+Targets (spec §7, evaluated by `scripts/evaluate.py` on the reviewed test split, vs the Groq baseline): field F1 > 0.85 · product recall > 0.90 · price MAE < 0.05 € · date EM > 0.90 · ANLS > 0.80 · `vlm_validate` pass-rate > 0.80 · valid-JSON rate = 1.00 (structural guarantee). Record the printed table in this file as a new entry, then decide v1 posture (recommendation: dev/eval engine; Groq stays production default — Cloud Run is CPU-only).
+
+#### References
+
+- Adapted spec: [`documentation/receipt_vlm_spec_adapted.md`](documentation/receipt_vlm_spec_adapted.md) (decisions §1, integration contract §2, acceptance §7)
+- Original draft: [`documentation/receipt_vlm_spec.md`](documentation/receipt_vlm_spec.md)
+- Training guide: [`vlm_training/README.md`](vlm_training/README.md)
+- Provider pattern: Entries 5 and 7 in this file
+
+---

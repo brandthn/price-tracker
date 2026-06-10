@@ -32,5 +32,10 @@ def build_vlm_provider(
 
         return GroqProvider(**kwargs)
 
+    if resolved == VlmModelName.RECEIPT_VLM_500M.value:
+        from receipt_ocr.backends.vlm.receipt_vlm_provider import ReceiptVlmProvider
+
+        return ReceiptVlmProvider(**kwargs)
+
     valid = ", ".join(v.value for v in VlmModelName)
     raise ValueError(f"Unknown VLM model {resolved!r}. Valid options: {valid}.")

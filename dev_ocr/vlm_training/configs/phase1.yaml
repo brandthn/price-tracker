@@ -1,0 +1,7 @@
+# Phase 1 — projector warmup: vision→language alignment.
+phase: 1
+lr: 3.0e-4
+epochs: 5
+trainable: [projector]
+sources: [cord, sroie, synthetic]
+max_gen_samples: 4   # F1 is not the phase-1 target; keep val cheap

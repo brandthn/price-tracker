@@ -66,6 +66,7 @@ class VlmModelName(str, Enum):
 
     MOONDREAM_0_5B = "moondream-0.5b"
     GROQ_LLAMA4_SCOUT = "groq-llama4-scout"
+    RECEIPT_VLM_500M = "receipt-vlm-500m"
 
 
 ENV_VLM_MODEL = "RECEIPT_VLM_MODEL"
