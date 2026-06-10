@@ -69,13 +69,13 @@ variable "worker_indices_image_tag" {
   type        = string
   # Placeholder skeleton — Cloud Run garde l'image `us-docker.pkg.dev/cloudrun/container/hello`
   # tant que ce default n'est pas remplacé par un SHA réel pushé en AR.
-  default = "phase9-skeleton"
+  default = "3576a7f"
 }
 
 variable "worker_alertes_image_tag" {
   description = "Tag de l'image worker-alertes en AR. Bumper après chaque build (gcloud builds submit . --config=workers/alertes/cloudbuild.yaml)."
   type        = string
-  default     = "phase9-skeleton"
+  default     = "3576a7f"
 }
 
 variable "frontend_image_tag" {
