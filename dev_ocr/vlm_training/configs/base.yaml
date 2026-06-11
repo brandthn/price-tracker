@@ -18,3 +18,10 @@ data:
   real_images_dir: ../data/raw/images_tickets_caisse
   real_labels_dir: data/real_labels
   synthetic_val_fraction: 0.05
+  # On-the-fly rendering (recommended — layout + capture variety without extra PNGs)
+  synthetic_on_the_fly: false
+  synthetic_count: 2000
+  synthetic_diverse: false
+  synthetic_distort: false
+  synthetic_distort_intensity: medium
+  synthetic_extra_dir: null   # e.g. data/synthetic_preview_varied

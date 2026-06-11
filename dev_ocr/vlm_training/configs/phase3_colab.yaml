@@ -1,0 +1,13 @@
+# Phase 3 on Colab — low-LR JSON alignment. Requires phase2_best.pt.
+# Est. ~30–60 min on T4.
+
+phase: 3
+lr: 5.0e-5
+epochs: 5
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 32
+
+data:
+  synthetic_count: 2000
+  synthetic_distort_intensity: heavy

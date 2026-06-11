@@ -1,0 +1,12 @@
+# Phase 2 on Colab — projector + LoRA (+ real French photos from Drive).
+# Requires phase1_best.pt. Est. ~1–2 h on T4.
+
+phase: 2
+lr: 1.0e-4
+epochs: 10
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 16
+
+data:
+  synthetic_count: 4000

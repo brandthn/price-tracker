@@ -22,7 +22,11 @@ ImageSource = Union[str, Path, Image.Image, Callable[[], Image.Image]]
 
 @dataclass
 class ReceiptSample:
-    """One training example: an image source and its canonical ground truth."""
+    """One training example: an image source and its canonical ground truth.
+
+    ``image`` may be a path, PIL image, or a zero-arg callable returning PIL
+    (used for on-the-fly synthetic rendering with layout/distortion variety).
+    """
 
     image: ImageSource
     ticket: Ticket

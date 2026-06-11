@@ -48,6 +48,7 @@ class ReceiptVLM(nn.Module):
         lora_rank: int = 16,
         lora_alpha: float = 32.0,
         lora_dropout: float = 0.05,
+        gradient_checkpointing: bool = False,
     ) -> None:
         super().__init__()
         from transformers import AutoModelForCausalLM, AutoTokenizer, CLIPVisionModel
@@ -83,6 +84,8 @@ class ReceiptVLM(nn.Module):
                 dropout=lora_dropout,
                 target_modules=("q_proj", "v_proj"),
             )
+        if gradient_checkpointing and hasattr(self.lm, "gradient_checkpointing_enable"):
+            self.lm.gradient_checkpointing_enable()
 
         self.system_prompt = SYSTEM_PROMPT
         self._token_texts: Optional[list[str]] = None

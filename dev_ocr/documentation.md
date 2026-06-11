@@ -1082,3 +1082,186 @@ Targets (spec §7, evaluated by `scripts/evaluate.py` on the reviewed test split
 - Provider pattern: Entries 5 and 7 in this file
 
 ---
+
+### Entry 12 — 2026-06-11 01:00 (UTC+2)
+
+**Scope:** Resume development from Entry 11 — richer synthetic data, practical local training pipeline, label-review tooling. Full `phase1.yaml` run had **not completed** (log stopped after startup; only smoke-test `phase1_best.json` existed).
+
+#### Synthetic data — layout & capture variety
+
+Extended `receipt_vlm/data/synthetic.py`:
+
+| Capability | Detail |
+|------------|--------|
+| **8 layout styles** | `thermal_classic/narrow/wide`, `compact`, `retail_dashed`, `discount`, `minimal`, `dense` |
+| **10 colour palettes** | cream, aged thermal, pink thermal, sepia, blue fade, etc. |
+| **Pre-render noise** | vertical fade, line jitter, ghost/smear lines, optional proportional fonts |
+| **Post-render distortions** | rotation, perspective warp, brightness/contrast, blur, Gaussian noise, JPEG recompression, vignette, table background framing, partial crop |
+| **CLI flags** | `--diverse`, `--distort`, `--distort-intensity light\|medium\|heavy`, `--start-index` |
+
+Generated **100 varied previews** in `vlm_training/data/synthetic_preview_varied/` (`--n 100 --diverse --distort --distort-intensity heavy`).
+
+#### Training pipeline improvements
+
+| Change | File | Why |
+|--------|------|-----|
+| On-the-fly synthetic | `receipt_vlm/data/samples.py` | Renders diverse+distorted receipts at `__getitem__` time — no 5k×PNG duplication, new layout every epoch |
+| Sample builder extracted | `samples.py` ← `train.py` | `build_samples()`, `build_live_synthetic_samples()`, `load_disk_synthetic_samples()` |
+| Skip slow val generation | `trainer.py` | `max_gen_samples: 0` skips constrained decoding in validation (saves ~minutes/epoch in phase 1) |
+| Batch progress | `trainer.py` | `log_every: N` prints batch loss during long epochs |
+| Gradient checkpointing | `vlm.py` + config | `model.gradient_checkpointing: true` — fits 8 GB VRAM |
+| Label review helper | `scripts/review_labels.py` | `--list test`, `--mark-reviewed`, `--mark-all-test` |
+
+New **local curriculum configs** (RTX 2070 8 GB, ~2–8 h total):
+
+| Config | Epochs | Sources | Notes |
+|--------|--------|---------|-------|
+| `phase1_local.yaml` | 3 | CORD 150 + 1200 live synthetic | projector only, `max_gen_samples: 0` |
+| `phase2_local.yaml` | 5 | 1500 live synthetic + 10 real train | + LoRA, `max_gen_samples: 8` |
+| `phase3_local.yaml` | 3 | 800 live synthetic + real | low LR, heavy distort, `max_gen_samples: 16` |
+
+**Local command sequence:**
+
+```powershell
+cd dev_ocr/vlm_training
+.venv\Scripts\python scripts/train.py --config configs/phase1_local.yaml
+.venv\Scripts\python scripts/train.py --config configs/phase2_local.yaml --resume checkpoints/phase1_best.pt
+.venv\Scripts\python scripts/train.py --config configs/phase3_local.yaml --resume checkpoints/phase2_best.pt
+.venv\Scripts\python scripts/export_checkpoint.py --checkpoint checkpoints/phase3_best.pt --output checkpoints/receipt_vlm_500m_merged.pt
+# after reviewing test labels:
+.venv\Scripts\python scripts/evaluate.py --checkpoint checkpoints/receipt_vlm_500m_merged.pt `
+  --images ../data/raw/images_tickets_caisse --labels data/real_labels --split test --baseline
+```
+
+Review test labels before evaluate:
+
+```powershell
+.venv\Scripts\python scripts/review_labels.py --list test
+# fix JSONs, then:
+.venv\Scripts\python scripts/review_labels.py --mark-reviewed image_8.jpg image_11.jpg ...
+```
+
+#### Status vs Entry 11 next steps
+
+| Step | Status |
+|------|--------|
+| 5k static synthetic | Done (`data/synthetic/`) |
+| 100 varied previews | Done (`data/synthetic_preview_varied/`) |
+| Groq pseudo-labels 18/19 | Done; `image_19.jpg` still unlabelled |
+| Test label manual review | **Pending** (all `reviewed: false`) |
+| Phase 1 full (`phase1.yaml`) | **Not completed** — use `phase1_local.yaml` instead |
+| Phases 2–3 / export / eval | Blocked on phase 1 checkpoint |
+
+#### Next steps
+
+1. Run `phase1_local.yaml` → `phase2_local.yaml` → `phase3_local.yaml` (detached `Start-Process` if long).
+2. Review 5 test-split labels; run `evaluate.py --baseline`.
+3. Append eval results here as Entry 13.
+4. Optional: full-scale run on Colab (`phase1/2/3.yaml` with `synthetic_on_the_fly: true` to save disk).
+
+#### References
+
+- Entry 11 operational handbook (same file)
+- Varied synthetic CLI: `scripts/generate_synthetic.py --help`
+
+---
+
+### Entry 13 — 2026-06-11 (UTC+2)
+
+**Scope:** Google Colab training setup — notebook, path configs, data-packaging script, config merge in `train.py`, and operator guide. Enables the full 3-phase curriculum on a T4/A100 with checkpoints persisted to Drive (alternative to local RTX 2070 runs from Entry 12).
+
+#### Motivation
+
+Local phase 1 on an 8 GB RTX 2070 is slow (~hours per phase) and was interrupted once by shell exit. Colab offers a free/cheap GPU, more VRAM headroom, and Drive persistence across session disconnects. The setup avoids uploading 5k synthetic PNGs by reusing on-the-fly diverse synthetic from Entry 12.
+
+#### What was implemented
+
+| Component | Path | Role |
+|-----------|------|------|
+| Config merge | `scripts/train.py` | `load_config()` merges `base.yaml` ← `colab_paths.yaml` ← `phase*_colab.yaml` when the phase filename contains `_colab` |
+| Colab paths overlay | `configs/colab_paths.yaml` | Drive checkpoint dir, `batch_size: 8`, `num_workers: 2`, on-the-fly synthetic defaults, real-photo paths on Drive |
+| Phase configs | `configs/phase{1,2,3}_colab.yaml` | Phase-specific LR/epochs/sources; phase 1 skips slow val gen (`max_gen_samples: 0`) |
+| Notebook | `notebooks/train_receipt_vlm_colab.ipynb` | Mount Drive → clone repo → install → unzip data → train phases 1→3 → export merged `.pt` → optional sanity check |
+| Operator guide | `vlm_training/COLAB.md` | Step-by-step, Drive layout, CLI equivalents, troubleshooting, time estimates |
+| Data packager | `scripts/zip_colab_upload.py` | Zips `images_tickets_caisse/` + `real_labels/` → `colab_upload/receipt_vlm_colab_data.zip` for Drive upload (phases 2–3 only) |
+| Gitignore | `dev_ocr/.gitignore` | `vlm_training/colab_upload/` (generated zip, not committed) |
+
+#### Config merge order
+
+```text
+base.yaml
+  ← colab_paths.yaml   (only when config name contains "_colab")
+  ← phaseN_colab.yaml
+```
+
+Key Colab defaults from `colab_paths.yaml`:
+
+| Setting | Value |
+|---------|-------|
+| `checkpoint_dir` | `/content/drive/MyDrive/receipt_vlm/checkpoints` |
+| `batch_size` | 8 |
+| `synthetic_on_the_fly` | true (3000–4000 samples, diverse + medium distort) |
+| `real_images_dir` / `real_labels_dir` | under `My Drive/receipt_vlm/` |
+
+Phase 1 needs **no** real photos (CORD + live synthetic). Phases 2–3 require the data zip or manual upload of photos + labels.
+
+#### Expected Drive layout (after notebook run)
+
+```text
+My Drive/receipt_vlm/
+├── checkpoints/
+│   ├── phase1_best.pt
+│   ├── phase2_best.pt
+│   └── phase3_best.pt
+├── images_tickets_caisse/
+├── real_labels/
+└── receipt_vlm_500m_merged.pt    ← download for local inference
+```
+
+#### How to proceed (operator checklist)
+
+1. **Push** this repo (or upload the notebook manually).
+2. **Pack real data** (PC): `python scripts/zip_colab_upload.py` → upload `colab_upload/receipt_vlm_colab_data.zip` to Drive.
+3. **Colab:** Runtime → T4 GPU → open `notebooks/train_receipt_vlm_colab.ipynb`.
+4. **Edit Configuration cell:** set `REPO_URL`, `DATA_ZIP_ON_DRIVE`; optionally `RUN_PHASE_1 = False` if resuming from an uploaded `phase1_best.pt`.
+5. **Run all cells** (~3–4 h on T4).
+6. **Download** `receipt_vlm_500m_merged.pt` and set `RECEIPT_VLM_MODEL_PATH` locally.
+
+CLI equivalent (inside `vlm_training/` on Colab):
+
+```bash
+python scripts/train.py --config configs/phase1_colab.yaml
+python scripts/train.py --config configs/phase2_colab.yaml --resume /content/drive/MyDrive/receipt_vlm/checkpoints/phase1_best.pt
+python scripts/train.py --config configs/phase3_colab.yaml --resume /content/drive/MyDrive/receipt_vlm/checkpoints/phase2_best.pt
+python scripts/export_checkpoint.py --checkpoint /content/drive/.../phase3_best.pt --output /content/drive/.../receipt_vlm_500m_merged.pt
+```
+
+#### Session disconnect recovery
+
+Checkpoints on Drive survive; Colab runtime does not. Re-open the notebook, mount Drive, set phase flags to skip completed phases (`RUN_PHASE_1 = False`, etc.), and continue from the last `--resume` checkpoint.
+
+#### Status vs Entry 12 next steps
+
+| Step | Status |
+|------|--------|
+| Colab notebook + configs + docs | **Done** (this entry) |
+| Local `phase1_local.yaml` run | Uncertain / superseded by Colab path |
+| Test label manual review | **Pending** (still blocking `evaluate.py`) |
+| Full training (phases 1–3) | **Pending** — run on Colab |
+| Export + eval vs Groq | Blocked on training + reviewed test labels |
+
+#### Next steps
+
+1. Run the Colab notebook end-to-end; download merged checkpoint.
+2. Review 5 test-split labels (`review_labels.py --list test`); run `evaluate.py --baseline`.
+3. Append eval results as Entry 14.
+4. Optional: upload partial local `phase1_best.pt` to skip phase 1 on Colab.
+
+#### References
+
+- Colab guide: [`vlm_training/COLAB.md`](vlm_training/COLAB.md)
+- Notebook: [`vlm_training/notebooks/train_receipt_vlm_colab.ipynb`](vlm_training/notebooks/train_receipt_vlm_colab.ipynb)
+- Local pipeline: Entry 12 in this file
+- Architecture & acceptance: Entry 11 in this file
+
+---

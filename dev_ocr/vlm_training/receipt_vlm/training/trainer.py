@@ -66,6 +66,7 @@ class ReceiptTrainer:
         trainable_patterns: tuple[str, ...] = ("projector", "lora_"),
         weight_decay: float = 0.01,
         max_gen_samples: int = 16,
+        log_every: int = 0,
     ) -> dict[str, Any]:
         """Run one curriculum phase; returns the best validation record."""
         self._set_trainable(trainable_patterns)
@@ -83,7 +84,7 @@ class ReceiptTrainer:
         best: dict[str, Any] = {"val_loss": float("inf")}
         for epoch in range(epochs):
             start = time.time()
-            train_loss = self._train_epoch(optimizer)
+            train_loss = self._train_epoch(optimizer, log_every=log_every)
             val_loss, val_metrics = self._val_epoch(max_gen_samples)
             scheduler.step()
 
@@ -118,9 +119,10 @@ class ReceiptTrainer:
             enabled=self.device.type == "cuda",
         )
 
-    def _train_epoch(self, optimizer: torch.optim.Optimizer) -> float:
+    def _train_epoch(self, optimizer: torch.optim.Optimizer, log_every: int = 0) -> float:
         self.model.train()
         total_loss, n_batches = 0.0, 0
+        n_total = len(self.train_loader)
         for batch in self.train_loader:
             pixel_values = batch["pixel_values"].to(self.device)
             input_ids = batch["input_ids"].to(self.device)
@@ -144,6 +146,11 @@ class ReceiptTrainer:
 
             total_loss += loss.item()
             n_batches += 1
+            if log_every and n_batches % log_every == 0:
+                print(
+                    f"  batch {n_batches}/{n_total} loss {loss.item():.4f}",
+                    flush=True,
+                )
         return total_loss / max(1, n_batches)
 
     @torch.no_grad()
@@ -168,7 +175,10 @@ class ReceiptTrainer:
             n_batches += 1
 
             # Generation-based metrics on a budget (constrained decoding is
-            # sequential and would dominate epoch time otherwise).
+            # sequential and would dominate epoch time otherwise). Set
+            # max_gen_samples=0 in config to skip entirely (recommended phase 1).
+            if max_gen_samples <= 0:
+                continue
             remaining = max_gen_samples - len(predictions)
             if remaining > 0:
                 outputs = self.model.generate(
