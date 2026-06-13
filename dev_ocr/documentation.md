@@ -1218,14 +1218,65 @@ My Drive/receipt_vlm/
 └── receipt_vlm_500m_merged.pt    ← download for local inference
 ```
 
-#### How to proceed (operator checklist)
+#### Current state (at time of writing)
 
-1. **Push** this repo (or upload the notebook manually).
-2. **Pack real data** (PC): `python scripts/zip_colab_upload.py` → upload `colab_upload/receipt_vlm_colab_data.zip` to Drive.
-3. **Colab:** Runtime → T4 GPU → open `notebooks/train_receipt_vlm_colab.ipynb`.
-4. **Edit Configuration cell:** set `REPO_URL`, `DATA_ZIP_ON_DRIVE`; optionally `RUN_PHASE_1 = False` if resuming from an uploaded `phase1_best.pt`.
-5. **Run all cells** (~3–4 h on T4).
-6. **Download** `receipt_vlm_500m_merged.pt` and set `RECEIPT_VLM_MODEL_PATH` locally.
+| Item | Status |
+|------|--------|
+| Colab notebook, configs, `COLAB.md`, zip script | **Done** |
+| Entry 13 in this file | **Done** |
+| Local phase 1 | **Stopped after startup** (`logs/phase1.log` shows config + sample count only — no epoch lines) |
+| Colab data zip | **Not created** — local disk full (`SQLITE_FULL`) |
+| Test labels | All still `reviewed: false` in `review_status.json` |
+
+Local training cannot resume until disk space is freed. **Colab is the recommended path.**
+
+#### Todo — Colab training path
+
+##### 1. Free local disk space (optional but helpful)
+
+Delete large generated folders no longer needed locally, e.g.:
+
+- `vlm_training/data/synthetic/` (5k PNGs — Colab uses on-the-fly synthetic)
+- `vlm_training/data/synthetic_preview_varied/` (previews only)
+- `__pycache__` / old logs under `vlm_training/logs/`
+
+##### 2. Push code to GitHub
+
+Commit and push the Colab files (notebook, configs, `COLAB.md`, this entry, etc.) on branch `ocr_worker_module` (or your training branch).
+
+##### 3. Upload real data to Drive (phases 2–3)
+
+**Option A** — if disk space allows:
+
+```powershell
+cd dev_ocr\vlm_training
+.venv\Scripts\python scripts\zip_colab_upload.py
+```
+
+Upload `colab_upload/receipt_vlm_colab_data.zip` to Google Drive.
+
+**Option B** — if disk is still tight, upload these folders directly to `My Drive/receipt_vlm/`:
+
+- `dev_ocr/data/raw/images_tickets_caisse/`
+- `dev_ocr/vlm_training/data/real_labels/`
+
+Phase 1 does **not** need real photos (CORD + on-the-fly synthetic only).
+
+##### 4. Run Colab
+
+1. [colab.research.google.com](https://colab.research.google.com) → **Runtime → Change runtime type → T4 GPU**
+2. Upload `dev_ocr/vlm_training/notebooks/train_receipt_vlm_colab.ipynb` (or open from cloned repo)
+3. Edit the **Configuration** cell:
+
+```python
+REPO_URL = "https://github.com/YOUR_USER/price-tracker.git"
+REPO_BRANCH = "ocr_worker_module"
+DATA_ZIP_ON_DRIVE = "/content/drive/MyDrive/receipt_vlm_colab_data.zip"  # if using zip
+```
+
+4. **Run all cells** (~3–4 h on T4)
+
+Phase 1 runs without real photos. Phases 2–3 require the Drive data from step 3.
 
 CLI equivalent (inside `vlm_training/` on Colab):
 
@@ -1236,26 +1287,51 @@ python scripts/train.py --config configs/phase3_colab.yaml --resume /content/dri
 python scripts/export_checkpoint.py --checkpoint /content/drive/.../phase3_best.pt --output /content/drive/.../receipt_vlm_500m_merged.pt
 ```
 
-#### Session disconnect recovery
+##### 5. After training
 
-Checkpoints on Drive survive; Colab runtime does not. Re-open the notebook, mount Drive, set phase flags to skip completed phases (`RUN_PHASE_1 = False`, etc.), and continue from the last `--resume` checkpoint.
+1. Download `My Drive/receipt_vlm/receipt_vlm_500m_merged.pt` from Drive.
+2. Set local inference env:
 
-#### Status vs Entry 12 next steps
+```powershell
+$env:RECEIPT_OCR_BACKEND = "vlm"
+$env:RECEIPT_VLM_MODEL = "receipt-vlm-500m"
+$env:RECEIPT_VLM_MODE = "json"
+$env:RECEIPT_VLM_MODEL_PATH = "D:\path\to\receipt_vlm_500m_merged.pt"
+```
 
-| Step | Status |
-|------|--------|
-| Colab notebook + configs + docs | **Done** (this entry) |
-| Local `phase1_local.yaml` run | Uncertain / superseded by Colab path |
-| Test label manual review | **Pending** (still blocking `evaluate.py`) |
-| Full training (phases 1–3) | **Pending** — run on Colab |
-| Export + eval vs Groq | Blocked on training + reviewed test labels |
+3. Review the 5 test-split labels (blocking for evaluation):
 
-#### Next steps
+```powershell
+.venv\Scripts\python scripts\review_labels.py --list test
+# fix JSONs in data/real_labels/, then:
+.venv\Scripts\python scripts\review_labels.py --mark-reviewed image_8.jpg image_11.jpg image_13.jpg image_15.jpg image_16.jpg
+```
 
-1. Run the Colab notebook end-to-end; download merged checkpoint.
-2. Review 5 test-split labels (`review_labels.py --list test`); run `evaluate.py --baseline`.
-3. Append eval results as Entry 14.
-4. Optional: upload partial local `phase1_best.pt` to skip phase 1 on Colab.
+4. Run eval vs Groq baseline:
+
+```powershell
+.venv\Scripts\python scripts\evaluate.py --checkpoint path\to\receipt_vlm_500m_merged.pt `
+  --images ../data/raw/images_tickets_caisse --labels data/real_labels --split test --baseline `
+  --output logs/eval_results.json
+```
+
+5. Append eval results as **Entry 14** in this file.
+
+##### 6. If Colab session disconnects
+
+Re-open the notebook, mount Drive again, and skip finished phases:
+
+```python
+RUN_PHASE_1 = False  # if phase1_best.pt exists on Drive
+RUN_PHASE_2 = True
+```
+
+Checkpoints on Drive survive; Colab runtime state does not.
+
+##### Optional
+
+- Upload a partial local `phase1_best.pt` to `My Drive/receipt_vlm/checkpoints/` and set `RUN_PHASE_1 = False` to skip phase 1.
+- Hand-label `image_19.jpg` (failed Groq pseudo-labelling) and add to a split if desired.
 
 #### References
 
