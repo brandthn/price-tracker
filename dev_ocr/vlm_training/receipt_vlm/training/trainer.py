@@ -181,9 +181,15 @@ class ReceiptTrainer:
                 continue
             remaining = max_gen_samples - len(predictions)
             if remaining > 0:
-                outputs = self.model.generate(
-                    pixel_values[:remaining], constrained=True
-                )
+                # Generation must run under the SAME autocast as the training
+                # forward. AMP caches bf16 copies of the autocast-eligible
+                # weights (the LoRA-wrapped q_proj/v_proj); calling generate()
+                # outside autocast feeds an fp32 input into a bf16 weight and
+                # raises "mat1 and mat2 have different dtype". Disabled on CPU.
+                with self._autocast():
+                    outputs = self.model.generate(
+                        pixel_values[:remaining], constrained=True
+                    )
                 for output, target in zip(outputs, batch["target_texts"]):
                     predictions.append(ticket_from_json(output))
                     golds.append(ticket_from_json(target))
