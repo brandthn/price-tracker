@@ -36,7 +36,11 @@ def main() -> None:
         lora_alpha=model_cfg.get("lora_alpha", 32.0),
         lora_dropout=model_cfg.get("lora_dropout", 0.05),
     )
-    model.load_state_dict(checkpoint["model_state"])
+    # Checkpoints are adapter-only (projector + LoRA); the frozen CLIP/SmolLM2
+    # backbones come from the pretrained init above, so load non-strict.
+    result = model.load_state_dict(checkpoint["model_state"], strict=False)
+    if result.unexpected_keys:
+        raise RuntimeError(f"unexpected keys in checkpoint: {result.unexpected_keys[:5]}")
     model.eval()
 
     merged = model.export_merged_state()

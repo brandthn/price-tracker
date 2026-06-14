@@ -197,27 +197,71 @@ class ReceiptTrainer:
         metrics = evaluate_tickets(predictions, golds) if predictions else {}
         return total_loss / max(1, n_batches), metrics
 
+    @staticmethod
+    def _is_adapter_key(key: str) -> bool:
+        """True for the only tensors we actually train.
+
+        The from-scratch projector and the LoRA adapters are the sole trained
+        weights; the frozen CLIP + SmolLM2 backbones are re-created identically
+        from their pretrained init on every ``ReceiptVLM(...)``. Persisting them
+        would bloat each checkpoint to ~1.8 GB and make Colab-disk saves and
+        browser transfers corruption-prone. Adapter-only is ~11M params (~45 MB).
+        """
+        return key.startswith("projector.") or "lora_A" in key or "lora_B" in key
+
     def _save_checkpoint(self, name: str, record: dict[str, Any]) -> None:
+        import os
+
         checkpoint_dir = Path(self.config.get("checkpoint_dir", "checkpoints"))
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         path = checkpoint_dir / name
-        torch.save(
-            {
-                "model_state": self.model.state_dict(),
-                "config": self.config,
-                "record": record,
-            },
-            path,
-        )
+
+        adapter_state = {
+            k: v for k, v in self.model.state_dict().items() if self._is_adapter_key(k)
+        }
+        payload = {
+            "model_state": adapter_state,
+            "config": self.config,
+            "record": record,
+            "adapter_only": True,
+        }
+
+        # Atomic write + read-back verify: a truncated checkpoint (full disk,
+        # killed process, bad transfer) must fail loudly HERE, not hours later
+        # when a downstream phase tries to resume from it.
+        tmp = path.with_name(path.name + ".tmp")
+        torch.save(payload, tmp)
+        try:
+            torch.load(tmp, map_location="cpu", weights_only=False)
+        except Exception as exc:
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError(f"checkpoint verify failed for {path}: {exc}") from exc
+        os.replace(tmp, path)
+
         (checkpoint_dir / (path.stem + ".json")).write_text(
             json.dumps(record, indent=2), encoding="utf-8"
         )
-        print(f"Checkpoint saved: {path}")
+        print(f"Checkpoint saved: {path} ({path.stat().st_size / 1e6:.0f} MB, adapter-only)")
 
 
 def load_model_state(model: nn.Module, checkpoint_path: str | Path) -> None:
-    """Load a training checkpoint produced by :class:`ReceiptTrainer`."""
+    """Load a training checkpoint produced by :class:`ReceiptTrainer`.
+
+    Checkpoints store only the trained projector + LoRA tensors; the frozen
+    backbones already exist from the pretrained init, so the load is non-strict
+    (missing backbone keys are expected). Legacy full checkpoints still load.
+    """
     checkpoint = torch.load(
         str(checkpoint_path), map_location="cpu", weights_only=False
     )
-    model.load_state_dict(checkpoint["model_state"])
+    state = checkpoint["model_state"]
+    result = model.load_state_dict(state, strict=False)
+    if result.unexpected_keys:
+        raise RuntimeError(
+            f"unexpected keys in {checkpoint_path}: {result.unexpected_keys[:5]}"
+        )
+    print(
+        f"Loaded {len(state)} adapter/projector tensors from "
+        f"{Path(checkpoint_path).name}",
+        flush=True,
+    )
