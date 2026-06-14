@@ -363,7 +363,7 @@ module "run_worker_indices" {
     PRT_INDICES_MIN_OBSERVATIONS       = "3"
     PRT_INDICES_WINDOW_WEEKS_AGGREGATS = "12"
     PRT_INDICES_WINDOW_WEEKS_RANKINGS  = "8"
-    PRT_INDICES_Z_THRESHOLD            = "3.0"
+    PRT_INDICES_Z_THRESHOLD            = "2.0"
     PRT_INDICES_TOP_N_RANKINGS         = "500"
 
     PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
