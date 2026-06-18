@@ -67,8 +67,17 @@ class ReceiptTrainer:
         weight_decay: float = 0.01,
         max_gen_samples: int = 16,
         log_every: int = 0,
+        start_epoch: int = 0,
     ) -> dict[str, Any]:
-        """Run one curriculum phase; returns the best validation record."""
+        """Run one curriculum phase; returns the best validation record.
+
+        Each epoch writes two checkpoints: ``phase{p}_best.pt`` (overwritten on
+        improvement, used by export) and a per-epoch ``phase{p}_epoch{NN}_loss{L}.pt``
+        snapshot so a mid-phase stop loses at most the current epoch. ``start_epoch``
+        resumes the loop part-way through a phase (see ``scripts/train.py`` auto-resume);
+        optimizer momentum is not restored — adapter-only checkpoints stay small — but the
+        cosine LR schedule is fast-forwarded so the learning-rate curve still lines up.
+        """
         self._set_trainable(trainable_patterns)
         trainable = [p for p in self.model.parameters() if p.requires_grad]
         if not trainable:
@@ -80,9 +89,16 @@ class ReceiptTrainer:
 
         optimizer = AdamW(trainable, lr=lr, weight_decay=weight_decay)
         scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
+        if start_epoch:
+            if start_epoch >= epochs:
+                print(f"Phase {phase} already complete ({start_epoch}/{epochs} epochs)", flush=True)
+                return {"val_loss": float("inf"), "phase": phase, "epoch": start_epoch}
+            for _ in range(start_epoch):  # align the LR schedule with resumed progress
+                scheduler.step()
+            print(f"Resuming phase {phase} at epoch {start_epoch + 1}/{epochs}", flush=True)
 
         best: dict[str, Any] = {"val_loss": float("inf")}
-        for epoch in range(epochs):
+        for epoch in range(start_epoch, epochs):
             start = time.time()
             train_loss = self._train_epoch(optimizer, log_every=log_every)
             val_loss, val_metrics = self._val_epoch(max_gen_samples)
@@ -96,14 +112,20 @@ class ReceiptTrainer:
                 f"F1 {f1:.3f} | {elapsed:.0f}s"
             )
 
+            record = {
+                "phase": phase,
+                "epoch": epoch + 1,
+                "val_loss": val_loss,
+                **val_metrics,
+            }
             if val_loss < best["val_loss"]:
-                best = {
-                    "phase": phase,
-                    "epoch": epoch + 1,
-                    "val_loss": val_loss,
-                    **val_metrics,
-                }
+                best = record
                 self._save_checkpoint(f"phase{phase}_best.pt", best)
+            # Per-epoch snapshot LAST so a stdout-watching notebook can mirror both
+            # files to durable storage when it sees this "_epoch" save line.
+            self._save_checkpoint(
+                f"phase{phase}_epoch{epoch + 1:02d}_loss{val_loss:.4f}.pt", record
+            )
         return best
 
     # ------------------------------------------------------------------

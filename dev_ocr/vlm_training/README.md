@@ -49,6 +49,12 @@ python scripts/train.py --config configs/phase3_local.yaml --resume checkpoints/
 python scripts/zip_colab_upload.py   # pack real photos + labels for Drive upload
 # then open notebooks/train_receipt_vlm_colab.ipynb in Colab
 
+# Vertex AI (GCP, ~3–4 h on T4): code+checkpoints in a GCS bucket
+python scripts/zip_selfcontained_colab.py            # one bundle (code + photos + labels)
+gsutil cp colab_upload/receipt_vlm_colab_bundle.zip gs://YOUR_BUCKET/receipt_vlm/
+# Workbench (persistent VM):      notebooks/train_receipt_vlm_vertex.ipynb            — see VERTEX.md
+# Colab Enterprise (ephemeral):   notebooks/train_receipt_vlm_colab_enterprise.ipynb — see COLAB_ENTERPRISE.md
+
 # 4. Merge LoRA + export a single inference-ready .pt
 python scripts/export_checkpoint.py --checkpoint checkpoints/phase3_best.pt \
     --output checkpoints/receipt_vlm_500m_merged.pt
@@ -71,6 +77,17 @@ RECEIPT_VLM_MODEL_PATH=/models/receipt_vlm_500m_merged.pt
 
 This package may import `receipt_ocr`; the reverse is forbidden (except the single
 provider file, which lazily imports `receipt_vlm` model code at inference time).
+
+## Vertex AI (GCP)
+
+Two flavours, both reusing the self-contained bundle (`scripts/zip_selfcontained_colab.py`)
+with checkpoints syncing to a GCS bucket after each phase so a teardown never loses progress:
+
+- **Workbench** (persistent JupyterLab VM) — guide [`VERTEX.md`](VERTEX.md); open
+  `notebooks/train_receipt_vlm_vertex.ipynb` on a GPU Workbench instance.
+- **Colab Enterprise** (managed, ephemeral runtime) — guide [`COLAB_ENTERPRISE.md`](COLAB_ENTERPRISE.md);
+  open `notebooks/train_receipt_vlm_colab_enterprise.ipynb` on a GPU runtime. `COLAB_ENTERPRISE.md`
+  has a Workbench-vs-Colab-Enterprise comparison.
 
 ## Google Colab
 
