@@ -21,6 +21,18 @@ steps:
       - 'NEXT_PUBLIC_API_BASE_URL=${_API_BASE_URL}'
       - '--build-arg'
       - 'NEXT_PUBLIC_DEMO_BEARER=${_DEMO_BEARER}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_API_KEY=${_FIREBASE_API_KEY}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_FIREBASE_AUTH_DOMAIN}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${_FIREBASE_STORAGE_BUCKET}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${_FIREBASE_MESSAGING_SENDER_ID}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_APP_ID=${_FIREBASE_APP_ID}'
       - '-t'
       - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/frontend:${_SHORT_SHA}'
       - '.'
@@ -42,3 +54,13 @@ substitutions:
   _SHORT_SHA: 'latest'
   _API_BASE_URL: 'https://prt-prod-backend-y5iagyfila-ew.a.run.app'
   _DEMO_BEARER: 'demo'
+  # Firebase Auth — config web PUBLIQUE (cf. console Firebase → Paramètres projet →
+  # Vos applications → Web). À renseigner ici (valeurs stables) ou via
+  # --substitutions au build. Tant qu'elles sont vides, le frontend reste en mode
+  # démo (pas de login).
+  _FIREBASE_API_KEY: ''
+  _FIREBASE_AUTH_DOMAIN: 'price-tracker-prod-01.firebaseapp.com'
+  _FIREBASE_PROJECT_ID: 'price-tracker-prod-01'
+  _FIREBASE_STORAGE_BUCKET: 'price-tracker-prod-01.firebasestorage.app'
+  _FIREBASE_MESSAGING_SENDER_ID: '683154425349'
+  _FIREBASE_APP_ID: ''

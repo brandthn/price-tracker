@@ -63,11 +63,13 @@ module "run_backend" {
     GOOGLE_CLOUD_PROJECT = var.project_id
     PRT_GCP_REGION       = var.region
 
-    # Mode démo — bypasse la vérification Firebase JWT.
-    # Maintenu jusqu'à Phase 10 (frontend Next.js + Firebase Web SDK).
-    # Revert : mettre PRT_ENV=prod + PRT_AUTH_DISABLE=0 (ou supprimer la ligne).
-    PRT_ENV          = "dev"
-    PRT_AUTH_DISABLE = "1"
+    # Vérification Firebase JWT : pilotée par `var.backend_auth_enabled`.
+    #   false (défaut) → mode démo (PRT_ENV=dev, PRT_AUTH_DISABLE=1, user fake).
+    #   true           → prod (PRT_ENV=prod, PRT_AUTH_DISABLE=0, vrai per-user).
+    # ⚠️ Ne passer true qu'après déploiement du frontend avec config Firebase.
+    # Cf. docs/phase-11-auth-handoff.md.
+    PRT_ENV          = var.backend_auth_enabled ? "prod" : "dev"
+    PRT_AUTH_DISABLE = var.backend_auth_enabled ? "0" : "1"
 
     PRT_LOG_LEVEL       = "INFO"
     PRT_OPENAPI_ENABLED = "true"
