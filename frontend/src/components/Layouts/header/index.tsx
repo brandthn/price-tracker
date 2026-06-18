@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
 import { ThemeToggleSwitch } from "./theme-toggle";
+import { UserInfo } from "./user-info";
 
 export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();
@@ -36,6 +37,7 @@ export function Header() {
 
       <div className="2xsm:gap-4 flex flex-1 items-center justify-end gap-3">
         <ThemeToggleSwitch />
+        <UserInfo />
       </div>
     </header>
   );

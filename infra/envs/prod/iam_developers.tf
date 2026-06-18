@@ -53,6 +53,9 @@ locals {
     # Cloud Scheduler — déclencher manuellement les workers (`gcloud scheduler jobs run`)
     "roles/cloudscheduler.admin",
 
+    # Service Usage — consommer les APIs activées du projet (quota project).
+    "roles/serviceusage.serviceUsageConsumer",
+
     # Monitoring + Logs
     "roles/monitoring.editor",
     "roles/logging.viewer",

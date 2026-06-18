@@ -58,6 +58,20 @@ variable "backend_image_tag" {
   default = "63c5d4a"
 }
 
+variable "backend_auth_enabled" {
+  description = <<-EOT
+    Active la vérification réelle des JWT Firebase côté backend (PRT_ENV=prod +
+    PRT_AUTH_DISABLE=0). `false` = mode démo (bypass, tous les appels mappés sur
+    un user fake — pas de per-user).
+
+    ⚠️ Passer à `true` UNIQUEMENT après avoir déployé le frontend avec sa config
+    Firebase (NEXT_PUBLIC_FIREBASE_*) : sinon le front démo envoie un Bearer
+    invalide → 401. Voir docs/phase-11-auth-handoff.md.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "worker_ocr_image_tag" {
   description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
   type        = string
