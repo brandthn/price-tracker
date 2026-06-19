@@ -1,5 +1,7 @@
 import { apiFetch } from "./client";
 import type {
+  FeedbackRating,
+  FeedbackResponse,
   Ticket,
   TicketDetail,
   TicketItemPatch,
@@ -42,6 +44,18 @@ export function patchTicketItems(
   });
 }
 
+// Boucle de feedback : 👍/👎 sur l'output OCR. Un 👎 déclenche un re-OCR tier-2.
+export function submitFeedback(
+  id: string,
+  rating: FeedbackRating,
+): Promise<FeedbackResponse> {
+  return apiFetch<FeedbackResponse>(`/tickets/${id}/feedback`, {
+    method: "POST",
+    body: { rating },
+    authenticated: true,
+  });
+}
+
 // Upload direct GCS via Signed URL V4. Doit matcher `Content-Type` exactement.
 export async function uploadToSignedURL(
   signedUrl: string,
@@ -59,4 +73,10 @@ export async function uploadToSignedURL(
   }
 }
 
-export type { Ticket, TicketDetail, TicketsListResponse, UploadURLResponse };
+export type {
+  FeedbackResponse,
+  Ticket,
+  TicketDetail,
+  TicketsListResponse,
+  UploadURLResponse,
+};

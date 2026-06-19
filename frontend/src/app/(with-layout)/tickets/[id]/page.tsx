@@ -4,6 +4,7 @@ import { getTicket } from "@/lib/api/tickets";
 import { ApiError } from "@/lib/api/client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ItemsValidator } from "./_components/items-validator";
+import { OcrFeedback } from "./_components/ocr-feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,11 @@ export default async function TicketDetailPage({
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
+
+  // Le ticket est "pris en compte" dès l'OCR : on présente alors le feedback
+  // 👍/👎, l'édition ligne-par-ligne devenant optionnelle.
+  const hasOcrResult =
+    ticket.status === "ocr_done" || ticket.status === "validated";
 
   return (
     <>
@@ -46,12 +52,38 @@ export default async function TicketDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <Meta ticket={ticket} />
 
-        <div className="lg:col-span-2">
-          <ItemsValidator
-            ticketId={ticket.id}
-            initialItems={ticket.items}
-            ticketStatus={ticket.status}
-          />
+        <div className="space-y-6 lg:col-span-2">
+          {hasOcrResult && (
+            <OcrFeedback
+              ticketId={ticket.id}
+              initialFeedback={ticket.last_feedback}
+              initialAttempts={ticket.ocr_attempts}
+            />
+          )}
+
+          {hasOcrResult ? (
+            <details className="group rounded-[10px] bg-white shadow-1 dark:bg-gray-dark">
+              <summary className="cursor-pointer list-none px-5 py-4 text-sm font-medium text-dark-6 hover:text-dark dark:hover:text-white">
+                ✏️ Corriger les lignes (optionnel)
+                <span className="ml-1 text-xs text-dark-6 group-open:hidden">
+                  — déplier
+                </span>
+              </summary>
+              <div className="border-t border-stroke px-1 pb-1 dark:border-dark-3">
+                <ItemsValidator
+                  ticketId={ticket.id}
+                  initialItems={ticket.items}
+                  ticketStatus={ticket.status}
+                />
+              </div>
+            </details>
+          ) : (
+            <ItemsValidator
+              ticketId={ticket.id}
+              initialItems={ticket.items}
+              ticketStatus={ticket.status}
+            />
+          )}
         </div>
       </div>
     </>

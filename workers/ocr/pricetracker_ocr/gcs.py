@@ -16,6 +16,22 @@ class ImageTooLargeError(Exception):
         super().__init__(f"Image {path!r} exceeds 10 MB limit ({size} bytes).")
 
 
+def split_gs_uri(gs_uri: str) -> tuple[str, str]:
+    """Split ``gs://bucket/path/to/object`` → ``(bucket, object_path)``.
+
+    Utilisé par le re-OCR : la colonne ``tickets.gcs_path`` stocke l'URI gs://
+    complète, alors que la notification GCS d'origine fournissait bucket+name
+    séparés.
+    """
+    if not gs_uri.startswith("gs://"):
+        raise ValueError(f"Not a gs:// URI: {gs_uri!r}")
+    without_scheme = gs_uri[len("gs://"):]
+    bucket, _, object_path = without_scheme.partition("/")
+    if not bucket or not object_path:
+        raise ValueError(f"Malformed gs:// URI (missing bucket or object): {gs_uri!r}")
+    return bucket, object_path
+
+
 def _download_sync(bucket_name: str, object_path: str) -> bytes:
     client = storage.Client()
     bucket = client.bucket(bucket_name)

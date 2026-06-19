@@ -16,7 +16,7 @@ export async function OverviewCardsGroup() {
   }
 
   const total = list.total;
-  const counters = countByStatus(list.items);
+  const counters = countTickets(list.items);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4 2xl:gap-7.5">
@@ -27,22 +27,22 @@ export async function OverviewCardsGroup() {
         Icon={icons.TotalTicketsIcon}
       />
       <OverviewCard
-        label="En attente OCR"
-        value={counters.pending + counters.processing}
-        hint="pending / processing"
+        label="En analyse"
+        value={counters.analyzing}
+        hint="OCR en cours"
         Icon={icons.PendingIcon}
       />
       <OverviewCard
-        label="OCR terminé"
-        value={counters.ocr_done}
-        hint="lignes prêtes à valider"
-        Icon={icons.OcrDoneIcon}
+        label="👍 Utiles"
+        value={counters.up}
+        hint="output OCR jugé correct"
+        Icon={icons.ValidatedIcon}
       />
       <OverviewCard
-        label="Validés"
-        value={counters.validated}
-        hint="corrigés par l'utilisateur"
-        Icon={icons.ValidatedIcon}
+        label="👎 À revoir"
+        value={counters.down}
+        hint="re-analysés (tier-2)"
+        Icon={icons.OcrDoneIcon}
       />
     </div>
   );
@@ -56,16 +56,18 @@ function OverviewCardsEmpty({ reason }: { reason: string }) {
   );
 }
 
-function countByStatus(items: Ticket[]) {
-  const c = {
-    pending: 0,
-    processing: 0,
-    ocr_done: 0,
-    ocr_failed: 0,
-    validated: 0,
-  };
+const ANALYZING_STATUSES = new Set([
+  "pending",
+  "processing",
+  "ocr_processing",
+]);
+
+function countTickets(items: Ticket[]) {
+  const c = { analyzing: 0, up: 0, down: 0 };
   for (const t of items) {
-    if (t.status in c) c[t.status as keyof typeof c] += 1;
+    if (ANALYZING_STATUSES.has(t.status)) c.analyzing += 1;
+    if (t.last_feedback === "up") c.up += 1;
+    else if (t.last_feedback === "down") c.down += 1;
   }
   return c;
 }

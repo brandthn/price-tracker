@@ -71,6 +71,86 @@ async def set_ticket_done(pool: asyncpg.Pool, ticket_id: str, fields: dict[str, 
     )
 
 
+async def set_ticket_retrying(pool: asyncpg.Pool, ticket_id: str) -> bool:
+    """Claim un ticket pour re-OCR (tier-2). Retourne True si claimé.
+
+    On ne ré-analyse qu'un ticket déjà `ocr_done` (l'utilisateur a noté 👎 sur
+    un résultat existant). Si un duplicat de message arrive, le ticket est déjà
+    `ocr_processing` → la condition échoue → skip idempotent.
+    """
+    result = await pool.execute(
+        """
+        UPDATE tickets
+        SET status = 'ocr_processing', updated_at = now()
+        WHERE id = $1::uuid AND status = 'ocr_done'
+        """,
+        ticket_id,
+    )
+    return result.endswith("1")
+
+
+async def get_ticket_for_retry(pool: asyncpg.Pool, ticket_id: str) -> asyncpg.Record | None:
+    """Retourne gcs_path / ocr_attempts / enseigne / date_ticket pour le re-OCR."""
+    return await pool.fetchrow(
+        """
+        SELECT gcs_path, ocr_attempts, enseigne, date_ticket
+        FROM tickets
+        WHERE id = $1::uuid
+        """,
+        ticket_id,
+    )
+
+
+async def fetch_prix_extraits(pool: asyncpg.Pool, ticket_id: str) -> list[asyncpg.Record]:
+    """Lignes de l'extraction précédente (pour injecter dans le prompt correctif)."""
+    return await pool.fetch(
+        """
+        SELECT line_index, raw_text, unit_price, quantity
+        FROM prix_extraits
+        WHERE ticket_id = $1::uuid
+        ORDER BY line_index
+        """,
+        ticket_id,
+    )
+
+
+async def delete_prix_extraits(pool: asyncpg.Pool, ticket_id: str) -> None:
+    """Clean slate avant ré-insertion : le tier-2 peut renvoyer moins de lignes."""
+    await pool.execute(
+        "DELETE FROM prix_extraits WHERE ticket_id = $1::uuid", ticket_id
+    )
+
+
+async def set_ticket_done_retry(
+    pool: asyncpg.Pool, ticket_id: str, fields: dict[str, Any], model: str
+) -> None:
+    """Comme set_ticket_done mais incrémente ocr_attempts et renseigne ocr_model."""
+    await pool.execute(
+        """
+        UPDATE tickets
+        SET status          = 'ocr_done',
+            enseigne        = $2,
+            date_ticket     = $3,
+            total_eur       = $4,
+            ocr_confidence  = $5,
+            ocr_engine      = $6,
+            ocr_duration_ms = $7,
+            ocr_model       = $8,
+            ocr_attempts    = ocr_attempts + 1,
+            updated_at      = now()
+        WHERE id = $1::uuid
+        """,
+        ticket_id,
+        fields.get("enseigne"),
+        fields.get("ticket_date"),
+        fields.get("total_amount"),
+        fields.get("ocr_confidence"),
+        fields.get("ocr_engine"),
+        fields.get("ocr_duration_ms"),
+        model,
+    )
+
+
 async def set_ticket_failed(
     pool: asyncpg.Pool, ticket_id: str, error_message: str
 ) -> None:

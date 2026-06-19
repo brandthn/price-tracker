@@ -17,6 +17,7 @@ class Base(DeclarativeBase):
 
 # Import des modèles pour qu'ils soient enregistrés sur Base.metadata.
 from .notification_prefs import NotificationPrefs  # noqa: E402, F401
+from .ocr_feedback import OcrFeedback  # noqa: E402, F401
 from .prix_extraits import PrixExtrait  # noqa: E402, F401
 from .product_aliases import ProductAlias  # noqa: E402, F401
 from .products import Product  # noqa: E402, F401

@@ -95,7 +95,7 @@ variable "worker_alertes_image_tag" {
 variable "frontend_image_tag" {
   description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
   type        = string
-  default = "737f3ff"
+  default     = "737f3ff"
 }
 
 variable "frontend_cors_origins" {

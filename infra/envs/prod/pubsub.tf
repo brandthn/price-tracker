@@ -27,5 +27,18 @@ module "pubsub" {
       # worker-sa peut consommer le DLQ (replay manuel ou inspection).
       subscribers = [local.worker_sa]
     }
+
+    # Boucle de feedback OCR : un 👎 utilisateur publie le ticket_id ici
+    # (backend-sa = publisher). Une push subscription relaie vers worker-ocr
+    # /retry (cf. subscriptions.tf) pour une seconde passe LLM (tier-2).
+    "ocr-retry" = {
+      message_retention_duration = "604800s"
+      publishers                 = [local.backend_sa]
+      subscribers                = [local.worker_sa]
+    }
+    "ocr-retry-dlq" = {
+      message_retention_duration = "604800s"
+      subscribers                = [local.worker_sa]
+    }
   }
 }

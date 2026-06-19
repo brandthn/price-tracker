@@ -11,13 +11,17 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import AuthenticatedUser, verify_bearer
+from ..config import get_settings
 from ..db import get_session
 from ..gcs import generate_ticket_upload_url
 from ..logging import get_logger
+from ..models.ocr_feedback import OcrFeedback
 from ..models.prix_extraits import PrixExtrait
 from ..models.product_aliases import ProductAlias
 from ..models.tickets import Ticket
 from ..schemas.tickets import (
+    FeedbackRequest,
+    FeedbackResponse,
     PrixExtraitOut,
     TicketDetailOut,
     TicketItemsPatchRequest,
@@ -26,6 +30,7 @@ from ..schemas.tickets import (
     TicketUploadURLRequest,
     TicketUploadURLResponse,
 )
+from ..services import pubsub
 from ..services.user_provisioning import get_or_create_user
 
 logger = get_logger(__name__)
@@ -233,3 +238,78 @@ async def patch_ticket_items(
     out = TicketDetailOut.model_validate(ticket)
     out.items = [PrixExtraitOut.model_validate(i) for i in items]
     return out
+
+
+async def _load_ticket_detail(session: AsyncSession, ticket: Ticket) -> TicketDetailOut:
+    items = (
+        await session.execute(
+            select(PrixExtrait)
+            .where(PrixExtrait.ticket_id == ticket.id)
+            .order_by(PrixExtrait.line_index)
+        )
+    ).scalars().all()
+    out = TicketDetailOut.model_validate(ticket)
+    out.items = [PrixExtraitOut.model_validate(i) for i in items]
+    return out
+
+
+@router.post("/{ticket_id}/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    ticket_id: uuid.UUID,
+    body: FeedbackRequest,
+    user: AuthenticatedUser = Depends(verify_bearer),
+    session: AsyncSession = Depends(get_session),
+) -> FeedbackResponse:
+    """Avis 👍/👎 de l'utilisateur sur l'output OCR.
+
+    Le ticket est déjà "pris en compte" dès l'OCR — ce feedback ne valide rien,
+    il alimente l'historique d'analyse (`ocr_feedback`) et, si 👎, déclenche un
+    re-OCR par un second LLM (tier-2) tant que le plafond `prt_max_ocr_attempts`
+    n'est pas atteint (garde-fou anti-boucle).
+    """
+    db_user = await get_or_create_user(session, user)
+    ticket = await session.get(Ticket, ticket_id)
+    if ticket is None or ticket.user_id != db_user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ticket not found.")
+
+    # Historise l'avis (une ligne par avis, jamais d'upsert).
+    session.add(
+        OcrFeedback(
+            ticket_id=ticket.id,
+            user_id=db_user.id,
+            rating=body.rating,
+            ocr_attempt=ticket.ocr_attempts,
+            ocr_engine=ticket.ocr_model or ticket.ocr_engine,
+        )
+    )
+    ticket.last_feedback = body.rating
+
+    settings = get_settings()
+    retry_triggered = False
+    if body.rating == "down" and ticket.ocr_attempts < settings.prt_max_ocr_attempts:
+        retry_triggered = True
+
+    await session.commit()
+    await session.refresh(ticket)
+
+    # Publication APRÈS commit : on ne relance un re-OCR que si l'avis est bien
+    # persisté. Échec de publication → 502 explicite (le feedback reste sauvé).
+    if retry_triggered:
+        try:
+            await asyncio.to_thread(pubsub.publish_ocr_retry, str(ticket.id))
+        except Exception as exc:
+            logger.error("ocr_retry_publish_failed", ticket_id=str(ticket.id), error=str(exc))
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Feedback enregistré mais le re-OCR n'a pas pu être déclenché.",
+            ) from exc
+
+    detail = await _load_ticket_detail(session, ticket)
+    logger.info(
+        "ticket_feedback",
+        ticket_id=str(ticket.id),
+        rating=body.rating,
+        ocr_attempt=ticket.ocr_attempts,
+        retry_triggered=retry_triggered,
+    )
+    return FeedbackResponse(ticket=detail, retry_triggered=retry_triggered)
