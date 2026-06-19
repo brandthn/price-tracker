@@ -55,6 +55,29 @@ class Settings(BaseSettings):
         description="DEV ONLY : bypass Firebase Auth, retourne un user fake.",
     )
 
+    # --- Feedback loop / re-OCR ------------------------------------------
+    prt_ocr_retry_topic: str = Field(
+        default="ocr-retry",
+        description="Nom (ou chemin complet) du topic Pub/Sub déclenchant le re-OCR tier-2.",
+    )
+    prt_max_ocr_attempts: int = Field(
+        default=2,
+        description="Garde-fou anti-boucle : un 👎 ne relance un re-OCR que si "
+        "ocr_attempts < cette valeur (tier-1=1, tier-2=2).",
+    )
+
+    @property
+    def ocr_retry_topic_path(self) -> str:
+        """Chemin complet `projects/<proj>/topics/<topic>` attendu par PublisherClient.
+
+        Accepte soit un nom court (`ocr-retry`) — préfixé avec le projet — soit
+        un chemin déjà complet.
+        """
+        topic = self.prt_ocr_retry_topic
+        if topic.startswith("projects/"):
+            return topic
+        return f"projects/{self.google_cloud_project}/topics/{topic}"
+
     @property
     def cors_origins_list(self) -> list[str]:
         raw = [s.strip() for s in self.prt_cors_origins.split(",") if s.strip()]

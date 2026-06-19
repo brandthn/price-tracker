@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     prt_ocr_confidence_threshold: float = Field(default=0.55)
     prt_ocr_max_image_mb: int = Field(default=10)
 
+    # Re-OCR tier-2 (boucle de feedback 👎) -------------------------------
+    # MÊME modèle Groq que le tier-1 : la seconde passe se distingue uniquement
+    # par le prompt correctif (qui inclut l'extraction précédente erronée). On
+    # évite ainsi tout risque d'un modèle indisponible/instable avant la démo.
+    prt_ocr_retry_model: str = Field(
+        default="meta-llama/llama-4-scout-17b-16e-instruct"
+    )
+    # Garde-fou anti-boucle (aligné avec le backend) : ocr_attempts plafonné.
+    prt_ocr_max_attempts: int = Field(default=2)
+
     # Cloud SQL -----------------------------------------------------------
     prt_pg_host: str = Field(default="")
     prt_pg_port: int = Field(default=5432)

@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import { patchTicketItems } from "@/lib/api/tickets";
 import type { PrixExtrait } from "@/lib/api/types";
 
-const TICKET_VALIDATED = "validated";
-
 type Draft = {
   id: string;
   ean: string;
@@ -39,8 +37,9 @@ export function ItemsValidator({
 
   const isEmpty = initialItems.length === 0;
   const isAwaitingOcr =
-    ticketStatus === "pending" || ticketStatus === "processing";
-  const isValidated = ticketStatus === TICKET_VALIDATED;
+    ticketStatus === "pending" ||
+    ticketStatus === "processing" ||
+    ticketStatus === "ocr_processing";
 
   const update = (id: string, patch: Partial<Draft>) => {
     setDrafts((prev) =>
@@ -66,13 +65,11 @@ export function ItemsValidator({
           })),
         );
         toast.success(
-          changed.length === 0
-            ? "Ticket confirmé."
-            : `Ticket confirmé (${changed.length} correction${changed.length > 1 ? "s" : ""}).`,
+          `${changed.length} correction${changed.length > 1 ? "s" : ""} enregistrée${changed.length > 1 ? "s" : ""}.`,
         );
         router.refresh();
       } catch (err) {
-        toast.error(`Impossible de confirmer : ${(err as Error).message}`);
+        toast.error(`Impossible d'enregistrer : ${(err as Error).message}`);
       }
     });
   };
@@ -102,24 +99,18 @@ export function ItemsValidator({
         <h3 className="text-heading-6 font-bold text-dark dark:text-white">
           Articles ({drafts.length})
         </h3>
-        {isValidated ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-light-7 px-3 py-1 text-xs font-medium text-green">
-            ✓ Ticket validé
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={submit}
-            disabled={isPending}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isPending
-              ? "Enregistrement…"
-              : dirtyCount > 0
-              ? `Confirmer (${dirtyCount} correction${dirtyCount > 1 ? "s" : ""})`
-              : "Confirmer le ticket"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={submit}
+          disabled={isPending || dirtyCount === 0}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isPending
+            ? "Enregistrement…"
+            : dirtyCount > 0
+            ? `Enregistrer (${dirtyCount} correction${dirtyCount > 1 ? "s" : ""})`
+            : "Aucune correction"}
+        </button>
       </div>
 
       <div className="overflow-x-auto">

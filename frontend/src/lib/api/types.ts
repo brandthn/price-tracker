@@ -4,9 +4,12 @@
 export type TicketStatus =
   | "pending"
   | "processing"
+  | "ocr_processing"
   | "ocr_done"
   | "ocr_failed"
   | "validated";
+
+export type FeedbackRating = "up" | "down";
 
 export interface Ticket {
   id: string;
@@ -16,8 +19,11 @@ export interface Ticket {
   total_eur: number | null;
   ocr_confidence: number | null;
   ocr_engine: string | null;
+  ocr_model: string | null;
   ocr_duration_ms: number | null;
   ocr_error: string | null;
+  ocr_attempts: number;
+  last_feedback: FeedbackRating | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +47,11 @@ export interface PrixExtrait {
 
 export interface TicketDetail extends Ticket {
   items: PrixExtrait[];
+}
+
+export interface FeedbackResponse {
+  ticket: TicketDetail;
+  retry_triggered: boolean;
 }
 
 export interface TicketsListResponse {

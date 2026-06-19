@@ -16,9 +16,9 @@ from receipt_ocr.exceptions import ReceiptParseError
 
 from .auth import verify_oidc
 from .config import Settings, get_settings
-from .gcs import ImageTooLargeError, download_image
+from .gcs import ImageTooLargeError, download_image, split_gs_uri
 from .logging import configure_logging, get_logger
-from . import mapper, ocr, pg, pubsub
+from . import mapper, ocr, pg, pubsub, retry_ocr
 from .ocr import OcrProcessingError
 
 configure_logging(level=os.environ.get("PRT_LOG_LEVEL", "INFO"))
@@ -161,6 +161,101 @@ async def push(
     except Exception as transient_err:
         logger.error(
             "ocr_failed",
+            ticket_id=ticket_id,
+            error=str(transient_err),
+            retryable=True,
+            exc_info=True,
+        )
+        raise
+
+
+@app.post("/retry")
+async def retry(
+    request: Request,
+    _oidc: dict = Depends(verify_oidc),
+) -> Response:
+    """Re-OCR tier-2 déclenché par un 👎 utilisateur (topic Pub/Sub `ocr-retry`).
+
+    Ré-analyse un ticket déjà `ocr_done` avec un second LLM Groq + prompt
+    correctif incluant l'extraction précédente, puis réécrit `prix_extraits`
+    (clean slate) et incrémente `ocr_attempts`.
+    """
+    body = await request.body()
+    settings = get_settings()
+    pool: Any = request.app.state.pool
+
+    try:
+        ticket_id = pubsub.parse_retry_envelope(body)
+    except ValueError as exc:
+        logger.warning("retry_parse_failed", error=str(exc))
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(ticket_id=ticket_id)
+
+    claimed = await pg.set_ticket_retrying(pool, ticket_id)
+    if not claimed:
+        logger.info("retry_skip", ticket_id=ticket_id, reason="not_ocr_done_or_duplicate")
+        return Response(status_code=204)
+
+    row = await pg.get_ticket_for_retry(pool, ticket_id)
+    if row is None:
+        logger.warning("retry_ticket_missing", ticket_id=ticket_id)
+        return Response(status_code=204)
+
+    retry_model = settings.prt_ocr_retry_model
+    logger.info("retry_start", ticket_id=ticket_id, retry_model=retry_model)
+    t_start = time.monotonic()
+
+    try:
+        bucket, object_path = split_gs_uri(row["gcs_path"])
+        image_data = await download_image(bucket, object_path)
+
+        prev_rows = [dict(r) for r in await pg.fetch_prix_extraits(pool, ticket_id)]
+        previous_json = retry_ocr.build_previous_extraction_json(
+            row["enseigne"], row["date_ticket"], prev_rows
+        )
+
+        ocr_result = await asyncio.to_thread(
+            retry_ocr.run_retry_ocr, image_data, previous_json, retry_model
+        )
+        duration_ms = int((time.monotonic() - t_start) * 1000)
+
+        ticket_fields = mapper.map_ticket_fields(
+            ocr_result,
+            ticket_id,
+            object_path,
+            settings.prt_ocr_engine,
+            duration_ms,
+            confidence=1.0,
+        )
+        prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
+
+        # Clean slate : le tier-2 peut renvoyer un nombre de lignes différent.
+        await pg.delete_prix_extraits(pool, ticket_id)
+        await pg.set_ticket_done_retry(pool, ticket_id, ticket_fields, retry_model)
+        await pg.upsert_prix_extraits(pool, prix_rows)
+
+        logger.info(
+            "retry_done",
+            ticket_id=ticket_id,
+            retry_model=retry_model,
+            duration_ms=duration_ms,
+            n_lines=len(prix_rows),
+            prev_attempts=row["ocr_attempts"],
+        )
+        return Response(status_code=204)
+
+    except (ImageTooLargeError, OcrProcessingError, ValueError) as fatal_err:
+        await pg.set_ticket_failed(pool, ticket_id, str(fatal_err))
+        logger.warning(
+            "retry_failed", ticket_id=ticket_id, error=str(fatal_err), retryable=False
+        )
+        return Response(status_code=204)
+
+    except Exception as transient_err:
+        logger.error(
+            "retry_failed",
             ticket_id=ticket_id,
             error=str(transient_err),
             retryable=True,

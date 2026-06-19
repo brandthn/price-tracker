@@ -102,3 +102,79 @@ resource "google_pubsub_subscription" "ticket_uploaded_dlq_inspection" {
 
   labels = merge(var.labels, { component = "worker-ocr-dlq" })
 }
+
+# --- 3) Boucle de feedback : ocr-retry → worker-ocr /retry -----------------
+#
+# Déclenchée par un 👎 utilisateur (le backend publie {ticket_id} sur le topic
+# `ocr-retry`). Même schéma OIDC/DLQ que la subscription OCR principale : le
+# token est minté pour worker-sa (déjà autorisé à invoquer worker-ocr via
+# `worker_sa_invoker`). Le re-OCR tier-2 vit sur l'endpoint /retry du worker.
+resource "google_pubsub_subscription" "ocr_retry_worker_push" {
+  project = var.project_id
+  name    = "ocr-retry-worker-push"
+  topic   = module.pubsub.topics["ocr-retry"].name
+
+  ack_deadline_seconds       = 600
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  push_config {
+    push_endpoint = "${module.run_worker_ocr.uri}/retry"
+
+    oidc_token {
+      service_account_email = module.iam.emails["worker"]
+      audience              = module.run_worker_ocr.uri
+    }
+
+    attributes = {
+      x-goog-version = "v1"
+    }
+  }
+
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+
+  dead_letter_policy {
+    dead_letter_topic     = module.pubsub.topics["ocr-retry-dlq"].id
+    max_delivery_attempts = 5
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-retry" })
+
+  depends_on = [
+    google_service_account_iam_member.pubsub_token_creator_on_worker,
+    google_cloud_run_v2_service_iam_member.worker_sa_invoker,
+  ]
+}
+
+# Pub/Sub service agent : subscriber sur la sub retry (bascule DLQ) + publisher
+# sur le topic DLQ retry. Mêmes raisons que pour le DLQ OCR principal.
+resource "google_pubsub_subscription_iam_member" "pubsub_agent_retry_dlq_forwarder" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.ocr_retry_worker_push.name
+  role         = "roles/pubsub.subscriber"
+  member       = local.pubsub_agent_member
+}
+
+resource "google_pubsub_topic_iam_member" "pubsub_agent_retry_dlq_publisher" {
+  project = var.project_id
+  topic   = module.pubsub.topics["ocr-retry-dlq"].name
+  role    = "roles/pubsub.publisher"
+  member  = local.pubsub_agent_member
+}
+
+resource "google_pubsub_subscription" "ocr_retry_dlq_inspection" {
+  project = var.project_id
+  name    = "ocr-retry-dlq-inspection"
+  topic   = module.pubsub.topics["ocr-retry-dlq"].name
+
+  ack_deadline_seconds       = 60
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  labels = merge(var.labels, { component = "worker-ocr-retry-dlq" })
+}

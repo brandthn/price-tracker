@@ -94,6 +94,11 @@ module "run_backend" {
     PRT_PG_DB        = module.cloud_sql_main.db_name
     PRT_PG_USER      = module.cloud_sql_main.db_user
     PRT_PG_POOL_SIZE = "4"
+
+    # Boucle de feedback : un 👎 publie sur ce topic pour déclencher le re-OCR
+    # tier-2. Plafond d'essais = garde-fou anti-boucle (tier-1=1, tier-2=2).
+    PRT_OCR_RETRY_TOPIC  = module.pubsub.topics["ocr-retry"].name
+    PRT_MAX_OCR_ATTEMPTS = "2"
   }
 
   secret_env = {
@@ -145,6 +150,11 @@ module "run_worker_ocr" {
     PRT_GCP_REGION       = var.region
     PRT_BRONZE_BUCKET    = module.bucket_bronze.name
     PRT_OCR_ENGINE       = "groq"
+
+    # Re-OCR tier-2 (👎) : MÊME modèle Groq que le tier-1 + prompt correctif
+    # (/retry). La seconde passe ne change que le prompt, pas le modèle.
+    PRT_OCR_RETRY_MODEL  = "meta-llama/llama-4-scout-17b-16e-instruct"
+    PRT_OCR_MAX_ATTEMPTS = "2"
 
     PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
     PRT_PG_PORT      = "5432"

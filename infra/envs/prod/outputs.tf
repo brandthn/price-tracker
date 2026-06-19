@@ -92,10 +92,12 @@ output "cloud_scheduler_jobs" {
 }
 
 output "pubsub_subscriptions" {
-  description = "Pub/Sub subscriptions wired in Phase 5."
+  description = "Pub/Sub subscriptions (OCR pipeline + feedback re-OCR)."
   value = {
-    ocr_push       = google_pubsub_subscription.ticket_uploaded_ocr_push.id
-    dlq_inspection = google_pubsub_subscription.ticket_uploaded_dlq_inspection.id
+    ocr_push              = google_pubsub_subscription.ticket_uploaded_ocr_push.id
+    dlq_inspection        = google_pubsub_subscription.ticket_uploaded_dlq_inspection.id
+    ocr_retry_push        = google_pubsub_subscription.ocr_retry_worker_push.id
+    ocr_retry_dlq_inspect = google_pubsub_subscription.ocr_retry_dlq_inspection.id
   }
 }
 
