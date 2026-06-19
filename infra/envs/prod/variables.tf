@@ -69,7 +69,7 @@ variable "backend_auth_enabled" {
     invalide → 401. Voir docs/phase-11-auth-handoff.md.
   EOT
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "worker_ocr_image_tag" {
@@ -95,8 +95,7 @@ variable "worker_alertes_image_tag" {
 variable "frontend_image_tag" {
   description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
   type        = string
-  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
-  default = "b518872"
+  default = "737f3ff"
 }
 
 variable "frontend_cors_origins" {
