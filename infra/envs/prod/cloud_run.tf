@@ -496,3 +496,4 @@ resource "google_cloud_run_v2_service_iam_member" "worker_sa_invoker" {
   role     = "roles/run.invoker"
   member   = local.worker_sa
 }
+
