@@ -1,9 +1,10 @@
-"""Cloud SQL access for tickets and prix_extraits.
+"""Cloud SQL access pour le worker OCR tier-2.
 
-Noms de colonnes utilisés = schéma prod (migration 0001 + 0002) :
-  tickets  : date_ticket, total_eur, ocr_error, ocr_engine, ocr_duration_ms
-  prix_extraits : unit_price, line_total, match_method
-  + contrainte UNIQUE(ticket_id, line_index) + DEFAULT gen_random_uuid() sur id
+Contrat minimal : on reçoit un ticket, on relit son image + son extraction
+précédente, on ré-écrit `prix_extraits` et on incrémente `ocr_attempts`. Pas de
+machine à états (pas de claim) : le backend est le gatekeeper (il ne publie que
+si `ocr_attempts < max`), et un doublon de livraison Pub/Sub ne fait que ré-écrire
+le même résultat — inoffensif.
 """
 
 from __future__ import annotations
@@ -30,35 +31,58 @@ async def create_pool(settings: Settings) -> asyncpg.Pool:
     )
 
 
-async def set_ticket_processing(pool: asyncpg.Pool, ticket_id: str) -> bool:
-    """Set status to 'ocr_processing' si encore pending/uploaded. Retourne True si claimé."""
-    result = await pool.execute(
+async def get_ticket(pool: asyncpg.Pool, ticket_id: str) -> asyncpg.Record | None:
+    """gcs_path (image à OCR) + extraction précédente (contexte prompt correctif)."""
+    return await pool.fetchrow(
         """
-        UPDATE tickets
-        SET status = 'ocr_processing', updated_at = now()
-        WHERE id = $1::uuid AND status IN ('pending', 'uploaded')
+        SELECT gcs_path, ocr_attempts, enseigne, date_ticket
+        FROM tickets
+        WHERE id = $1::uuid
         """,
         ticket_id,
     )
-    return result.endswith("1")
 
 
-async def set_ticket_done(pool: asyncpg.Pool, ticket_id: str, fields: dict[str, Any]) -> None:
-    """Mise à jour tickets au succès OCR. Les clés de `fields` sont les noms
-    Python du mapper (ticket_date, total_amount) ; on les écrit dans les
-    colonnes DB réelles (date_ticket, total_eur, ocr_engine, ocr_duration_ms).
+async def fetch_prix_extraits(pool: asyncpg.Pool, ticket_id: str) -> list[asyncpg.Record]:
+    """Extraction précédente (pour injecter dans le prompt correctif)."""
+    return await pool.fetch(
+        """
+        SELECT line_index, raw_text, unit_price, quantity
+        FROM prix_extraits
+        WHERE ticket_id = $1::uuid
+        ORDER BY line_index
+        """,
+        ticket_id,
+    )
+
+
+async def delete_prix_extraits(pool: asyncpg.Pool, ticket_id: str) -> None:
+    """Clean slate : la tier-2 peut renvoyer un nombre de lignes différent."""
+    await pool.execute(
+        "DELETE FROM prix_extraits WHERE ticket_id = $1::uuid", ticket_id
+    )
+
+
+async def set_ticket_done(
+    pool: asyncpg.Pool, ticket_id: str, fields: dict[str, Any], model: str
+) -> None:
+    """Écrit le résultat OCR tier-2 : champs + ocr_model + bump ocr_attempts.
+
+    Le ticket reste `ocr_done` (il l'était déjà). Pas de flip de statut : en cas
+    d'échec tier-2, on laisse le résultat tier-1 intact côté appelant.
     """
     await pool.execute(
         """
         UPDATE tickets
-        SET status         = 'ocr_done',
-            enseigne       = $2,
-            date_ticket    = $3,
-            total_eur      = $4,
-            ocr_confidence = $5,
-            ocr_engine     = $6,
+        SET enseigne        = $2,
+            date_ticket     = $3,
+            total_eur       = $4,
+            ocr_confidence  = $5,
+            ocr_engine      = $6,
             ocr_duration_ms = $7,
-            updated_at     = now()
+            ocr_model       = $8,
+            ocr_attempts    = ocr_attempts + 1,
+            updated_at      = now()
         WHERE id = $1::uuid
         """,
         ticket_id,
@@ -68,26 +92,11 @@ async def set_ticket_done(pool: asyncpg.Pool, ticket_id: str, fields: dict[str, 
         fields.get("ocr_confidence"),
         fields.get("ocr_engine"),
         fields.get("ocr_duration_ms"),
+        model,
     )
 
 
-async def set_ticket_failed(
-    pool: asyncpg.Pool, ticket_id: str, error_message: str
-) -> None:
-    await pool.execute(
-        """
-        UPDATE tickets
-        SET status    = 'ocr_failed',
-            ocr_error = $2,
-            updated_at = now()
-        WHERE id = $1::uuid
-        """,
-        ticket_id,
-        error_message,
-    )
-
-
-_UPSERT_SQL = """
+_INSERT_SQL = """
 INSERT INTO prix_extraits (
     ticket_id, line_index, raw_text, quantity, unit_price, line_total,
     ean, match_method, match_confidence, needs_validation, validated_by_user
@@ -128,4 +137,4 @@ async def upsert_prix_extraits(pool: asyncpg.Pool, rows: list[dict[str, Any]]) -
         )
         for row in rows
     ]
-    await pool.executemany(_UPSERT_SQL, records)
+    await pool.executemany(_INSERT_SQL, records)

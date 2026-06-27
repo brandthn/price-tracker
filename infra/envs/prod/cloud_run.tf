@@ -151,11 +151,6 @@ module "run_worker_ocr" {
     PRT_BRONZE_BUCKET    = module.bucket_bronze.name
     PRT_OCR_ENGINE       = "groq"
 
-    # Re-OCR tier-2 (👎) : MÊME modèle Groq que le tier-1 + prompt correctif
-    # (/retry). La seconde passe ne change que le prompt, pas le modèle.
-    PRT_OCR_RETRY_MODEL  = "meta-llama/llama-4-scout-17b-16e-instruct"
-    PRT_OCR_MAX_ATTEMPTS = "2"
-
     PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
     PRT_PG_PORT      = "5432"
     PRT_PG_DB        = module.cloud_sql_main.db_name
@@ -177,6 +172,62 @@ module "run_worker_ocr" {
   }
 
   labels = merge(var.labels, { component = "worker-ocr" })
+}
+
+# --- Worker OCR tier-2 / LLM (Phase 12 — boucle de feedback) --------------
+# Worker OCR **indépendant** déclenché par un 👎 utilisateur : le backend publie
+# le ticket_id sur le topic `ocr-retry`, qui pousse vers le `POST /push` de ce
+# service. Même contrat que worker-ocr (« donne-moi un ticket, je fais l'OCR »),
+# mais avec un LLM Groq + prompt correctif réutilisant l'extraction précédente.
+# Vision cible : tier-1 = VLM/Tesseract maison, tier-2 (ici) = LLM Groq.
+module "run_worker_ocr_llm" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-worker-ocr-llm"
+  image                 = "${module.artifact_registry.docker_registry_url}/worker-ocr-llm:${var.worker_ocr_llm_image_tag}"
+  service_account_email = module.iam.emails["worker"]
+
+  min_instances   = 0
+  max_instances   = 5
+  cpu             = "2"
+  memory          = "2Gi"
+  timeout_seconds = 540
+
+  vpc_subnet = local.cloud_run_subnet
+  vpc_egress = "PRIVATE_RANGES_ONLY"
+  ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+
+    # Modèle Groq de la seconde passe. Défaut = même modèle que le tier-1
+    # (fiabilité) ; pointer vers un modèle plus performant ensuite.
+    PRT_OCR_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+    GROQ_API_KEY = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-groq-api-key"]
+      version = "latest"
+    }
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-llm" })
 }
 
 # --- Worker Ingestion (Phase 6.1) ----------------------------------------
@@ -492,6 +543,7 @@ module "run_worker_alertes" {
 locals {
   worker_run_services = toset([
     module.run_worker_ocr.name,
+    module.run_worker_ocr_llm.name,
     module.run_worker_ingestion.name,
     module.run_worker_off.name,
     module.run_worker_indices.name,

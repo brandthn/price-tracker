@@ -78,6 +78,7 @@ output "cloud_run_services" {
   value = {
     backend          = { name = module.run_backend.name, uri = module.run_backend.uri }
     worker-ocr       = { name = module.run_worker_ocr.name, uri = module.run_worker_ocr.uri }
+    worker-ocr-llm   = { name = module.run_worker_ocr_llm.name, uri = module.run_worker_ocr_llm.uri }
     worker-ingestion = { name = module.run_worker_ingestion.name, uri = module.run_worker_ingestion.uri }
     worker-off       = { name = module.run_worker_off.name, uri = module.run_worker_off.uri }
     worker-indices   = { name = module.run_worker_indices.name, uri = module.run_worker_indices.uri }

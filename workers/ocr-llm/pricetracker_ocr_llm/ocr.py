@@ -1,14 +1,9 @@
-"""Re-OCR tier-2 : second LLM Groq + prompt correctif (boucle de feedback 👎).
+"""OCR tier-2 : appel Groq vision direct + prompt correctif.
 
-Quand l'utilisateur juge l'output OCR erroné, on relance l'analyse avec un
-modèle Groq plus costaud ET un prompt qui inclut l'extraction précédente,
-en demandant explicitement une ré-analyse soignée. On bypasse volontairement
-``receipt_ocr.extract_receipt`` (prompt figé) pour pouvoir injecter le résultat
-précédent — tout en réutilisant son ``GroqProvider`` (préparation image + appel
-vision) et son schéma de sortie, de sorte que le mapper reste identique.
-
-Architecture future : tier-1 = VLM maison, tier-2 = LLM. Pour l'instant les deux
-tiers sont des LLM Groq (scout en tier-1, modèle + costaud en tier-2).
+On bypasse ``receipt_ocr.extract_receipt`` (prompt figé) afin d'injecter
+l'extraction précédente jugée erronée, tout en réutilisant son ``GroqProvider``
+(préparation image + appel vision) et son schéma de sortie → le mapper reste
+identique au worker tier-1.
 """
 
 from __future__ import annotations
@@ -21,16 +16,14 @@ from typing import Any
 
 from receipt_ocr.backends.vlm.groq_provider import GroqProvider
 from receipt_ocr.backends.vlm.prompts import RECEIPT_EXTRACTION_PROMPT
-from receipt_ocr.constants import (
-    ENV_GROQ_MODEL,
-    ENV_VLM_MODE,
-    VlmMode,
-)
+from receipt_ocr.constants import ENV_GROQ_MODEL, ENV_VLM_MODE, VlmMode
 from receipt_ocr.exceptions import ReceiptOcrError
 
-from .ocr import OcrProcessingError
 
-# Bloc correctif ajouté au prompt d'extraction standard.
+class OcrProcessingError(Exception):
+    """Wraps failures from the receipt_ocr package / Groq call."""
+
+
 _CORRECTIVE_TEMPLATE = """\
 
 ATTENTION — SECONDE ANALYSE.
@@ -70,12 +63,14 @@ def build_previous_extraction_json(
     return json.dumps(payload, ensure_ascii=False)
 
 
-def build_corrective_prompt(previous_json: str) -> str:
+def build_prompt(previous_json: str | None) -> str:
+    """Prompt d'extraction de base, enrichi du bloc correctif si dispo."""
+    if not previous_json:
+        return RECEIPT_EXTRACTION_PROMPT
     return RECEIPT_EXTRACTION_PROMPT + _CORRECTIVE_TEMPLATE.format(previous_json=previous_json)
 
 
 def _parse_json_object(content: str) -> dict:
-    """Parse la réponse du LLM en dict, avec réparation tolérante en fallback."""
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
@@ -83,21 +78,17 @@ def _parse_json_object(content: str) -> dict:
 
         parsed = json_repair.loads(content)
     if not isinstance(parsed, dict):
-        raise OcrProcessingError("Retry OCR did not return a JSON object.")
+        raise OcrProcessingError("OCR did not return a JSON object.")
     return parsed
 
 
-def run_retry_ocr(image_bytes: bytes, previous_json: str, model: str) -> dict:
-    """Seconde passe OCR via Groq direct + prompt correctif. Retourne le dict brut.
-
-    Le dict renvoyé a la même forme que ``receipt_ocr.extract_receipt``
-    (``{"ticket": {...}}``) pour être consommé tel quel par le mapper.
-    """
-    # GroqProvider exige le mode JSON ; on force la sélection du modèle tier-2.
+def run_ocr(image_bytes: bytes, model: str, previous_json: str | None = None) -> dict:
+    """Seconde passe OCR via Groq. Retourne le dict brut ``{"ticket": {...}}``."""
+    # GroqProvider exige le mode JSON ; on force la sélection du modèle.
     os.environ[ENV_VLM_MODE] = VlmMode.JSON.value
     os.environ[ENV_GROQ_MODEL] = model
 
-    prompt = build_corrective_prompt(previous_json)
+    prompt = build_prompt(previous_json)
 
     tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
     tmp_path = Path(tmp.name)
