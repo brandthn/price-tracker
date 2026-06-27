@@ -103,12 +103,13 @@ resource "google_pubsub_subscription" "ticket_uploaded_dlq_inspection" {
   labels = merge(var.labels, { component = "worker-ocr-dlq" })
 }
 
-# --- 3) Boucle de feedback : ocr-retry → worker-ocr /retry -----------------
+# --- 3) Boucle de feedback : ocr-retry → worker-ocr-llm /push --------------
 #
 # Déclenchée par un 👎 utilisateur (le backend publie {ticket_id} sur le topic
-# `ocr-retry`). Même schéma OIDC/DLQ que la subscription OCR principale : le
-# token est minté pour worker-sa (déjà autorisé à invoquer worker-ocr via
-# `worker_sa_invoker`). Le re-OCR tier-2 vit sur l'endpoint /retry du worker.
+# `ocr-retry`). Le message est poussé vers le **second worker indépendant**
+# `worker-ocr-llm` (OCR tier-2). Même schéma OIDC/DLQ que la subscription OCR
+# principale : le token est minté pour worker-sa (autorisé à invoquer
+# worker-ocr-llm via `worker_sa_invoker`).
 resource "google_pubsub_subscription" "ocr_retry_worker_push" {
   project = var.project_id
   name    = "ocr-retry-worker-push"
@@ -120,11 +121,11 @@ resource "google_pubsub_subscription" "ocr_retry_worker_push" {
   enable_message_ordering    = false
 
   push_config {
-    push_endpoint = "${module.run_worker_ocr.uri}/retry"
+    push_endpoint = "${module.run_worker_ocr_llm.uri}/push"
 
     oidc_token {
       service_account_email = module.iam.emails["worker"]
-      audience              = module.run_worker_ocr.uri
+      audience              = module.run_worker_ocr_llm.uri
     }
 
     attributes = {

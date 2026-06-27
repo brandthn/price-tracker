@@ -78,6 +78,14 @@ variable "worker_ocr_image_tag" {
   default     = "63c5d4a"
 }
 
+variable "worker_ocr_llm_image_tag" {
+  description = "Tag de l'image worker-ocr-llm (OCR tier-2) en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-llm/cloudbuild.yaml)."
+  type        = string
+  # Placeholder skeleton (hello) tant que ce default n'est pas remplacé par un
+  # SHA réel pushé en AR au premier build du worker tier-2 (Phase 12).
+  default = "latest"
+}
+
 variable "worker_indices_image_tag" {
   description = "Tag de l'image worker-indices en AR. Bumper après chaque build (gcloud builds submit . --config=workers/indices/cloudbuild.yaml)."
   type        = string

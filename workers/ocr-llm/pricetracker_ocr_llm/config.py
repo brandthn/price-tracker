@@ -1,4 +1,4 @@
-"""Settings worker OCR — env vars pydantic-settings."""
+"""Settings worker OCR tier-2 (LLM Groq) — env vars pydantic-settings."""
 
 from __future__ import annotations
 
@@ -18,11 +18,12 @@ class Settings(BaseSettings):
     # GCP -----------------------------------------------------------------
     google_cloud_project: str = Field(default="")
     prt_gcp_region: str = Field(default="europe-west1")
-    prt_bronze_bucket: str = Field(default="")
 
-    # OCR -----------------------------------------------------------------
-    prt_ocr_engine: str = Field(default="groq")
-    prt_ocr_confidence_threshold: float = Field(default=0.55)
+    # OCR LLM -------------------------------------------------------------
+    # Modèle Groq vision utilisé pour la seconde passe. Défaut = même modèle que
+    # le tier-1 (fiabilité) ; pointer vers un modèle plus performant ensuite.
+    prt_ocr_model: str = Field(default="meta-llama/llama-4-scout-17b-16e-instruct")
+    prt_ocr_engine_label: str = Field(default="groq")
     prt_ocr_max_image_mb: int = Field(default=10)
 
     # Cloud SQL -----------------------------------------------------------
@@ -43,16 +44,6 @@ class Settings(BaseSettings):
 
     # Logging -------------------------------------------------------------
     prt_log_level: str = Field(default="INFO")
-
-    # Future-phase EAN matching (déclaré, non utilisé Phase 8) ------------
-    prt_models_bucket: str | None = None
-    prt_ocr_model_uri: str | None = None
-    prt_ean_match_cosine_threshold: float = Field(default=0.78)
-    prt_ean_match_top_k: int = Field(default=5)
-    prt_ean_fuzzy_min_score: int = Field(default=82)
-    prt_vertex_model: str = Field(default="text-embedding-004")
-    prt_vertex_output_dim: int = Field(default=768)
-    prt_vertex_task_type: str = Field(default="RETRIEVAL_QUERY")
 
     @property
     def allowed_issuers(self) -> list[str]:

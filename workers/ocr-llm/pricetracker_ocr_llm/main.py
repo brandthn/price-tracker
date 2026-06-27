@@ -1,9 +1,13 @@
-"""FastAPI app worker OCR — POST /push (Pub/Sub) → GCS → receipt_ocr → Cloud SQL."""
+"""FastAPI app worker OCR tier-2 — POST /push (Pub/Sub `ocr-retry`).
+
+Contrat identique au worker tier-1 : on reçoit un ticket, on fait l'OCR, that's
+it. Ici, l'OCR = un LLM Groq avec prompt correctif qui réutilise l'extraction
+précédente jugée erronée.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -12,13 +16,12 @@ from typing import Any
 import structlog
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from receipt_ocr.exceptions import ReceiptParseError
 
-from .auth import verify_oidc
-from .config import Settings, get_settings
-from .gcs import ImageTooLargeError, download_image
-from .logging import configure_logging, get_logger
 from . import mapper, ocr, pg, pubsub
+from .auth import verify_oidc
+from .config import get_settings
+from .gcs import ImageTooLargeError, download_image, split_gs_uri
+from .logging import configure_logging, get_logger
 from .ocr import OcrProcessingError
 
 configure_logging(level=os.environ.get("PRT_LOG_LEVEL", "INFO"))
@@ -39,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="prt-prod-worker-ocr",
+    title="prt-prod-worker-ocr-llm",
     docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
@@ -61,100 +64,67 @@ async def push(
     pool: Any = request.app.state.pool
 
     try:
-        bucket, gcs_object_path = pubsub.parse_pubsub_envelope(body)
+        ticket_id = pubsub.parse_retry_envelope(body)
     except ValueError as exc:
         logger.warning("push_parse_failed", error=str(exc))
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
-
-    try:
-        ticket_id = pubsub.extract_ticket_id(gcs_object_path)
-        user_id = pubsub.extract_user_id(gcs_object_path)
-    except ValueError as exc:
-        logger.warning("push_path_invalid", error=str(exc), gcs_path=gcs_object_path)
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(ticket_id=ticket_id)
 
-    subscription = ""
-    try:
-        outer = json.loads(body)
-        subscription = str(outer.get("subscription") or "")
-    except json.JSONDecodeError:
-        pass
-
-    logger.info(
-        "push_received",
-        ticket_id=ticket_id,
-        gcs_path=gcs_object_path,
-        subscription=subscription,
-        bucket=bucket,
-    )
-
-    claimed = await pg.set_ticket_processing(pool, ticket_id)
-    if not claimed:
-        logger.info(
-            "ticket_already_processed",
-            ticket_id=ticket_id,
-            reason="idempotent_skip",
-        )
+    row = await pg.get_ticket(pool, ticket_id)
+    if row is None:
+        logger.warning("ticket_missing", ticket_id=ticket_id)
         return Response(status_code=204)
 
-    logger.info("ocr_start", ticket_id=ticket_id, engine=settings.prt_ocr_engine)
+    model = settings.prt_ocr_model
+    logger.info("ocr_start", ticket_id=ticket_id, model=model, tier=2)
     t_start = time.monotonic()
-    image_bytes = 0
 
     try:
-        image_data = await download_image(bucket, gcs_object_path)
-        image_bytes = len(image_data)
+        bucket, object_path = split_gs_uri(row["gcs_path"])
+        image_data = await download_image(bucket, object_path)
+
+        prev_rows = [dict(r) for r in await pg.fetch_prix_extraits(pool, ticket_id)]
+        previous_json = ocr.build_previous_extraction_json(
+            row["enseigne"], row["date_ticket"], prev_rows
+        )
+
         ocr_result = await asyncio.to_thread(
-            ocr.run_ocr,
-            image_data,
-            settings.prt_ocr_engine,
+            ocr.run_ocr, image_data, model, previous_json
         )
         duration_ms = int((time.monotonic() - t_start) * 1000)
 
         ticket_fields = mapper.map_ticket_fields(
             ocr_result,
             ticket_id,
-            gcs_object_path,
-            settings.prt_ocr_engine,
+            object_path,
+            settings.prt_ocr_engine_label,
             duration_ms,
             confidence=1.0,
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
-        await pg.set_ticket_done(pool, ticket_id, ticket_fields)
+        # Clean slate avant ré-insertion : la tier-2 peut renvoyer moins de lignes.
+        await pg.delete_prix_extraits(pool, ticket_id)
+        await pg.set_ticket_done(pool, ticket_id, ticket_fields, model)
         await pg.upsert_prix_extraits(pool, prix_rows)
 
         logger.info(
-            "pg_upsert_done",
-            ticket_id=ticket_id,
-            n_lines=len(prix_rows),
-        )
-        logger.info(
             "ocr_done",
             ticket_id=ticket_id,
-            user_id=user_id,
-            gcs_path=gcs_object_path,
+            model=model,
             duration_ms=duration_ms,
             n_lines=len(prix_rows),
-            n_resolved_vector=0,
-            n_resolved_fuzzy=0,
-            n_needs_validation=len(prix_rows),
-            ocr_confidence=1.0,
-            image_bytes=image_bytes,
-            model_version=settings.prt_ocr_engine,
+            prev_attempts=row["ocr_attempts"],
         )
         return Response(status_code=204)
 
-    except (ImageTooLargeError, OcrProcessingError, ReceiptParseError, ValueError) as fatal_err:
-        await pg.set_ticket_failed(pool, ticket_id, str(fatal_err))
+    except (ImageTooLargeError, OcrProcessingError, ValueError) as fatal_err:
+        # Échec tier-2 : on NE touche pas au ticket (le résultat tier-1 reste
+        # valable). On ack (204) pour ne pas boucler sur une erreur déterministe.
         logger.warning(
-            "ocr_failed",
-            ticket_id=ticket_id,
-            error=str(fatal_err),
-            retryable=False,
+            "ocr_failed", ticket_id=ticket_id, error=str(fatal_err), retryable=False
         )
         return Response(status_code=204)
 
