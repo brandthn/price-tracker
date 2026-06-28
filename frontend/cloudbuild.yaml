@@ -58,9 +58,9 @@ substitutions:
   # Vos applications → Web). À renseigner ici (valeurs stables) ou via
   # --substitutions au build. Tant qu'elles sont vides, le frontend reste en mode
   # démo (pas de login).
-  _FIREBASE_API_KEY: ''
+  _FIREBASE_API_KEY: 'AIzaSyBaoR9AJKX-0hMHOjOt6LnySjsG-oRzwYA'
   _FIREBASE_AUTH_DOMAIN: 'price-tracker-prod-01.firebaseapp.com'
   _FIREBASE_PROJECT_ID: 'price-tracker-prod-01'
   _FIREBASE_STORAGE_BUCKET: 'price-tracker-prod-01.firebasestorage.app'
   _FIREBASE_MESSAGING_SENDER_ID: '683154425349'
-  _FIREBASE_APP_ID: ''
+  _FIREBASE_APP_ID: '1:683154425349:web:8ba3d14213e785a6e2fe6c'

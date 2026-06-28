@@ -55,7 +55,7 @@ variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
   # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
-  default = "63c5d4a"
+  default = "47ad007"
 }
 
 variable "backend_auth_enabled" {
@@ -81,16 +81,12 @@ variable "worker_ocr_image_tag" {
 variable "worker_ocr_llm_image_tag" {
   description = "Tag de l'image worker-ocr-llm (OCR tier-2) en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-llm/cloudbuild.yaml)."
   type        = string
-  # Placeholder skeleton (hello) tant que ce default n'est pas remplacé par un
-  # SHA réel pushé en AR au premier build du worker tier-2 (Phase 12).
-  default = "latest"
+  default = "47ad007"
 }
 
 variable "worker_indices_image_tag" {
   description = "Tag de l'image worker-indices en AR. Bumper après chaque build (gcloud builds submit . --config=workers/indices/cloudbuild.yaml)."
   type        = string
-  # Placeholder skeleton — Cloud Run garde l'image `us-docker.pkg.dev/cloudrun/container/hello`
-  # tant que ce default n'est pas remplacé par un SHA réel pushé en AR.
   default = "3576a7f"
 }
 
@@ -103,7 +99,7 @@ variable "worker_alertes_image_tag" {
 variable "frontend_image_tag" {
   description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
   type        = string
-  default     = "737f3ff"
+  default     = "47ad007"
 }
 
 variable "frontend_cors_origins" {
