@@ -105,10 +105,12 @@ async def push(
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
-        # Clean slate avant ré-insertion : la tier-2 peut renvoyer moins de lignes.
-        await pg.delete_prix_extraits(pool, ticket_id)
-        await pg.set_ticket_done(pool, ticket_id, ticket_fields, model)
-        await pg.upsert_prix_extraits(pool, prix_rows)
+        # Écriture ATOMIQUE (delete → insert → bump ocr_attempts) en une seule
+        # transaction : le poll frontend ne voit jamais un état mi-écrit, et un
+        # échec laisse le résultat tier-1 intact (cf. pg.persist_tier2_result).
+        await pg.persist_tier2_result(
+            pool, ticket_id, ticket_fields, model, prix_rows
+        )
 
         logger.info(
             "ocr_done",

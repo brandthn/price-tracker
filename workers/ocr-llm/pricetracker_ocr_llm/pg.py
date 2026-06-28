@@ -56,46 +56,6 @@ async def fetch_prix_extraits(pool: asyncpg.Pool, ticket_id: str) -> list[asyncp
     )
 
 
-async def delete_prix_extraits(pool: asyncpg.Pool, ticket_id: str) -> None:
-    """Clean slate : la tier-2 peut renvoyer un nombre de lignes différent."""
-    await pool.execute(
-        "DELETE FROM prix_extraits WHERE ticket_id = $1::uuid", ticket_id
-    )
-
-
-async def set_ticket_done(
-    pool: asyncpg.Pool, ticket_id: str, fields: dict[str, Any], model: str
-) -> None:
-    """Écrit le résultat OCR tier-2 : champs + ocr_model + bump ocr_attempts.
-
-    Le ticket reste `ocr_done` (il l'était déjà). Pas de flip de statut : en cas
-    d'échec tier-2, on laisse le résultat tier-1 intact côté appelant.
-    """
-    await pool.execute(
-        """
-        UPDATE tickets
-        SET enseigne        = $2,
-            date_ticket     = $3,
-            total_eur       = $4,
-            ocr_confidence  = $5,
-            ocr_engine      = $6,
-            ocr_duration_ms = $7,
-            ocr_model       = $8,
-            ocr_attempts    = ocr_attempts + 1,
-            updated_at      = now()
-        WHERE id = $1::uuid
-        """,
-        ticket_id,
-        fields.get("enseigne"),
-        fields.get("ticket_date"),
-        fields.get("total_amount"),
-        fields.get("ocr_confidence"),
-        fields.get("ocr_engine"),
-        fields.get("ocr_duration_ms"),
-        model,
-    )
-
-
 _INSERT_SQL = """
 INSERT INTO prix_extraits (
     ticket_id, line_index, raw_text, quantity, unit_price, line_total,
@@ -118,10 +78,34 @@ DO UPDATE SET
 """
 
 
-async def upsert_prix_extraits(pool: asyncpg.Pool, rows: list[dict[str, Any]]) -> None:
-    if not rows:
-        return
-    records = [
+async def persist_tier2_result(
+    pool: asyncpg.Pool,
+    ticket_id: str,
+    fields: dict[str, Any],
+    model: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    """Persiste le résultat tier-2 de façon ATOMIQUE.
+
+    Tout dans UNE transaction, sur UNE connexion, dans cet ordre :
+      1. DELETE des anciennes lignes (clean slate : la tier-2 peut en renvoyer
+         un nombre différent).
+      2. INSERT des nouvelles lignes.
+      3. UPDATE tickets : champs + ocr_model + bump `ocr_attempts` (EN DERNIER).
+
+    Pourquoi atomique + bump en dernier :
+    - Le frontend poll `ocr_attempts > baseline` pour détecter la fin de la
+      ré-analyse. Avec 3 auto-commits séparés (ancien code), le poll pouvait
+      rafraîchir pile entre l'incrément d'`ocr_attempts` et la ré-insertion des
+      lignes → ticket affiché sans ligne. Ici, l'observateur externe ne voit
+      jamais d'état partiel : soit l'ancien résultat complet, soit le nouveau.
+    - En cas d'échec d'une étape, la transaction rollback : le résultat tier-1
+      reste INTACT (avant, un échec après le DELETE laissait le ticket à 0 ligne
+      avec `ocr_attempts` déjà bumpé = perte de données).
+
+    Le statut n'est pas touché (le ticket était déjà `ocr_done`).
+    """
+    insert_records = [
         (
             row["ticket_id"],
             row["line_index"],
@@ -137,4 +121,34 @@ async def upsert_prix_extraits(pool: asyncpg.Pool, rows: list[dict[str, Any]]) -
         )
         for row in rows
     ]
-    await pool.executemany(_INSERT_SQL, records)
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM prix_extraits WHERE ticket_id = $1::uuid", ticket_id
+            )
+            if insert_records:
+                await conn.executemany(_INSERT_SQL, insert_records)
+            await conn.execute(
+                """
+                UPDATE tickets
+                SET enseigne        = $2,
+                    date_ticket     = $3,
+                    total_eur       = $4,
+                    ocr_confidence  = $5,
+                    ocr_engine      = $6,
+                    ocr_duration_ms = $7,
+                    ocr_model       = $8,
+                    ocr_attempts    = ocr_attempts + 1,
+                    updated_at      = now()
+                WHERE id = $1::uuid
+                """,
+                ticket_id,
+                fields.get("enseigne"),
+                fields.get("ticket_date"),
+                fields.get("total_amount"),
+                fields.get("ocr_confidence"),
+                fields.get("ocr_engine"),
+                fields.get("ocr_duration_ms"),
+                model,
+            )
