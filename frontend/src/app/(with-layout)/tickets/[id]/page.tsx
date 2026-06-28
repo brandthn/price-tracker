@@ -71,6 +71,7 @@ export default async function TicketDetailPage({
               </summary>
               <div className="border-t border-stroke px-1 pb-1 dark:border-dark-3">
                 <ItemsValidator
+                  key={ticket.updated_at}
                   ticketId={ticket.id}
                   initialItems={ticket.items}
                   ticketStatus={ticket.status}
@@ -79,6 +80,7 @@ export default async function TicketDetailPage({
             </details>
           ) : (
             <ItemsValidator
+              key={ticket.updated_at}
               ticketId={ticket.id}
               initialItems={ticket.items}
               ticketStatus={ticket.status}

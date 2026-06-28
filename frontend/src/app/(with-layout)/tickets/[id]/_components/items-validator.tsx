@@ -128,7 +128,12 @@ export function ItemsValidator({
           </thead>
           <tbody className="divide-y divide-stroke dark:divide-dark-3">
             {drafts.map((d) => {
-              const original = initialItems.find((i) => i.id === d.id)!;
+              // Garde défensive : si le state local se désynchronise du serveur
+              // (ex: lignes ré-écrites avec de nouveaux ids après un re-OCR),
+              // on saute la ligne au lieu de crasher tout l'arbre. Le `key` sur
+              // le composant (cf. page.tsx) remonte normalement avec les bons ids.
+              const original = initialItems.find((i) => i.id === d.id);
+              if (!original) return null;
               return (
                 <tr
                   key={d.id}
