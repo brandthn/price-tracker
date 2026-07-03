@@ -49,7 +49,7 @@ class VertexEmbedder:
         location: str,
         model_name: str,
         batch_size: int,
-        task_type: str = "RETRIEVAL_DOCUMENT",
+        task_type: str = "SEMANTIC_SIMILARITY",
         output_dim: int = 768,
         max_request_chars: int = 45000,
     ) -> None:

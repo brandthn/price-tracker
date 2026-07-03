@@ -69,10 +69,15 @@ def merge_catalogue(
     table: str,
     products: Iterable[OFFProduct],
     enriched_at_iso: str,
+    source: str = "openfoodfacts",
     location: str = "EU",
 ) -> int:
     """Charge les `products` en staging puis MERGE vers `catalogue_produits`.
     Retourne le nombre de lignes affectées par le MERGE.
+
+    `source` : provenance — `openfoodfacts` (worker API, défaut) ou
+    `openfoodfacts_dump` (chargement bulk depuis le dump OFF). Sans ça, les deux
+    voies sont indistinguables dans BQ (elles réutilisent le même code).
     """
     rows = [
         {
@@ -88,7 +93,7 @@ def merge_catalogue(
             "image_url": p.image_url,
             "off_found": p.found,
             "enriched_at": enriched_at_iso,
-            "source": "openfoodfacts",
+            "source": source,
         }
         for p in products
     ]

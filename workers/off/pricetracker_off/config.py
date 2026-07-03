@@ -46,7 +46,16 @@ class Settings(BaseSettings):
     # Vertex AI -----------------------------------------------------------
     prt_vertex_model: str = Field(default="text-embedding-004")
     prt_vertex_batch: int = Field(default=250, description="Max instances par appel Vertex.")
-    prt_vertex_task_type: str = Field(default="RETRIEVAL_DOCUMENT")
+    prt_vertex_task_type: str = Field(
+        default="SEMANTIC_SIMILARITY",
+        description=(
+            "Similarité produit↔produit (reco de substituts) : les deux côtés du "
+            "cosinus sont des documents produit. Tout l'espace pgvector doit "
+            "partager ce task_type — un même texte donne un vecteur DIFFÉRENT "
+            "selon le task_type. ⚠️ La var Terraform PRT_VERTEX_TASK_TYPE du "
+            "worker déployé doit être alignée sur cette valeur (apply humain)."
+        ),
+    )
     prt_vertex_output_dim: int = Field(default=768)
 
     # Cloud SQL -----------------------------------------------------------

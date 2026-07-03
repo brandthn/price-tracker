@@ -26,13 +26,20 @@ logger = get_logger(__name__)
 
 # Champs explicitement demandés à OFF — limite la taille de la réponse et
 # rend le contrat de schéma explicite côté worker.
+# generic_name / labels_tags / quantity servent UNIQUEMENT à construire le texte
+# d'embedding « balanced » (cf. embedding_text.build_embedding_text) — ils ne
+# sont PAS persistés en base. Ils existent aussi dans le dump OFF, d'où la parité.
 _FIELDS = ",".join(
     [
         "code",
         "product_name",
         "product_name_fr",
+        "generic_name",
+        "generic_name_fr",
         "brands",
         "categories_tags",
+        "labels_tags",
+        "quantity",
         "nutriscore_grade",
         "nova_group",
         "ecoscore_grade",
@@ -44,7 +51,14 @@ _FIELDS = ",".join(
 
 @dataclass
 class OFFProduct:
-    """Vue normalisée des champs OFF utilisés par le worker."""
+    """Vue normalisée des champs OFF utilisés par le worker.
+
+    Les 4 derniers champs (`generic_name`, `categories_tags`, `labels_tags`,
+    `quantity`) ne sont **pas persistés** en base : ils servent uniquement à
+    construire le texte d'embedding via `embedding_text.build_embedding_text`.
+    Ils ont un défaut pour que les constructions « tombstone » et la
+    reconstruction depuis l'artefact (load_artifact) restent inchangées.
+    """
 
     ean: str
     name: str | None
@@ -57,12 +71,11 @@ class OFFProduct:
     ecoscore: str | None
     image_url: str | None
     found: bool
-
-    @property
-    def embedding_text(self) -> str:
-        """Texte qu'on enverra à Vertex AI text-embedding-004."""
-        parts = [self.name or "", self.brand or "", self.category_l3 or ""]
-        return " | ".join(p for p in parts if p).strip() or self.ean
+    # --- champs texte-embedding uniquement (non persistés) ---
+    generic_name: str | None = None
+    categories_tags: list[str] | None = None  # hiérarchie brute (en:/fr:), général->spécifique
+    labels_tags: list[str] | None = None  # brut (en:/fr:)
+    quantity: str | None = None
 
 
 def _parse_categories(tags: list[str] | None) -> tuple[str | None, str | None, str | None]:
@@ -110,6 +123,11 @@ def _to_off_product(ean: str, payload: dict[str, Any]) -> OFFProduct:
         ecoscore=(product.get("ecoscore_grade") or "").upper() or None,
         image_url=product.get("image_front_url") or product.get("image_url") or None,
         found=True,
+        # champs texte-embedding (non persistés) — normalisés à parité avec le dump
+        generic_name=product.get("generic_name_fr") or product.get("generic_name") or None,
+        categories_tags=product.get("categories_tags") or None,
+        labels_tags=product.get("labels_tags") or None,
+        quantity=(product.get("quantity") or "").strip() or None,
     )
 
 
@@ -149,7 +167,7 @@ class OFFClient:
             http2=False,
         )
 
-    async def __aenter__(self) -> "OFFClient":
+    async def __aenter__(self) -> OFFClient:
         return self
 
     async def __aexit__(self, *exc: object) -> None:

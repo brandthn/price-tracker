@@ -38,10 +38,13 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
-import duckdb
-
-# Réutilise le contrat produit + le parsing catégories du worker déployé.
+# Réutilise le contrat produit + le parsing catégories + la formule d'embedding
+# du worker déployé. `build_embedding_text` est la SOURCE UNIQUE partagée avec
+# le worker quotidien (parité API↔dump). `duckdb` est importé paresseusement
+# dans `fetch_from_parquet` : ce module reste importable (mappers, parité) sans
+# la dép lourde, notamment côté tests.
 from pricetracker_off.config import get_settings
+from pricetracker_off.embedding_text import build_embedding_text
 from pricetracker_off.off_client import OFFProduct, _parse_categories
 
 # --- Colonnes tirées du parquet OFF (schéma food.parquet, validé via DESCRIBE) ---
@@ -72,23 +75,6 @@ SELECT
 FROM read_parquet(?) p
 SEMI JOIN want w ON p.code = w.ean
 """
-
-# Labels non-sémantiques (logos réglementaires / emballage) : bruit pour la reco.
-# On garde tout le reste (bio, vegan, gluten-free, aop, fair-trade, ...).
-_LABEL_DENYLIST = (
-    "triman", "green dot", "green point", "point vert", "fsc", "pefc",
-    "nutriscore", "nutri score", "ecoscore", "eco score", "eco emballage",
-    "sustainable", "recycl", "tetra pak", "carton", "plastic", "glass",
-    "points", "made for", "terracycle", "distributor label", "saveurs de l",
-    "brevet", "medaille", "charte", "certifie par",
-)
-
-# Jetons trahissant de la métadonnée pipeline polluant `generic_name`.
-_GENERIC_NAME_JUNK = ("product_id", "excatego", "recategor", "exns:")
-
-# Scores parfois mis à tort comme CATÉGORIE par des contributeurs OFF
-# (ex: "Nutri score A") — on les exclut aussi de la hiérarchie de catégories.
-_CATEGORY_DENYLIST = ("nutri score", "nutriscore", "eco score", "ecoscore")
 
 
 def read_eans(csv_path: Path) -> list[str]:
@@ -137,89 +123,6 @@ def _as_text(v: object) -> str:
             return _pick_name(v) or ""
         return ", ".join(str(x) for x in v)
     return str(v)
-
-
-def _clean_tag(tag: str) -> str:
-    """`en:dairy-desserts` / `fr:sauce-aux-piments` -> `dairy desserts` / `sauce aux piments`."""
-    import re
-
-    t = re.sub(r"^[a-z]{2,3}:", "", tag or "")
-    return t.replace("-", " ").strip()
-
-
-def _clean_categories(tags: list[str] | None) -> list[str]:
-    """Hiérarchie COMPLÈTE nettoyée, dédupliquée, ordre général -> spécifique."""
-    if not tags:
-        return []
-    out: list[str] = []
-    seen: set[str] = set()
-    for tag in tags:
-        c = _clean_tag(tag)
-        key = c.lower()
-        if not c or key in seen:
-            continue
-        if any(bad in key for bad in _CATEGORY_DENYLIST):
-            continue  # score glissé en catégorie par un contributeur
-        seen.add(key)
-        out.append(c)
-    return out
-
-
-def _clean_labels(tags: list[str] | None, cap: int = 6) -> list[str]:
-    """Labels sémantiques (bio, vegan, gluten-free, aop...) ; on écarte les
-    logos réglementaires/emballage (denylist). Ordre d'origine, dédupliqué."""
-    if not tags:
-        return []
-    out: list[str] = []
-    seen: set[str] = set()
-    for tag in tags:
-        c = _clean_tag(tag)
-        key = c.lower()
-        if not c or key in seen:
-            continue
-        if any(bad in key for bad in _LABEL_DENYLIST):
-            continue
-        seen.add(key)
-        out.append(c)
-        if len(out) >= cap:
-            break
-    return out
-
-
-def build_embedding_text(row: dict) -> str:
-    """Texte d'embedding 'balanced' — signal sémantique positif uniquement :
-    nom, nom générique, marque, HIÉRARCHIE DE CATÉGORIES COMPLÈTE, labels utiles,
-    quantité. Exclut volontairement nutriscore/nova/ecoscore (scores ordinaux ->
-    colonnes de filtrage), ingrédients et allergènes (bruit / dilution)."""
-    name = _pick_name(row.get("product_name")) or ""
-    generic = _as_text(row.get("generic_name"))
-    brand = (row.get("brands") or "").split(",")[0].strip()
-    cats = _clean_categories(row.get("categories_tags"))
-    labels = _clean_labels(row.get("labels_tags"))
-    qty = (row.get("quantity") or "").strip()
-
-    segments: list[str] = []
-    if name:
-        segments.append(name)
-    # generic_name seulement s'il apporte de l'info (pas un doublon du nom,
-    # pas de la métadonnée pipeline polluante)
-    gl = generic.lower()
-    if (
-        generic
-        and gl not in name.lower()
-        and name.lower() not in gl
-        and not any(j in gl for j in _GENERIC_NAME_JUNK)
-    ):
-        segments.append(generic)
-    if brand:
-        segments.append(f"marque {brand}")
-    if cats:
-        segments.append("catégorie " + " > ".join(cats))
-    if labels:
-        segments.append(", ".join(labels))
-    if qty:
-        segments.append(qty)
-    return ". ".join(segments).strip() or (row.get("ean") or "")
 
 
 def _barcode_path(code: str) -> str:
@@ -272,6 +175,11 @@ def _row_to_product(row: dict) -> OFFProduct:
         ecoscore=(row.get("ecoscore_grade") or "").upper() or None,
         image_url=_pick_image_url(ean, row.get("images")),
         found=True,
+        # champs texte-embedding (non persistés) — normalisés à parité avec l'API
+        generic_name=_as_text(row.get("generic_name")) or None,
+        categories_tags=row.get("categories_tags") or None,
+        labels_tags=row.get("labels_tags") or None,
+        quantity=(row.get("quantity") or "").strip() or None,
     )
 
 
@@ -289,6 +197,8 @@ def fetch_from_parquet(
     """Filtre le dump OFF sur `eans`. Renvoie (produits, textes_embedding) alignés :
     - trouvés : OFFProduct mappé + texte d'embedding 'balanced' (catégories complètes) ;
     - non-trouvés : tombstone off_found=false + texte None (pas d'embedding)."""
+    import duckdb  # lazy : dép lourde absente du wheel/tests, requise seulement ici
+
     con = duckdb.connect()
     con.execute("CREATE TEMP TABLE want(ean VARCHAR)")
     con.executemany("INSERT INTO want VALUES (?)", [(e,) for e in eans])
@@ -300,7 +210,8 @@ def fetch_from_parquet(
         row = dict(zip(cols, tup, strict=True))
         p = _row_to_product(row)
         found[p.ean] = p
-        found_text[p.ean] = build_embedding_text(row)
+        # parité : le worker quotidien appelle la MÊME fonction sur un OFFProduct
+        found_text[p.ean] = build_embedding_text(p)
 
     products: list[OFFProduct] = []
     texts: list[str | None] = []
@@ -369,6 +280,16 @@ def main() -> int:
     ap.add_argument("--out", required=True, type=Path, help="Artefact de sortie .jsonl.gz.")
     ap.add_argument("--limit", type=int, default=0, help="Limite le nb d'EAN (dry-run).")
     ap.add_argument("--no-embed", action="store_true", help="Skip Vertex (mapping only).")
+    ap.add_argument(
+        "--found-only",
+        action="store_true",
+        help=(
+            "N'émet PAS de tombstones : seuls les EAN trouvés dans le dump sont "
+            "écrits dans l'artefact. Garde-fou vague 2 — un EAN présent en base "
+            "mais absent du dump (ex: import Maty, produit hors OFF) ne doit pas "
+            "être écrasé/vidé par un tombstone au chargement."
+        ),
+    )
     args = ap.parse_args()
 
     t0 = time.time()
@@ -381,6 +302,13 @@ def main() -> int:
     n_found = sum(p.found for p in products)
     print(f"[2/4] OFF match : {n_found}/{len(products)} trouvés "
           f"({100 * n_found / len(products):.1f}%), {len(products) - n_found} tombstones")
+    if args.found_only:
+        kept = [(p, t) for p, t in zip(products, texts, strict=True) if p.found]
+        n_dropped = len(products) - len(kept)
+        products = [p for p, _ in kept]
+        texts = [t for _, t in kept]
+        print(f"       --found-only : {n_dropped} tombstones exclus, "
+              f"{len(products)} produits conservés")
     for p, t in zip(products, texts, strict=True):  # aperçu de 2 textes embeddés
         if t:
             print(f"       ex. embed_text[{p.ean}]: {t[:160]}")

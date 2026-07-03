@@ -39,8 +39,14 @@ from .pg import open_pool, upsert_products
 configure_logging(level=os.environ.get("PRT_LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
 
+# Provenance des lignes chargées ici : le dump OFF (bulk), à distinguer de
+# `openfoodfacts` (worker API 1-par-1). Cf. handoff — sinon les deux voies sont
+# indistinguables dans catalogue_produits (BQ) et products (Cloud SQL).
+_DUMP_SOURCE = "openfoodfacts_dump"
+
 # Champs OFFProduct reconstruits depuis chaque record de l'artefact
-# (`embedding_text` et `embedding` sont hors dataclass → lus à part).
+# (`embedding_text` et `embedding` sont hors dataclass → lus à part ; les champs
+# texte-embedding non persistés — generic_name/labels/quantity — sont ignorés).
 _PRODUCT_FIELDS = (
     "ean", "name", "brand", "category_l1", "category_l2", "category_l3",
     "nutriscore", "nova", "ecoscore", "image_url", "found",
@@ -110,6 +116,7 @@ async def load(gcs_uri: str) -> dict[str, object]:
         table=settings.prt_bq_table_catalogue,
         products=products,
         enriched_at_iso=enriched_at_iso,
+        source=_DUMP_SOURCE,
     )
 
     # 2) Cloud SQL UPSERT (réutilise le code worker) — nécessite le VPC
@@ -122,7 +129,9 @@ async def load(gcs_uri: str) -> dict[str, object]:
         max_size=settings.prt_pg_pool_size,
     )
     try:
-        pg_rows = await upsert_products(pool, products=products, embeddings=embeddings)
+        pg_rows = await upsert_products(
+            pool, products=products, embeddings=embeddings, source=_DUMP_SOURCE
+        )
     finally:
         await pool.close()
 
