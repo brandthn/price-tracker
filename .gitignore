@@ -48,6 +48,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# OFF bulk dump + enrichment artifacts (gros fichiers régénérables, jamais commit —
+# visibles dans le repo sous data/off_bulk/ pour inspection).
+data/off_bulk/
+
 # Secrets & creds
 *.pem
 *.key
