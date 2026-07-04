@@ -36,14 +36,13 @@ export default async function TicketDetailPage({
             href="/tickets"
             className="text-sm text-primary hover:underline"
           >
-            ← Tickets
+            ← Mes tickets
           </Link>
           <h1 className="mt-2 text-heading-4 font-bold text-dark dark:text-white">
             {ticket.enseigne ?? "Ticket sans enseigne"}
           </h1>
           <p className="text-sm text-dark-6">
-            {ticket.date_ticket ?? "Date inconnue"} ·{" "}
-            <code className="text-xs">{ticket.id}</code>
+            {ticket.date_ticket ?? "Date inconnue"}
           </p>
         </div>
         <StatusBadge status={ticket.status} />
@@ -103,17 +102,21 @@ function Meta({
       {hasAnalyse && (
         <div className="rounded-[10px] bg-white p-5 shadow-1 dark:bg-gray-dark">
           <h3 className="mb-3 text-sm font-semibold uppercase text-dark-6">
-            Analyse
+            Lecture du ticket
           </h3>
           <dl className="space-y-2 text-sm">
             {ticket.ocr_confidence != null && (
               <Row
-                label="Confiance"
-                value={`${(ticket.ocr_confidence * 100).toFixed(0)}%`}
+                label="Qualité de lecture"
+                value={`${(ticket.ocr_confidence * 100).toFixed(0)} %`}
               />
             )}
             {ticket.ocr_error && (
-              <Row label="Erreur" value={ticket.ocr_error} variant="error" />
+              <Row
+                label="Lecture"
+                value="Échouée — réessayez avec une photo plus nette et bien éclairée."
+                variant="error"
+              />
             )}
           </dl>
         </div>
@@ -132,9 +135,9 @@ function Meta({
                 : "—"
             }
           />
-          <Row label="Lignes" value={String(ticket.items.length)} />
+          <Row label="Articles" value={String(ticket.items.length)} />
           <Row
-            label="Validées"
+            label="Vérifiés par vous"
             value={String(ticket.items.filter((i) => i.validated_by_user).length)}
           />
         </dl>

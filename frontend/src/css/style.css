@@ -818,3 +818,61 @@ input[type="search"]::-webkit-search-cancel-button {
 .custom-gradient-1 {
   background-image: linear-gradient(145deg, #eef 0%, #fff8fc 100%);
 }
+
+/* ---------------------------------------------------------------------------
+ * Tokens dataviz — consommés par les composants de charts (SVG maison).
+ * Sémantique prix : hausse = rouge/chaud, baisse = vert (texte) ; la carte
+ * choroplèthe utilise une échelle divergente bleu↔rouge (le couple
+ * rouge/vert pur est illisible en daltonisme deutéranope) avec un gris
+ * neutre au point zéro. Le signe +/− accompagne TOUJOURS la couleur.
+ * ------------------------------------------------------------------------- */
+:root {
+  --viz-line: #5750f1; /* série unique = accent de marque */
+  --viz-area: rgba(87, 80, 241, 0.08);
+  --viz-grid: #eceef2;
+  --viz-axis: #c6cbd4;
+  --viz-ink: #111928;
+  --viz-ink-2: #6b7280;
+  --viz-surface: #ffffff;
+
+  --viz-up-text: #b91c1c; /* variation en hausse (texte + signe) */
+  --viz-down-text: #15803d; /* variation en baisse (texte + signe) */
+  --viz-up-bg: rgba(242, 48, 48, 0.08);
+  --viz-down-bg: rgba(34, 173, 92, 0.1);
+
+  /* Carte : arm bleu (baisse) / gris neutre / arm rouge (hausse) */
+  --viz-map-down-3: #1c5cab;
+  --viz-map-down-2: #5598e7;
+  --viz-map-down-1: #b7d3f6;
+  --viz-map-zero: #eeedea;
+  --viz-map-up-1: #f6c3c3;
+  --viz-map-up-2: #e66a6a;
+  --viz-map-up-3: #b62525;
+  --viz-map-empty: #f3f4f6;
+  --viz-map-stroke: #ffffff;
+}
+
+.dark {
+  --viz-line: #8681f5;
+  --viz-area: rgba(134, 129, 245, 0.1);
+  --viz-grid: #27303e;
+  --viz-axis: #4b5563;
+  --viz-ink: #ffffff;
+  --viz-ink-2: #9ca3af;
+  --viz-surface: #122031;
+
+  --viz-up-text: #f87171;
+  --viz-down-text: #4ade80;
+  --viz-up-bg: rgba(248, 113, 113, 0.14);
+  --viz-down-bg: rgba(74, 222, 128, 0.14);
+
+  --viz-map-down-3: #86b6ef;
+  --viz-map-down-2: #3987e5;
+  --viz-map-down-1: #1c4877;
+  --viz-map-zero: #383835;
+  --viz-map-up-1: #6b2a2a;
+  --viz-map-up-2: #d05050;
+  --viz-map-up-3: #f19a9a;
+  --viz-map-empty: #1f2a37;
+  --viz-map-stroke: #122031;
+}

@@ -1,7 +1,7 @@
 import { UploadForm } from "./_components/upload-form";
 
 export const metadata = {
-  title: "Upload ticket",
+  title: "Ajouter un ticket",
 };
 
 export default function TicketUploadPage() {
@@ -9,10 +9,10 @@ export default function TicketUploadPage() {
     <>
       <div className="mb-6">
         <h1 className="text-heading-4 font-bold text-dark dark:text-white">
-          Uploader un ticket
+          Ajouter un ticket
         </h1>
         <p className="text-sm text-dark-6">
-          Photographie ton ticket de caisse, on s&apos;occupe du reste.
+          Photographiez votre ticket de caisse — on s&apos;occupe du reste.
         </p>
       </div>
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -33,4 +35,36 @@ class ProductSearchResult(BaseModel):
 class SubstituteOut(ProductOut):
     similarity: float = Field(
         description="Score cosine (1 = identique, 0 = orthogonal). Plus c'est haut, plus c'est proche."
+    )
+
+
+class PricePoint(BaseModel):
+    """Médiane hebdomadaire des prix relevés pour un EAN (Silver open_prices_clean)."""
+
+    week: datetime.date
+    median_price_eur: float
+    observations: int
+
+
+class StorePrice(BaseModel):
+    """Prix médian récent d'un EAN dans une enseigne — trié du moins cher au plus cher."""
+
+    enseigne: str
+    median_price_eur: float
+    observations: int
+    last_seen_week: datetime.date | None = None
+
+
+class ProductPricesOut(BaseModel):
+    """Historique + comparateur enseignes d'un produit. `series` et `by_store`
+    peuvent être vides (EAN jamais relevé dans Open Prices) : le frontend
+    affiche alors « pas encore de relevés » plutôt qu'un graphe vide."""
+
+    ean: str
+    series: list[PricePoint] = Field(default_factory=list)
+    by_store: list[StorePrice] = Field(default_factory=list)
+    latest_median_eur: float | None = None
+    pct_change_window: float | None = Field(
+        default=None,
+        description="Variation % entre la première et la dernière semaine de la série.",
     )

@@ -77,6 +77,19 @@ def query_dicts(
     return rows_to_dicts(job.result())
 
 
+# Département FR dérivé du code postal Silver (`open_prices_clean.postcode`).
+# Cas particuliers : Corse (20xxx → 2A/2B) et DOM (97x/98x sur 3 chiffres).
+# Utilisé par les requêtes régionales (indices + carte observatoire).
+DEPT_FROM_POSTCODE_SQL = """
+    CASE
+      WHEN postcode LIKE '97%' OR postcode LIKE '98%' THEN SUBSTR(postcode, 1, 3)
+      WHEN postcode LIKE '20%' THEN
+        IF(SAFE_CAST(SUBSTR(postcode, 1, 3) AS INT64) < 202, '2A', '2B')
+      ELSE SUBSTR(postcode, 1, 2)
+    END
+"""
+
+
 def query_dicts_safe(
     sql: str,
     *,

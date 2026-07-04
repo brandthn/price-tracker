@@ -112,7 +112,6 @@ export interface InflationIndex {
   base_period: string | null;
   current: number | null;
   series: IndexPoint[];
-  insee_comparison: number | null;
 }
 
 export interface RankingItem {
@@ -136,4 +135,59 @@ export interface BrandStats {
   avg_price_eur: number | null;
   median_pct_change: number | null;
   top_increases: RankingItem[];
+}
+
+export interface MapDepartementValue {
+  departement: string;
+  inflation_pct: number | null;
+  sample_size: number | null;
+}
+
+export interface MapOut {
+  period: string | null;
+  values: MapDepartementValue[];
+}
+
+export interface PricePoint {
+  week: string;
+  median_price_eur: number;
+  observations: number;
+}
+
+export interface StorePrice {
+  enseigne: string;
+  median_price_eur: number;
+  observations: number;
+  last_seen_week: string | null;
+}
+
+export interface ProductPrices {
+  ean: string;
+  series: PricePoint[];
+  by_store: StorePrice[];
+  latest_median_eur: number | null;
+  pct_change_window: number | null;
+}
+
+export interface BasketMonth {
+  month: string;
+  total_eur: number;
+  tickets: number;
+}
+
+export interface BasketProduct {
+  ean: string | null;
+  label: string;
+  purchases: number;
+  avg_price_eur: number | null;
+  last_purchased: string | null;
+}
+
+export interface BasketSummary {
+  tickets_count: number;
+  total_spent_eur: number | null;
+  avg_ticket_eur: number | null;
+  first_ticket_date: string | null;
+  monthly: BasketMonth[];
+  top_products: BasketProduct[];
 }
