@@ -152,7 +152,7 @@ export default async function ProductDetailPage({
                   value: p.median_price_eur,
                   sampleSize: p.observations,
                 }))}
-                formatValue={(v) => formatEuro(v)}
+                unit="eur"
                 ariaLabel={`Évolution du prix de ${product.name ?? product.ean}`}
               />
             ) : (

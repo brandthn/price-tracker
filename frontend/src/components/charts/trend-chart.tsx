@@ -7,7 +7,7 @@
 // Série unique → pas de légende (le titre de la section nomme la série).
 
 import { useMemo, useRef, useState } from "react";
-import { formatDateShort } from "@/lib/format-fr";
+import { formatDateShort, formatEuro } from "@/lib/format-fr";
 
 export type TrendPoint = {
   date: string;
@@ -15,9 +15,14 @@ export type TrendPoint = {
   sampleSize?: number | null;
 };
 
+// Le format est un descripteur sérialisable, PAS une fonction : ce composant
+// est un client component appelé depuis des server components, et React ne
+// peut pas sérialiser une fonction à travers la frontière RSC.
+export type TrendUnit = "index" | "eur";
+
 type Props = {
   points: TrendPoint[];
-  formatValue: (v: number) => string;
+  unit: TrendUnit;
   // Ligne de référence horizontale (ex : base 100 d'un indice).
   baseline?: number;
   sampleLabel?: string; // ex : "relevés" — affiché dans le tooltip
@@ -25,12 +30,18 @@ type Props = {
   ariaLabel: string;
 };
 
+function formatValue(v: number, unit: TrendUnit): string {
+  return unit === "eur"
+    ? formatEuro(v)
+    : v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+}
+
 const W = 640;
 const PAD = { top: 18, right: 20, bottom: 26, left: 46 };
 
 export function TrendChart({
   points,
-  formatValue,
+  unit,
   baseline,
   sampleLabel = "relevés",
   height = 240,
@@ -191,7 +202,7 @@ export function TrendChart({
           fontWeight={600}
           fill="var(--viz-ink)"
         >
-          {formatValue(last.value)}
+          {formatValue(last.value, unit)}
         </text>
 
         {/* ticks X : premier / milieu / dernier */}
@@ -221,7 +232,7 @@ export function TrendChart({
             transform: "translate(-50%, -100%)",
           }}
         >
-          <div className="font-semibold">{formatValue(hovered.value)}</div>
+          <div className="font-semibold">{formatValue(hovered.value, unit)}</div>
           <div className="opacity-70">
             {formatDateShort(hovered.date)}
             {hovered.sampleSize != null && (
@@ -244,7 +255,7 @@ export function TrendChart({
           {points.map((p) => (
             <tr key={p.date}>
               <td>{p.date}</td>
-              <td>{formatValue(p.value)}</td>
+              <td>{formatValue(p.value, unit)}</td>
             </tr>
           ))}
         </tbody>

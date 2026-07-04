@@ -212,9 +212,7 @@ function NationalIndexCard({ index }: { index: InflationIndex | null }) {
                 value: p.value,
                 sampleSize: p.sample_size,
               }))}
-              formatValue={(v) =>
-                v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })
-              }
+              unit="index"
               baseline={100}
               ariaLabel="Indice d'inflation PriceTracker, semaine par semaine (base 100)"
             />
