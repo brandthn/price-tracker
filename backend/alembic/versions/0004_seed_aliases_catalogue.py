@@ -1,8 +1,11 @@
-"""seed_product_aliases_from_catalogue: backfill product_aliases depuis catalogue_labels.
+"""seed_aliases_catalogue: backfill product_aliases depuis catalogue_labels.
 
-Revision ID: 0004_seed_product_aliases_from_catalogue
+Revision ID: 0004_seed_aliases_catalogue
 Revises: 0003_ocr_feedback_loop
 Create Date: 2026-07-04
+
+NB id COURT : `alembic_version.version_num` est VARCHAR(32). Un revision id plus long
+est tronqué → le bump de version échoue et rollback TOUTE la migration (le seed inclus).
 
 But : alimenter `product_aliases` (vide) avec le corpus (libellé-ticket, enseigne) → EAN
 produit par le worker `catalogue` (Gemini vision sur les images Open Prices), stocké
@@ -51,7 +54,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0004_seed_product_aliases_from_catalogue"
+revision: str = "0004_seed_aliases_catalogue"
 down_revision: str | Sequence[str] | None = "0003_ocr_feedback_loop"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
