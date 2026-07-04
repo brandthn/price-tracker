@@ -82,6 +82,22 @@ uv run uvicorn pricetracker_off.main:app --reload --port 8080
 curl -X POST http://localhost:8080/run
 ```
 
+## Ré-enrichissement bulk (liste explicite d'EAN)
+
+Pour (ré)enrichir plusieurs milliers d'EAN d'un coup (init-scale, > quelques
+centaines), on **n'utilise pas** l'API 1-par-1 (`/run`, 15 req/min → ban) mais un
+**dump OFF** filtré :
+
+- `bulk/enrich.py` (local, hors wheel — dépend de `duckdb`) : CSV d'EAN → filtre le
+  dump `food.parquet` → `OFFProduct` + **embeddings Vertex** → artefact `off_enriched.jsonl.gz`.
+  Texte d'embedding = formule *balanced* (`build_embedding_text` : nom, marque,
+  **hiérarchie de catégories complète**, labels bio/vegan…, quantité ; exclut les scores).
+- `pricetracker_off/load_artifact.py` (Cloud, dans le VPC) : lit l'artefact GCS →
+  `merge_catalogue` (BQ) + `upsert_products` (Cloud SQL). Lancé en **Cloud Run Job**
+  (Cloud SQL private IP injoignable en local).
+
+Runbook complet (commandes, vérif, sécurité) : [`docs/off-bulk-reenrich-runbook.md`](../../docs/off-bulk-reenrich-runbook.md).
+
 ## Build & deploy
 
 Voir `docs/phase-06-handoff.md` §"Déploiement après codage".

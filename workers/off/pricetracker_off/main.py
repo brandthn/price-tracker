@@ -19,6 +19,7 @@ from fastapi import Depends, FastAPI
 from .auth import verify_oidc
 from .bq import discover_eans_to_enrich, merge_catalogue
 from .config import Settings, get_settings
+from .embedding_text import build_embedding_text
 from .logging import configure_logging, get_logger
 from .off_client import OFFClient, OFFProduct
 from .pg import open_pool, upsert_products
@@ -69,7 +70,7 @@ async def _fetch_loop(
             break
         try:
             product = await client.fetch_product(ean)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Une erreur sur un EAN ne doit pas faire échouer tout le batch.
             # On log et on continue ; cet EAN sera repicked au run suivant
             # (toujours absent de catalogue_produits).
@@ -138,7 +139,9 @@ async def run(_oidc: dict = Depends(verify_oidc)) -> dict[str, object]:
         task_type=settings.prt_vertex_task_type,
         output_dim=settings.prt_vertex_output_dim,
     )
-    embed_inputs = [p.embedding_text for p in found]
+    # MÊME formule que le bulk (module partagé) → l'espace vectoriel ne re-diverge
+    # pas : chaque nouvel EAN quotidien reçoit un embedding 'balanced', pas legacy.
+    embed_inputs = [build_embedding_text(p) for p in found]
     embeddings_found = await asyncio.to_thread(embedder.embed, embed_inputs)
 
     # Recombine : products[] et embeddings[] alignés (None pour not_found)
