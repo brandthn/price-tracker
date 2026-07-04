@@ -1,0 +1,39 @@
+[project]
+name = "pricetracker-matching"
+version = "0.1.0"
+description = "PriceTracker — résolution EAN (product_aliases) partagée par les workers OCR tier-1/tier-2."
+requires-python = ">=3.11,<3.13"
+license = { text = "Proprietary" }
+authors = [{ name = "PriceTracker" }]
+# Aucune dépendance runtime : la lib est pure (le pool asyncpg est INJECTÉ par
+# l'appelant, en duck-typing — seul `.fetch` est utilisé).
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pricetracker_matching"]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra -q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+ignore = ["E501"]

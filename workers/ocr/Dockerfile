@@ -14,6 +14,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
 WORKDIR /app
 
 COPY dev_ocr /app/dev_ocr
+COPY libs/pricetracker_matching /app/libs/pricetracker_matching
 COPY workers/ocr/pyproject.toml workers/ocr/README.md ./workers/ocr/
 COPY workers/ocr/pricetracker_ocr ./workers/ocr/pricetracker_ocr
 

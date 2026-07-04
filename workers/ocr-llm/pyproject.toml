@@ -21,6 +21,7 @@ dependencies = [
     "json-repair>=0.30",
     "python-dotenv>=1.0",
     "receipt-ocr",
+    "pricetracker-matching",
 ]
 
 [dependency-groups]
@@ -43,6 +44,7 @@ package = true
 
 [tool.uv.sources]
 receipt-ocr = { path = "../../dev_ocr" }
+pricetracker-matching = { path = "../../libs/pricetracker_matching" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
