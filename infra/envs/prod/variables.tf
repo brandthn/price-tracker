@@ -54,8 +54,7 @@ variable "worker_off_image_tag" {
 variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
-  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
-  default = "47ad007"
+  default = "e591912"
 }
 
 variable "backend_auth_enabled" {
@@ -75,13 +74,13 @@ variable "backend_auth_enabled" {
 variable "worker_ocr_image_tag" {
   description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
   type        = string
-  default     = "63c5d4a"
+  default     = "6d71bf8"
 }
 
 variable "worker_ocr_llm_image_tag" {
   description = "Tag de l'image worker-ocr-llm (OCR tier-2) en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-llm/cloudbuild.yaml)."
   type        = string
-  default = "47ad007"
+  default = "6d71bf8"
 }
 
 variable "worker_indices_image_tag" {
