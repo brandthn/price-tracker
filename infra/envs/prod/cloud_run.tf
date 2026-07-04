@@ -351,7 +351,7 @@ module "run_worker_off" {
 
     PRT_VERTEX_MODEL      = "text-embedding-004"
     PRT_VERTEX_BATCH      = "250"
-    PRT_VERTEX_TASK_TYPE  = "RETRIEVAL_DOCUMENT"
+    PRT_VERTEX_TASK_TYPE  = "SEMANTIC_SIMILARITY"
     PRT_VERTEX_OUTPUT_DIM = "768"
 
     PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
