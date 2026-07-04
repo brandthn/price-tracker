@@ -16,6 +16,7 @@ from typing import Any
 import structlog
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from pricetracker_matching import alias_lookup
 
 from . import mapper, ocr, pg, pubsub
 from .auth import verify_oidc
@@ -105,6 +106,13 @@ async def push(
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
+        # Résolution EAN via product_aliases (lecture seule). MÊME fonction et
+        # MÊME point que le tier-1 (juste après map_prix_extraits_rows, avant
+        # l'écriture) → comportement strictement identique.
+        match_stats = await alias_lookup.resolve_line_eans(
+            pool, ticket_fields.get("enseigne"), prix_rows
+        )
+
         # Écriture ATOMIQUE (delete → insert → bump ocr_attempts) en une seule
         # transaction : le poll frontend ne voit jamais un état mi-écrit, et un
         # échec laisse le résultat tier-1 intact (cf. pg.persist_tier2_result).
@@ -118,6 +126,10 @@ async def push(
             model=model,
             duration_ms=duration_ms,
             n_lines=len(prix_rows),
+            n_resolved_user=match_stats.n_resolved_user,
+            n_resolved_catalogue=match_stats.n_resolved_catalogue,
+            n_resolved_total=match_stats.n_resolved_total,
+            n_needs_validation=match_stats.n_needs_validation,
             prev_attempts=row["ocr_attempts"],
         )
         return Response(status_code=204)

@@ -510,6 +510,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pricetracker-matching"
+version = "0.1.0"
+source = { directory = "../../libs/pricetracker_matching" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+]
+
+[[package]]
 name = "pricetracker-ocr"
 version = "0.1.0"
 source = { editable = "." }
@@ -521,6 +534,7 @@ dependencies = [
     { name = "groq" },
     { name = "json-repair" },
     { name = "pillow" },
+    { name = "pricetracker-matching" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
@@ -546,6 +560,7 @@ requires-dist = [
     { name = "groq", specifier = ">=0.13" },
     { name = "json-repair", specifier = ">=0.30" },
     { name = "pillow", specifier = ">=10.0" },
+    { name = "pricetracker-matching", directory = "../../libs/pricetracker_matching" },
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "python-dotenv", specifier = ">=1.0" },

@@ -12,6 +12,7 @@ from typing import Any
 import structlog
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from pricetracker_matching import alias_lookup
 from receipt_ocr.exceptions import ReceiptParseError
 
 from .auth import verify_oidc
@@ -124,6 +125,12 @@ async def push(
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
+        # Résolution EAN via product_aliases (lecture seule). Étage post-OCR
+        # agnostique moteur/tier : MÊME fonction, MÊME point que le tier-2.
+        match_stats = await alias_lookup.resolve_line_eans(
+            pool, ticket_fields.get("enseigne"), prix_rows
+        )
+
         await pg.set_ticket_done(pool, ticket_id, ticket_fields)
         await pg.upsert_prix_extraits(pool, prix_rows)
 
@@ -139,9 +146,10 @@ async def push(
             gcs_path=gcs_object_path,
             duration_ms=duration_ms,
             n_lines=len(prix_rows),
-            n_resolved_vector=0,
-            n_resolved_fuzzy=0,
-            n_needs_validation=len(prix_rows),
+            n_resolved_user=match_stats.n_resolved_user,
+            n_resolved_catalogue=match_stats.n_resolved_catalogue,
+            n_resolved_total=match_stats.n_resolved_total,
+            n_needs_validation=match_stats.n_needs_validation,
             ocr_confidence=1.0,
             image_bytes=image_bytes,
             model_version=settings.prt_ocr_engine,

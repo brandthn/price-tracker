@@ -19,6 +19,9 @@ async def client():
     mock_pool = MagicMock()
     mock_pool.execute = AsyncMock(return_value="UPDATE 1")
     mock_pool.executemany = AsyncMock()
+    # alias_lookup.resolve_line_eans queries product_aliases; empty result set
+    # → every line stays unresolved (non-regression of the pre-matcher path).
+    mock_pool.fetch = AsyncMock(return_value=[])
     mock_pool.close = AsyncMock()
     app.state.pool = mock_pool
 
