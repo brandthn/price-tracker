@@ -74,13 +74,13 @@ variable "backend_auth_enabled" {
 variable "worker_ocr_image_tag" {
   description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
   type        = string
-  default     = "6d71bf8"
+  default     = "90598e4"
 }
 
 variable "worker_ocr_llm_image_tag" {
   description = "Tag de l'image worker-ocr-llm (OCR tier-2) en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-llm/cloudbuild.yaml)."
   type        = string
-  default = "6d71bf8"
+  default = "90598e4"
 }
 
 variable "worker_indices_image_tag" {
