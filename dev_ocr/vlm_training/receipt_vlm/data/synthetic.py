@@ -20,7 +20,10 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 from receipt_vlm.data.schema import Product, Ticket, serialize_ticket
 
-FRENCH_STORES = [
+# NOTE: store names + product lexicon now live in receipt_vlm/data/locales.py (per-locale).
+# The lists below are unused legacy French content, kept only for reference; generate_ticket
+# reads the locale packs. Safe to delete.
+_LEGACY_FRENCH_STORES = [
     {"name": "Carrefour Market", "address": "12 rue de la République, 69002 Lyon"},
     {"name": "Carrefour City", "address": "8 avenue Jean Jaurès, 75019 Paris"},
     {"name": "Monoprix", "address": "21 boulevard Haussmann, 75009 Paris"},
@@ -143,16 +146,23 @@ _LAYOUT_STYLES = (
 )
 
 
-def generate_ticket(seed: Optional[int] = None) -> Ticket:
-    """Generate a random :class:`Ticket` with perfect canonical labels."""
+def generate_ticket(seed: Optional[int] = None, locale: Optional[str] = None) -> Ticket:
+    """Generate a random :class:`Ticket` with perfect canonical labels.
+
+    ``locale`` selects a :mod:`receipt_vlm.data.locales` pack (default French);
+    it drives the store names + product lexicon so the same renderer emits
+    receipts in any Latin-script locale.
+    """
+    from receipt_vlm.data.locales import get_locale
+
+    pack = get_locale(locale)
     rng = random.Random(seed)
-    store = rng.choice(FRENCH_STORES)
+    store_name, store_addr = rng.choice(pack.stores)
     n_items = rng.randint(3, 14)
 
     produits: list[Product] = []
     for _ in range(n_items):
-        category = rng.choice(list(PRODUCTS_BY_CATEGORY))
-        name, base_price = rng.choice(PRODUCTS_BY_CATEGORY[category])
+        name, base_price = rng.choice(pack.products)
         price = round(base_price * rng.uniform(0.9, 1.12), 2)
         qty = rng.choice([1, 1, 1, 1, 2, 2, 3, 4])
         produits.append(Product(name, price, qty))
@@ -167,13 +177,46 @@ def generate_ticket(seed: Optional[int] = None) -> Ticket:
 
     return Ticket(
         date=moment.strftime("%Y%m%d %H:%M") if include_date else "",
-        chaine_supermarche=store["name"],
-        adresse=store["address"] if include_address else "",
+        chaine_supermarche=store_name,
+        adresse=store_addr if include_address else "",
         produits=produits,
     )
 
 
-def _load_font(size: int, mono: bool = True) -> ImageFont.ImageFont:
+# --- Font pool: drop .ttf/.otf into receipt_vlm/data/fonts/ (or point --fonts-dir at
+# one) to massively widen glyph/typeface diversity — the biggest OCR-diversity lever.
+# Empty pool => fall back to the system fonts below (original behaviour preserved).
+_FONT_DIR = Path(__file__).resolve().parent / "fonts"
+_FONT_EXTS = (".ttf", ".otf", ".ttc")
+_FONT_POOL: list[str] = []
+
+
+def add_fonts_from_dir(directory: str | Path) -> int:
+    """Register every font file under ``directory`` into the render pool. Returns count added."""
+    d = Path(directory)
+    if not d.is_dir():
+        return 0
+    added = 0
+    for p in sorted(d.rglob("*")):
+        if p.suffix.lower() in _FONT_EXTS and str(p) not in _FONT_POOL:
+            _FONT_POOL.append(str(p))
+            added += 1
+    return added
+
+
+add_fonts_from_dir(_FONT_DIR)  # auto-load bundled fonts if the dir exists
+
+
+def _pick_font_path(rng: random.Random, mono: bool) -> Optional[str]:
+    return rng.choice(_FONT_POOL) if _FONT_POOL else None
+
+
+def _load_font(size: int, mono: bool = True, path: Optional[str] = None) -> ImageFont.ImageFont:
+    if path:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            pass
     candidates = (_WINDOWS_FONTS + _UNIX_FONTS) if mono else (
         "arial.ttf", "calibri.ttf", "segoeui.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -186,16 +229,26 @@ def _load_font(size: int, mono: bool = True) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _format_price(value: float, euro_style: str) -> str:
-    if euro_style == "suffix":
-        return f"{value:.2f} EUR"
-    if euro_style == "space":
-        return f"{value:.2f} €"
+def _format_price(value: float, style: str, symbol: str = "€", code: str = "EUR") -> str:
+    if style == "suffix":
+        return f"{value:.2f} {code}"
+    if style == "space":
+        return f"{value:.2f} {symbol}"
     return f"{value:.2f}"
 
 
-def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[str], dict]:
-    """Return text lines and layout metadata for a given style."""
+def _build_lines(
+    ticket: Ticket, rng: random.Random, style: str, loc: "LocalePack | None" = None
+) -> tuple[list[str], dict]:
+    """Return text lines and layout metadata for a given style + locale.
+
+    ``loc`` is a :class:`receipt_vlm.data.locales.LocalePack` (default French); it
+    supplies every printed UI word so the layout logic stays language-neutral.
+    """
+    from receipt_vlm.data.locales import get_locale
+
+    L = loc or get_locale(None)
+
     if style == "thermal_narrow":
         cols = rng.choice([30, 32, 34])
     elif style == "thermal_wide":
@@ -207,7 +260,12 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
     else:
         cols = rng.choice([36, 38, 40, 42])
 
-    meta = {"cols": cols, "style": style, "euro_style": rng.choice(["plain", "space", "suffix"])}
+    money_style = rng.choice(["plain", "space", "suffix"])
+    meta = {"cols": cols, "style": style, "euro_style": money_style, "locale": L.code}
+
+    def fmt(v: float) -> str:
+        return _format_price(v, money_style, L.currency_symbol, L.currency_code)
+
     lines: list[str] = []
 
     if style == "retail_dashed":
@@ -229,7 +287,7 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
         lines.append(("*** " + ticket.chaine_supermarche.upper() + " ***").center(cols))
     elif style == "retail_dashed":
         lines.append(ticket.chaine_supermarche.upper())
-        lines.append("TICKET DE CAISSE")
+        lines.append(L.subtitle)
     else:
         lines.append(ticket.chaine_supermarche.upper().center(cols))
 
@@ -251,7 +309,7 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
             lines.append(align(addr))
 
     if style != "minimal" and rng.random() < 0.45:
-        tel = (f"Tel 0{rng.randint(1, 5)}.{rng.randint(10, 99)}."
+        tel = (f"{L.tel_prefix} 0{rng.randint(1, 5)}.{rng.randint(10, 99)}."
                f"{rng.randint(10, 99)}.{rng.randint(10, 99)}.{rng.randint(10, 99)}")
         lines.append(tel.center(cols) if style not in ("retail_dashed",) else tel)
 
@@ -260,28 +318,29 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
 
     if ticket.date:
         day, time_part = ticket.date.split(" ")
+        yyyy, mm, dd = day[0:4], day[4:6], day[6:8]
+        dstr = f"{mm}/{dd}/{yyyy}" if L.date_order == "mdy" else f"{dd}/{mm}/{yyyy}"
         if style == "retail_dashed":
-            lines.append(f"DATE {day[6:8]}/{day[4:6]}/{day[0:4]}  HEURE {time_part}")
+            lines.append(L.date_retail.format(d=dstr, t=time_part))
         elif style == "compact":
-            lines.append(f"{day[6:8]}/{day[4:6]}/{day[0:4]} {time_part}")
+            lines.append(f"{dstr} {time_part}")
         else:
-            lines.append(f"Le {day[6:8]}/{day[4:6]}/{day[0:4]} a {time_part}")
+            lines.append(L.date_default.format(d=dstr, t=time_part))
 
     if style == "discount":
-        lines.append(f"CAISSE {rng.randint(1, 12):02d}  N° {rng.randint(100000, 999999)}")
+        lines.append(L.register_discount.format(nn=f"{rng.randint(1, 12):02d}", num=rng.randint(100000, 999999)))
     else:
-        lines.append(f"Caisse {rng.randint(1, 9)}  Ticket {rng.randint(1000, 99999)}")
+        lines.append(L.register_default.format(n=rng.randint(1, 9), num=rng.randint(1000, 99999)))
 
     if sep_light and style != "minimal":
         lines.append(sep_light)
 
     total = 0.0
-    euro = meta["euro_style"]
     for product in ticket.produits:
         line_total = round(product.prix_unitaire_ou_kg * product.unites, 2)
         total = round(total + line_total, 2)
         name = product.nom_produit[: cols - 12]
-        price_txt = _format_price(line_total, euro)
+        price_txt = fmt(line_total)
 
         if style == "compact":
             if product.unites > 1:
@@ -289,7 +348,7 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
             else:
                 lines.append(f"{name} {price_txt}"[:cols])
         elif style == "dense":
-            unit = _format_price(product.prix_unitaire_ou_kg, euro)
+            unit = fmt(product.prix_unitaire_ou_kg)
             lines.append(name[:cols])
             if product.unites > 1:
                 lines.append(f"  {product.unites} @ {unit}".ljust(cols - len(price_txt)) + price_txt)
@@ -297,7 +356,7 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
                 lines.append((" " * (cols - len(price_txt))) + price_txt)
         elif product.unites > 1:
             lines.append(name)
-            qty_part = f"  {product.unites} x {_format_price(product.prix_unitaire_ou_kg, euro)}"
+            qty_part = f"  {product.unites} x {fmt(product.prix_unitaire_ou_kg)}"
             pad = cols - max(8, len(price_txt))
             lines.append(qty_part.ljust(pad) + price_txt.rjust(len(price_txt)))
         else:
@@ -307,45 +366,42 @@ def _build_lines(ticket: Ticket, rng: random.Random, style: str) -> tuple[list[s
     if sep_light and style != "minimal":
         lines.append(sep_light)
 
-    total_txt = _format_price(total, euro)
+    total_txt = fmt(total)
     if style == "discount":
-        lines.append(("A PAYER " + total_txt).center(cols))
+        lines.append((L.total_pay + " " + total_txt).center(cols))
     elif style == "retail_dashed":
-        lines.append("MONTANT TTC".ljust(cols - len(total_txt)) + total_txt)
+        lines.append(L.total_retail.ljust(cols - len(total_txt)) + total_txt)
     else:
-        lines.append("TOTAL TTC".ljust(cols - len(total_txt)) + total_txt)
+        lines.append(L.total_default.ljust(cols - len(total_txt)) + total_txt)
 
     n_articles = sum(p.unites for p in ticket.produits)
-    lines.append(f"{n_articles} article(s)" if style != "compact" else f"Articles: {n_articles}")
+    lines.append(L.articles_compact.format(n=n_articles) if style == "compact"
+                 else L.articles_default.format(n=n_articles))
 
     if rng.random() < 0.75:
-        tva = round(total * 0.055 / 1.055, 2)
-        tva_txt = _format_price(tva, euro)
-        lines.append(f"TVA 5.5%".ljust(cols - len(tva_txt)) + tva_txt)
+        rate = L.tax_rate
+        tva = round(total * rate / (1 + rate), 2)
+        tva_txt = fmt(tva)
+        tax_lbl = L.tax_label.format(pct=f"{rate * 100:g}%")
+        lines.append(tax_lbl.ljust(cols - len(tva_txt)) + tva_txt)
 
     if style == "discount" and rng.random() < 0.4:
-        lines.append("CARTE FIDELITE: ****" + str(rng.randint(1000, 9999)))
+        lines.append(L.loyalty_label + str(rng.randint(1000, 9999)))
 
-    payment = rng.choice(["CB", "CARTE BANCAIRE", "ESPECES", "SANS CONTACT", "TICKET RESTO"])
+    payment = rng.choice(L.payment_methods)
     if style == "retail_dashed":
-        lines.append(f"PAIEMENT : {payment}")
+        lines.append(L.payment_retail.format(m=payment))
     else:
-        lines.append(f"Reglement: {payment}")
+        lines.append(L.payment_default.format(m=payment))
 
-    if payment != "ESPECES" and rng.random() < 0.65:
-        lines.append(f"CB **** **** **** {rng.randint(1000, 9999)}")
+    if payment != L.cash_word and rng.random() < 0.65:
+        lines.append(f"**** **** **** {rng.randint(1000, 9999)}")
 
     if sep_heavy and style != "minimal":
         lines.append(sep_heavy)
-    lines.append(rng.choice([
-        "Merci de votre visite !",
-        "A bientot !",
-        "Merci et a bientot",
-        "Bonnes fetes !",
-        "A tres bientot",
-    ]).center(cols) if style not in ("retail_dashed", "minimal") else rng.choice([
-        "Merci", "A bientot", "Merci de votre visite",
-    ]))
+    lines.append(rng.choice(L.thankyou).center(cols)
+                 if style not in ("retail_dashed", "minimal")
+                 else rng.choice(L.thankyou_short))
 
     # Drop accidental empty lines from minimal style
     lines = [ln for ln in lines if ln != "" or style == "minimal"]
@@ -393,7 +449,7 @@ def _draw_receipt(
         font_size = rng.choice([12, 13, 14])
         mono = True
 
-    font = _load_font(font_size, mono=mono)
+    font = _load_font(font_size, mono=mono, path=_pick_font_path(rng, mono))
     line_height = font_size + rng.randint(3, 7)
     margin_x = rng.randint(4, 24)
     margin_y = rng.randint(10, 32)
@@ -516,58 +572,116 @@ def _frame_on_background(img: Image.Image, rng: random.Random) -> Image.Image:
     return canvas
 
 
+def _chromatic_aberration(img: Image.Image, rng: random.Random) -> Image.Image:
+    """Shift the R/B channels a few px — cheap-lens / phone-camera fringing."""
+    arr = np.asarray(img)
+    shift = rng.randint(1, 3)
+    out = arr.copy()
+    out[:, :, 0] = np.roll(arr[:, :, 0], shift, axis=1)
+    out[:, :, 2] = np.roll(arr[:, :, 2], -shift, axis=1)
+    return Image.fromarray(out)
+
+
+def _texture_overlay(img: Image.Image, rng: random.Random) -> Image.Image:
+    """Blend a smoothed random-noise layer at low alpha — paper grain / table texture."""
+    w, h = img.size
+    noise = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
+    tex = Image.fromarray(noise).filter(ImageFilter.GaussianBlur(rng.uniform(2, 6)))
+    return Image.blend(img, tex.convert("RGB"), rng.uniform(0.04, 0.14))
+
+
+def _stamp_overlay(img: Image.Image, rng: random.Random) -> Image.Image:
+    """Composite a semi-transparent rotated stamp/logo (PAID / store mark simulation)."""
+    base = img.convert("RGBA")
+    sw, sh = rng.randint(80, 160), rng.randint(48, 90)
+    stamp = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(stamp)
+    colour = rng.choice([(180, 30, 30, 150), (30, 60, 150, 150), (40, 120, 40, 150)])
+    if rng.random() < 0.5:
+        draw.ellipse([2, 2, sw - 2, sh - 2], outline=colour, width=3)
+    else:
+        draw.rectangle([2, 2, sw - 2, sh - 2], outline=colour, width=3)
+    text = rng.choice(["PAID", "COPY", "VOID", "OK", "MERCI", "*"])
+    draw.text((sw // 2 - 4 * len(text), sh // 2 - 7), text, fill=colour, font=_load_font(16))
+    stamp = stamp.rotate(rng.uniform(-25, 25), expand=True)
+    x = rng.randint(0, max(1, base.width - stamp.width))
+    y = rng.randint(0, max(1, base.height - stamp.height))
+    base.alpha_composite(stamp, (x, y))
+    return base.convert("RGB")
+
+
+# Every toggleable transform name (order = application order in distort_receipt_image).
+ALL_VARIATIONS: tuple[str, ...] = (
+    "rotate", "warp", "chroma", "brightness", "contrast", "blur", "noise",
+    "overlay", "stamp", "jpeg", "vignette", "frame", "crop", "autocontrast",
+)
+
+
 def distort_receipt_image(
     image: Image.Image,
     seed: Optional[int] = None,
     *,
     intensity: str = "medium",
+    variations: "set[str] | None" = None,
 ) -> Image.Image:
-    """Post-render capture noise: rotation, perspective, blur, JPEG, etc.
+    """Post-render capture noise, as a toggleable graded menu.
 
     Args:
         image: clean rendered receipt.
         seed: RNG seed for reproducibility.
         intensity: ``light`` | ``medium`` | ``heavy`` — probability/strength scale.
+        variations: subset of :data:`ALL_VARIATIONS` to enable; ``None`` = all.
     """
     rng = random.Random(seed)
     img = image.convert("RGB")
 
+    enabled = ALL_VARIATIONS if variations is None else tuple(v for v in ALL_VARIATIONS if v in variations)
     probs = {"light": 0.35, "medium": 0.65, "heavy": 0.85}[intensity]
-    def maybe(p_scale: float = 1.0) -> bool:
-        return rng.random() < min(1.0, probs * p_scale)
 
-    if maybe(0.7):
+    def on(name: str, p_scale: float = 1.0) -> bool:
+        return name in enabled and rng.random() < min(1.0, probs * p_scale)
+
+    if on("rotate", 0.7):
         angle = rng.uniform(-9, 9) if intensity == "heavy" else rng.uniform(-6, 6)
         img = img.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=img.getpixel((0, 0)))
 
-    if maybe(0.8):
+    if on("warp", 0.8):
         img = _perspective_warp(img, rng)
 
-    if maybe(0.5):
+    if on("chroma", 0.4):
+        img = _chromatic_aberration(img, rng)
+
+    if on("brightness", 0.5):
         img = ImageEnhance.Brightness(img).enhance(rng.uniform(0.75, 1.25))
 
-    if maybe(0.5):
+    if on("contrast", 0.5):
         img = ImageEnhance.Contrast(img).enhance(rng.uniform(0.7, 1.35))
 
-    if maybe(0.4):
+    if on("blur", 0.4):
         radius = rng.uniform(0.4, 1.8) if intensity != "heavy" else rng.uniform(0.6, 2.5)
         img = img.filter(ImageFilter.GaussianBlur(radius=radius))
 
-    if maybe(0.35):
+    if on("noise", 0.35):
         arr = _add_gaussian_noise(np.asarray(img), sigma=rng.uniform(3, 14))
         img = Image.fromarray(arr)
 
-    if maybe(0.55):
+    if on("overlay", 0.35):
+        img = _texture_overlay(img, rng)
+
+    if on("stamp", 0.3):
+        img = _stamp_overlay(img, rng)
+
+    if on("jpeg", 0.55):
         quality = rng.randint(35, 88) if intensity == "heavy" else rng.randint(45, 92)
         img = _jpeg_recompress(img, quality)
 
-    if maybe(0.45):
+    if on("vignette", 0.45):
         img = _vignette(img, strength=rng.uniform(0.15, 0.45))
 
-    if maybe(0.4):
+    if on("frame", 0.4):
         img = _frame_on_background(img, rng)
 
-    if maybe(0.25) and intensity in ("medium", "heavy"):
+    if on("crop", 0.25) and intensity in ("medium", "heavy"):
         # Partial crop (photo zoomed in)
         w, h = img.size
         crop_pct = rng.uniform(0.02, 0.12)
@@ -578,7 +692,7 @@ def distort_receipt_image(
         if right - left > w * 0.5 and bottom - top > h * 0.5:
             img = img.crop((left, top, right, bottom))
 
-    if maybe(0.2):
+    if on("autocontrast", 0.2):
         img = ImageOps.autocontrast(img, cutoff=rng.randint(0, 2))
 
     return img
@@ -592,6 +706,8 @@ def render_receipt_image(
     diverse: bool = False,
     distort: bool = False,
     distort_intensity: str = "medium",
+    locale: Optional[str] = None,
+    distort_variations: "set[str] | None" = None,
 ) -> Image.Image:
     """Render a :class:`Ticket` as a PIL receipt image.
 
@@ -602,20 +718,26 @@ def render_receipt_image(
         diverse: enable multi-style layouts, palettes, and pre-render noise.
         distort: apply post-render capture distortions.
         distort_intensity: ``light`` | ``medium`` | ``heavy`` when ``distort=True``.
+        locale: language pack for printed UI words (default French).
+        distort_variations: subset of transforms to enable (see
+            :func:`distort_receipt_image`); ``None`` = all.
     """
+    from receipt_vlm.data.locales import get_locale
+
+    pack = get_locale(locale)
     rng = random.Random(seed)
     style = _pick_style(rng, diverse=diverse)
-    lines, meta = _build_lines(ticket, rng, style)
+    lines, meta = _build_lines(ticket, rng, style, loc=pack)
 
     if diverse:
         img = _draw_receipt(lines, rng, meta, diverse=True)
     else:
         # Legacy path: keep original behaviour for existing datasets/tests.
         meta = {"cols": rng.choice([38, 40, 42]), "style": "thermal_classic", "euro_style": "plain"}
-        lines, _ = _build_lines(ticket, rng, "thermal_classic")
+        lines, _ = _build_lines(ticket, rng, "thermal_classic", loc=pack)
         img = Image.new("RGB", (width, 1), (255, 255, 255))
         font_size = rng.choice([12, 13, 14])
-        font = _load_font(font_size)
+        font = _load_font(font_size, path=_pick_font_path(rng, True))
         line_height = font_size + 5
         margin_x, margin_y = rng.randint(8, 20), rng.randint(14, 28)
         height = len(lines) * line_height + 2 * margin_y
@@ -627,7 +749,12 @@ def render_receipt_image(
             draw.text((margin_x, margin_y + i * line_height), line, fill=ink, font=font)
 
     if distort:
-        img = distort_receipt_image(img, seed=None if seed is None else seed + 7919, intensity=distort_intensity)
+        img = distort_receipt_image(
+            img,
+            seed=None if seed is None else seed + 7919,
+            intensity=distort_intensity,
+            variations=distort_variations,
+        )
 
     return img
 
@@ -641,23 +768,28 @@ def save_dataset(
     distort: bool = False,
     distort_intensity: str = "medium",
     start_index: int = 0,
+    locale: Optional[str] = None,
+    distort_variations: "set[str] | None" = None,
 ) -> list[Path]:
     """Generate ``n`` (image, label) pairs under ``output_dir``.
 
-    Writes ``receipt_{i:05d}.png`` and matching ``.json`` labels.
+    Writes ``receipt_{i:05d}.png`` and matching ``.json`` labels. ``locale`` and
+    ``distort_variations`` are forwarded to the renderer.
     """
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
     for i in range(n):
         idx = start_index + i
-        ticket = generate_ticket(seed=seed + i)
+        ticket = generate_ticket(seed=seed + i, locale=locale)
         image = render_receipt_image(
             ticket,
             seed=seed + i,
             diverse=diverse,
             distort=distort,
             distort_intensity=distort_intensity,
+            locale=locale,
+            distort_variations=distort_variations,
         )
         image_path = output / f"receipt_{idx:05d}.png"
         label_path = output / f"receipt_{idx:05d}.json"
