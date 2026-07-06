@@ -48,7 +48,7 @@ variable "worker_ingestion_image_tag" {
 variable "worker_off_image_tag" {
   description = "Tag de l'image worker-off en AR. Doit exister dans le repo prt-prod-docker."
   type        = string
-  default     = "f54739f"
+  default     = "43d4669"
 }
 
 variable "backend_image_tag" {

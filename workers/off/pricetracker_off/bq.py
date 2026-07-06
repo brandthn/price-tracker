@@ -62,6 +62,51 @@ def discover_eans_to_enrich(
     return eans
 
 
+def fetch_median_prices(
+    *,
+    project_id: str,
+    dataset: str,
+    table_open_prices: str,
+    window_weeks: int,
+    min_obs: int,
+    location: str = "EU",
+) -> dict[str, tuple[float, int]]:
+    """Médian de prix par EAN sur une fenêtre glissante → `{ean: (median_eur, obs)}`.
+
+    Décision Étape 0 : fenêtre LARGE (12 mois) + seuil bas (≥1 obs) — PAS la CTE
+    `weekly` d'`indices` (min 3 obs *par semaine*), qui écrase à ~27 EAN sur du
+    flux de prix épars. On médiane sur toute la fenêtre, tous relevés confondus,
+    hors outliers IQR. `obs` = nb de relevés (confiance du prix, pour pondérer/tri).
+    """
+    client = _client(project_id, location)
+    src = f"`{project_id}.{dataset}.{table_open_prices}`"
+    sql = f"""
+    SELECT
+      product_code AS ean,
+      APPROX_QUANTILES(price_eur, 100)[OFFSET(50)] AS median_eur,
+      COUNT(*) AS obs
+    FROM {src}
+    WHERE product_code IS NOT NULL
+      AND (iqr_outlier IS NULL OR iqr_outlier = FALSE)
+      AND price_date >= DATE_SUB(CURRENT_DATE(), INTERVAL @window_weeks WEEK)
+    GROUP BY product_code
+    HAVING COUNT(*) >= @min_obs
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("window_weeks", "INT64", window_weeks),
+            bigquery.ScalarQueryParameter("min_obs", "INT64", min_obs),
+        ]
+    )
+    rows = client.query(sql, job_config=job_config).result()
+    prices: dict[str, tuple[float, int]] = {}
+    for r in rows:
+        if r["median_eur"] is not None:
+            prices[r["ean"]] = (float(r["median_eur"]), int(r["obs"]))
+    logger.info("bq_median_prices_done", eans=len(prices), window_weeks=window_weeks)
+    return prices
+
+
 def merge_catalogue(
     *,
     project_id: str,

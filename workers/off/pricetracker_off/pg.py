@@ -237,3 +237,106 @@ async def update_reco_columns(
                     pass
     logger.info("pg_update_reco_columns_done", candidates=candidates, updated=updated)
     return {"candidates": candidates, "updated": updated}
+
+
+# --- Étape 2 : calcul des paires substitut→produit -------------------------
+
+
+async def fetch_scorable_products(pool: asyncpg.Pool) -> dict[str, dict[str, Any]]:
+    """Produits candidats au scoring : embedding + quantité normalisée présents
+    (sans quoi ni kNN ni €/unité). Renvoie `{ean: {name, brand, category_l3,
+    categories_tags, quantity_value(float), quantity_unit}}`."""
+    sql = """
+    SELECT ean, name, brand, category_l3, categories_tags,
+           quantity_value, quantity_unit
+    FROM products
+    WHERE embedding IS NOT NULL
+      AND quantity_value IS NOT NULL
+      AND quantity_unit IS NOT NULL
+    """
+    out: dict[str, dict[str, Any]] = {}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(sql, timeout=180)
+    for r in rows:
+        tags = r["categories_tags"]
+        out[r["ean"]] = {
+            "name": r["name"],
+            "brand": r["brand"],
+            "category_l3": r["category_l3"],
+            "categories_tags": list(tags) if tags is not None else None,
+            "quantity_value": float(r["quantity_value"]),
+            "quantity_unit": r["quantity_unit"],
+        }
+    logger.info("pg_fetch_scorable_done", products=len(out))
+    return out
+
+
+async def fetch_knn_pairs(pool: asyncpg.Pool, *, k: int) -> list[tuple[str, str, float]]:
+    """kNN pgvector plein-catalogue : pour chaque source, ses `k` voisins par
+    cosinus d'embedding, restreints à la **même dimension d'unité** (kg↔kg,
+    L↔L). Renvoie `[(source_ean, target_ean, cosine)]`.
+
+    Signal PRIMAIRE de génération de candidats (la catégorie ne filtre pas ici,
+    elle scorera ensuite). `1 - (a <=> b)` = similarité cosinus (pgvector).
+    On sur-fetch `k` (le filtre « a un prix + moins cher » réduit ensuite).
+    """
+    sql = """
+    SELECT s.ean AS source_ean, n.ean AS target_ean,
+           1 - (s.embedding <=> n.embedding) AS cosine
+    FROM products s
+    CROSS JOIN LATERAL (
+        SELECT p.ean, p.embedding
+        FROM products p
+        WHERE p.ean <> s.ean
+          AND p.embedding IS NOT NULL
+          AND p.quantity_value IS NOT NULL
+          AND p.quantity_unit = s.quantity_unit
+        ORDER BY p.embedding <=> s.embedding
+        LIMIT $1
+    ) n
+    WHERE s.embedding IS NOT NULL
+      AND s.quantity_value IS NOT NULL
+      AND s.quantity_unit IS NOT NULL
+    """
+    async with pool.acquire() as conn:
+        # Recall ANN : ivfflat scanne `probes` listes (défaut 1 = rapide, recall
+        # faible). On élargit pour la qualité des voisins (batch, pas latence).
+        # SET LOCAL → borné à la transaction (pas de fuite sur la conn poolée).
+        async with conn.transaction():
+            await conn.execute("SET LOCAL ivfflat.probes = 10")
+            rows = await conn.fetch(sql, k, timeout=1200)
+    pairs = [(r["source_ean"], r["target_ean"], float(r["cosine"])) for r in rows]
+    logger.info("pg_fetch_knn_done", pairs=len(pairs), k=k)
+    return pairs
+
+
+async def write_substitutions(
+    pool: asyncpg.Pool, rows: Sequence[tuple[Any, ...]]
+) -> int:
+    """Publie `product_substitutions` : TRUNCATE + INSERT (recompute plein, comme
+    les tables Gold). Atomique. `rows` = tuples alignés sur l'ordre des colonnes.
+
+    Les colonnes NUMERIC sont passées en float et castées `::float8` en SQL
+    (asyncpg exige sinon des Decimal sur un type numeric)."""
+    if not rows:
+        logger.warning("pg_write_substitutions_empty")
+        async with pool.acquire() as conn:
+            await conn.execute("TRUNCATE TABLE product_substitutions")
+        return 0
+
+    insert = """
+    INSERT INTO product_substitutions (
+        source_ean, target_ean, tier, score, cosine, cat_agreement, quantity_unit,
+        source_price_per_unit, target_price_per_unit, saving_per_unit, saving_pct,
+        source_price_obs, target_price_obs
+    ) VALUES (
+        $1, $2, $3, $4::float8, $5::float8, $6::float8, $7,
+        $8::float8, $9::float8, $10::float8, $11::float8, $12, $13
+    )
+    """
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("TRUNCATE TABLE product_substitutions")
+            await conn.executemany(insert, rows)
+    logger.info("pg_write_substitutions_done", rows=len(rows))
+    return len(rows)
