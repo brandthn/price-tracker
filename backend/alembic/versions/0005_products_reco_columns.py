@@ -1,8 +1,10 @@
 """products: socle reco substituts — quantité normalisée + chemin de catégories OFF.
 
-Revision ID: 0005_products_quantity_categories
+Revision ID: 0005_products_reco_columns
 Revises: 0004_seed_aliases_catalogue
 Create Date: 2026-07-06
+
+⚠️ id volontairement COURT : `alembic_version.version_num` = VARCHAR(32).
 
 Ajoute à `products` (table PARTAGÉE avec le worker OFF) les colonnes OFF
 aujourd'hui JETÉES mais nécessaires à la reco de substituts :
@@ -35,7 +37,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0005_products_quantity_categories"
+revision: str = "0005_products_reco_columns"
 down_revision: str | Sequence[str] | None = "0004_seed_aliases_catalogue"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
