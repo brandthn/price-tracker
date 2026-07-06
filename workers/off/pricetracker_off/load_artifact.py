@@ -46,10 +46,16 @@ _DUMP_SOURCE = "openfoodfacts_dump"
 
 # Champs OFFProduct reconstruits depuis chaque record de l'artefact
 # (`embedding_text` et `embedding` sont hors dataclass → lus à part ; les champs
-# texte-embedding non persistés — generic_name/labels/quantity — sont ignorés).
+# texte-embedding pur — generic_name/labels_tags — sont ignorés).
 _PRODUCT_FIELDS = (
     "ean", "name", "brand", "category_l1", "category_l2", "category_l3",
     "nutriscore", "nova", "ecoscore", "image_url", "found",
+)
+# Socle reco (Étapes 1+2) — reconstruits en plus (via .get : les artefacts d'avant
+# ces colonnes ne les portent pas → None, laissant simplement quantity_*/
+# categories_tags à NULL). `categories_tags` sert au chemin complet persisté.
+_RECO_FIELDS = (
+    "quantity", "product_quantity", "product_quantity_unit", "categories_tags",
 )
 
 
@@ -86,7 +92,12 @@ def read_artifact(gcs_uri: str) -> tuple[list[OFFProduct], list[list[float] | No
             if not line.strip():
                 continue
             rec = json.loads(line)
-            products.append(OFFProduct(**{k: rec[k] for k in _PRODUCT_FIELDS}))
+            products.append(
+                OFFProduct(
+                    **{k: rec[k] for k in _PRODUCT_FIELDS},
+                    **{k: rec.get(k) for k in _RECO_FIELDS},
+                )
+            )
             embeddings.append(rec.get("embedding"))
     logger.info(
         "artifact_read",

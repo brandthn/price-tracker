@@ -12,12 +12,14 @@ encode côté Python.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
 
 from .logging import get_logger
 from .off_client import OFFProduct
+from .quantity import normalize_quantity
 
 logger = get_logger(__name__)
 
@@ -26,6 +28,12 @@ def _vector_literal(vec: Sequence[float]) -> str:
     # pgvector accepte '[1.0,2.0,...]' en text — convertit côté SQL via
     # le cast `::vector(768)`. Float repr Python est suffisamment précis.
     return "[" + ",".join(f"{v:.7f}" for v in vec) + "]"
+
+
+def _quantity_numeric(value: float | None) -> Decimal | None:
+    """float canonique (kg/L) → Decimal pour la colonne NUMERIC (asyncpg exige
+    un Decimal, pas un float, sur un type `numeric`). None passe tel quel."""
+    return Decimal(str(value)) if value is not None else None
 
 
 async def open_pool(
@@ -77,13 +85,14 @@ async def upsert_products(
     INSERT INTO products (
         ean, name, brand, category_l1, category_l2, category_l3,
         nutriscore, nova, ecoscore, image_url, off_found, embedding,
-        enriched_at, source
+        enriched_at, source, quantity_raw, quantity_value, quantity_unit,
+        categories_tags
     )
     VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         CASE WHEN $12::text IS NULL THEN NULL ELSE $12::vector END,
-        now(), $13
+        now(), $13, $14, $15, $16, $17
     )
     ON CONFLICT (ean) DO UPDATE SET
         name = EXCLUDED.name,
@@ -98,12 +107,19 @@ async def upsert_products(
         off_found = EXCLUDED.off_found,
         embedding = COALESCE(EXCLUDED.embedding, products.embedding),
         enriched_at = EXCLUDED.enriched_at,
-        source = EXCLUDED.source
+        source = EXCLUDED.source,
+        quantity_raw = EXCLUDED.quantity_raw,
+        quantity_value = EXCLUDED.quantity_value,
+        quantity_unit = EXCLUDED.quantity_unit,
+        categories_tags = EXCLUDED.categories_tags
     """
     written = 0
     async with pool.acquire() as conn:
         async with conn.transaction():
             for prod, emb in zip(products, embeddings, strict=True):
+                qty_value, qty_unit = normalize_quantity(
+                    prod.product_quantity, prod.product_quantity_unit
+                )
                 args: list[Any] = [
                     prod.ean,
                     prod.name,
@@ -118,6 +134,10 @@ async def upsert_products(
                     prod.found,
                     _vector_literal(emb) if emb is not None else None,
                     source,
+                    prod.quantity,
+                    _quantity_numeric(qty_value),
+                    qty_unit,
+                    prod.categories_tags,
                 ]
                 await conn.execute(sql, *args)
                 written += 1
@@ -164,4 +184,56 @@ async def update_embeddings(
                 except (ValueError, IndexError):
                     pass
     logger.info("pg_update_embeddings_done", candidates=candidates, updated=updated)
+    return {"candidates": candidates, "updated": updated}
+
+
+async def update_reco_columns(
+    pool: asyncpg.Pool,
+    *,
+    products: Sequence[OFFProduct],
+) -> dict[str, int]:
+    """Backfill des colonnes socle reco (Étapes 1+2) sur les produits DÉJÀ en base :
+    `UPDATE products SET quantity_raw/quantity_value/quantity_unit/categories_tags
+    = … WHERE ean = …`, SANS toucher aucune autre colonne.
+
+    Même garde-fou que `update_embeddings` : zéro régression sur les données
+    curées (name/brand/image_url/scores/embedding/source, dont l'import Maty).
+    Idempotent. Sert à alimenter les ~12 k produits déjà en base (le worker
+    quotidien, lui, écrit ces colonnes à l'`upsert` des nouveaux EAN).
+
+    - quantité : `(value, unit)` via `normalize_quantity` (g→kg, ml→L) ; sans unité
+      propre → value/unit NULL (exclu du €/unité), `quantity_raw` garde le texte OFF ;
+    - `categories_tags` : chemin OFF complet (pour la profondeur de préfixe commun,
+      tier catégorie §4). NULL si absent.
+
+    Retourne {'candidates': N, 'updated': M} — M ≤ N si des EAN ne sont pas en base.
+    """
+    sql = """
+    UPDATE products
+    SET quantity_raw = $2, quantity_value = $3, quantity_unit = $4,
+        categories_tags = $5
+    WHERE ean = $1
+    """
+    candidates = 0
+    updated = 0
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            for prod in products:
+                candidates += 1
+                qty_value, qty_unit = normalize_quantity(
+                    prod.product_quantity, prod.product_quantity_unit
+                )
+                status = await conn.execute(
+                    sql,
+                    prod.ean,
+                    prod.quantity,
+                    _quantity_numeric(qty_value),
+                    qty_unit,
+                    prod.categories_tags,
+                )
+                try:
+                    updated += int(status.split()[-1])
+                except (ValueError, IndexError):
+                    pass
+    logger.info("pg_update_reco_columns_done", candidates=candidates, updated=updated)
     return {"candidates": candidates, "updated": updated}
