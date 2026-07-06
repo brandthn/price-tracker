@@ -32,6 +32,7 @@ from receipt_vlm.data.dataset import ReceiptSample, _load_image  # noqa: E402
 from receipt_vlm.data.lin_schema import ticket_to_linear  # noqa: E402
 from receipt_vlm.data.ocr_dataset import OcrDataset, make_ocr_collate  # noqa: E402
 from receipt_vlm.data.ocr_transform import IMG_H, IMG_W, prepare_ocr_pixels  # noqa: E402
+from receipt_vlm.data.real_photos import load_real_samples  # noqa: E402
 from receipt_vlm.data.synthetic import generate_ticket, render_receipt_image  # noqa: E402
 from receipt_vlm.data.tokenizer import CharTokenizer  # noqa: E402
 from receipt_vlm.models.ocr_vlm import OcrVLM  # noqa: E402
@@ -62,6 +63,32 @@ def build_synthetic_samples(n, langs, seed, distort, intensity, return_text) -> 
             ticket=ticket, source="synthetic",
         ))
     return samples
+
+
+# Real receipt datasets that carry a "train" split (cord/trainingdatapro are val/test only).
+# Stage B mixes these in so the model sees real-photo appearance and stops hallucinating its
+# synthetic prior. Paths resolve under a base dir holding raw/<name> + labels/<name>.
+_DATA = Path(__file__).resolve().parents[1].parent / "data"
+REAL_TRAIN_SETS = ("wildreceipt", "expressexpense_srd")
+
+
+def build_real_train_samples(repeat: int, data_dir: str | None = None) -> list[ReceiptSample]:
+    """Load the real train splits (schema target only). ``repeat`` oversamples the small real
+    set so it isn't drowned by the on-the-fly synthetic each epoch. ``data_dir`` overrides the
+    base holding ``raw/<name>`` + ``labels/<name>`` (e.g. an attached Kaggle Dataset path)."""
+    base = Path(data_dir) if data_dir else _DATA
+    real: list[ReceiptSample] = []
+    for name in REAL_TRAIN_SETS:
+        images_dir, labels_dir = base / "raw" / name, base / "labels" / name
+        if not labels_dir.is_dir():
+            print(f"  [real] {name}: {labels_dir} missing, skipping", flush=True)
+            continue
+        got = load_real_samples(images_dir, labels_dir, split="train", require_reviewed=False)
+        print(f"  [real] {name}: {len(got)} train receipts", flush=True)
+        real.extend(got)
+    if not real:
+        raise SystemExit(f"--real set but no real samples found under {base} (raw/ + labels/).")
+    return real * max(1, repeat)
 
 
 def _levenshtein(a: str, b: str) -> int:
@@ -172,6 +199,13 @@ def main() -> None:
     p.add_argument("--target", default="transcription", choices=("transcription", "schema"),
                    help="Stage A READ = transcription (all visible text); Stage B = schema (fields)")
     p.add_argument("--n", type=int, default=20000, help="synthetic receipts per epoch")
+    p.add_argument("--real", action="store_true",
+                   help="Stage B: mix real train splits (wildreceipt+srd) in (schema target only)")
+    p.add_argument("--real-repeat", type=int, default=4,
+                   help="oversample factor for the real set so it isn't drowned by synthetic")
+    p.add_argument("--real-data-dir", default=None,
+                   help="base dir with raw/<name>+labels/<name> (e.g. attached Kaggle Dataset); "
+                        "defaults to dev_ocr/data")
     p.add_argument("--languages", default="fr,en,es,de,it")
     p.add_argument("--epochs", type=int, default=40)
     p.add_argument("--batch-size", type=int, default=24)
@@ -211,9 +245,16 @@ def main() -> None:
     print(f"target {args.target} | langs {langs} | n/epoch {args.n} | "
           f"vocab {tokenizer.vocab_size} | device {device}", flush=True)
 
+    if args.real and args.target != "schema":
+        raise SystemExit("--real needs --target schema (real photos have no rendered transcription).")
+
     return_text = args.target == "transcription"
     samples = build_synthetic_samples(args.n, langs, args.seed, args.distort,
                                       args.distort_intensity, return_text)
+    if args.real:
+        real = build_real_train_samples(args.real_repeat, args.real_data_dir)
+        print(f"mixing {len(real)} real (x{args.real_repeat}) + {len(samples)} synthetic", flush=True)
+        samples += real
     dataset = OcrDataset(samples, tokenizer, IMG_H, IMG_W, args.max_len, target_mode=args.target)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
                         num_workers=args.num_workers, collate_fn=make_ocr_collate(tokenizer.pad_id),

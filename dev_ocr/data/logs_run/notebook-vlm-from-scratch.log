@@ -1,0 +1,355 @@
+7.4s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+7.4s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+7.4s 3 0.00s - to python to disable frozen modules.
+7.4s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+8.0s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+8.0s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+8.0s 7 0.00s - to python to disable frozen modules.
+8.0s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+14.4s 9 Tesla T4
+14.7s 10 Checkpoints -> dataset: giorgiopasini/receipt-ocr-vlm-checkpoints | every epoch: True
+15.2s 11 Train package: /kaggle/working/repo/dev_ocr/vlm_training
+37.8s 12 Install OK
+37.8s 13 Checkpoints -> /kaggle/working/ocr_ckpts
+37.9s 14 Restored 0 file(s): nothing (fresh run)
+37.9s 15 >> /usr/bin/python3 -u scripts/train_ocr_vlm.py --target schema --checkpoint-dir /kaggle/working/ocr_ckpts --n 20000 --languages fr,en,es,de,it --epochs 40 --batch-size 24 --lr 0.0003 --embed-dim 256 --enc-depth 4 --dec-depth 4 --heads 8 --max-len 768 --num-workers 2 --log-every 200 --eval-every 1 --keep-last 3 --distort-intensity light --distort
+39.8s 16 [07:47:17 +    1s gap   2s] target schema | langs ['fr', 'en', 'es', 'de', 'it'] | n/epoch 20000 | vocab 190 | device cuda
+46.4s 17 [07:47:24 +    8s gap   7s] OcrVLM 8.73M params | 384 visual tokens | 834 batches/epoch
+168.7s 18 [07:49:26 +  130s gap 122s]   epoch 1 batch 200/834 loss 1.8221 (1.6 it/s)
+289.7s 19 [07:51:27 +  251s gap 121s]   epoch 1 batch 400/834 loss 1.2645 (1.7 it/s)
+411.0s 20 [07:53:29 +  373s gap 121s]   epoch 1 batch 600/834 loss 0.8706 (1.6 it/s)
+530.9s 21 [07:55:29 +  493s gap 120s]   epoch 1 batch 800/834 loss 0.6112 (1.7 it/s)
+562.9s 22 [07:56:00 +  524s gap  32s] epoch 1/40 | train 1.3831 | 505s | F1 0.005 prod_rec 0.031 anls 0.395 valid 1.00
+563.1s 23 [07:56:01 +  525s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch001_loss1.3831.pt (105 MB)
+564.8s 24 [dataset] create: ocr_vlm_epoch001_loss1.3831.pt
+574.0s 25 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+687.3s 26 [07:58:05 +  649s gap 124s]   epoch 2 batch 200/834 loss 0.4935 (1.6 it/s)
+807.0s 27 [08:00:05 +  769s gap 120s]   epoch 2 batch 400/834 loss 0.4255 (1.7 it/s)
+926.0s 28 [08:02:04 +  888s gap 119s]   epoch 2 batch 600/834 loss 0.3922 (1.7 it/s)
+1046.2s 29 [08:04:04 + 1008s gap 120s]   epoch 2 batch 800/834 loss 0.3800 (1.7 it/s)
+1078.5s 30 [08:04:36 + 1040s gap  32s] epoch 2/40 | train 0.4278 | 503s | F1 0.009 prod_rec 0.031 anls 0.388 valid 1.00
+1078.6s 31 [08:04:36 + 1040s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch002_loss0.4278.pt (105 MB)
+1079.3s 32 [dataset] version: ocr_vlm_epoch002_loss0.4278.pt
+1086.5s 33 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1199.5s 34 [08:06:37 + 1161s gap 121s]   epoch 3 batch 200/834 loss 0.3639 (1.7 it/s)
+1318.5s 35 [08:08:36 + 1280s gap 119s]   epoch 3 batch 400/834 loss 0.3688 (1.7 it/s)
+1438.4s 36 [08:10:36 + 1400s gap 120s]   epoch 3 batch 600/834 loss 0.3377 (1.7 it/s)
+1558.4s 37 [08:12:36 + 1520s gap 120s]   epoch 3 batch 800/834 loss 0.3540 (1.7 it/s)
+1587.6s 38 [08:13:05 + 1549s gap  29s] epoch 3/40 | train 0.3554 | 499s | F1 0.010 prod_rec 0.023 anls 0.393 valid 1.00
+1587.8s 39 [08:13:05 + 1549s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch003_loss0.3554.pt (105 MB)
+1588.6s 40 [dataset] version: ocr_vlm_epoch003_loss0.3554.pt
+1598.0s 41 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1708.1s 42 [08:15:06 + 1670s gap 120s]   epoch 4 batch 200/834 loss 0.3423 (1.7 it/s)
+1827.3s 43 [08:17:05 + 1789s gap 119s]   epoch 4 batch 400/834 loss 0.3320 (1.7 it/s)
+1947.7s 44 [08:19:05 + 1909s gap 120s]   epoch 4 batch 600/834 loss 0.3384 (1.7 it/s)
+2067.6s 45 [08:21:05 + 2029s gap 120s]   epoch 4 batch 800/834 loss 0.3399 (1.7 it/s)
+2098.7s 46 [08:21:36 + 2060s gap  31s] epoch 4/40 | train 0.3378 | 499s | F1 0.000 prod_rec 0.008 anls 0.307 valid 1.00
+2098.8s 47 [08:21:36 + 2060s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch004_loss0.3378.pt (105 MB)
+2099.9s 48 [dataset] version: ocr_vlm_epoch004_loss0.3378.pt
+2109.2s 49 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+2222.3s 50 [08:23:40 + 2184s gap 123s]   epoch 5 batch 200/834 loss 0.3263 (1.6 it/s)
+2343.6s 51 [08:25:41 + 2305s gap 121s]   epoch 5 batch 400/834 loss 0.3314 (1.6 it/s)
+2464.7s 52 [08:27:42 + 2426s gap 121s]   epoch 5 batch 600/834 loss 0.3299 (1.7 it/s)
+2585.7s 53 [08:29:43 + 2547s gap 121s]   epoch 5 batch 800/834 loss 0.3181 (1.7 it/s)
+2616.3s 54 [08:30:14 + 2578s gap  31s] epoch 5/40 | train 0.3298 | 507s | F1 0.010 prod_rec 0.016 anls 0.349 valid 1.00
+2616.5s 55 [08:30:14 + 2578s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch005_loss0.3298.pt (105 MB)
+2617.4s 56 [dataset] version: ocr_vlm_epoch005_loss0.3298.pt
+2626.9s 57 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+2736.1s 58 [08:32:14 + 2698s gap 120s]   epoch 6 batch 200/834 loss 0.3238 (1.7 it/s)
+2856.5s 59 [08:34:14 + 2818s gap 120s]   epoch 6 batch 400/834 loss 0.3212 (1.7 it/s)
+2978.9s 60 [08:36:16 + 2940s gap 122s]   epoch 6 batch 600/834 loss 0.3179 (1.6 it/s)
+3101.8s 61 [08:38:19 + 3063s gap 123s]   epoch 6 batch 800/834 loss 0.3189 (1.6 it/s)
+3133.2s 62 [08:38:51 + 3095s gap  31s] epoch 6/40 | train 0.3246 | 506s | F1 0.011 prod_rec 0.047 anls 0.417 valid 1.00
+3133.4s 63 [08:38:51 + 3095s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch006_loss0.3246.pt (105 MB)
+3134.4s 64 [dataset] version: ocr_vlm_epoch006_loss0.3246.pt
+3143.6s 65 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+3255.8s 66 [08:40:53 + 3217s gap 122s]   epoch 7 batch 200/834 loss 0.3252 (1.6 it/s)
+3376.5s 67 [08:42:54 + 3338s gap 121s]   epoch 7 batch 400/834 loss 0.3197 (1.7 it/s)
+3496.1s 68 [08:44:54 + 3458s gap 120s]   epoch 7 batch 600/834 loss 0.3183 (1.7 it/s)
+3618.2s 69 [08:46:56 + 3580s gap 122s]   epoch 7 batch 800/834 loss 0.3165 (1.6 it/s)
+3647.3s 70 [08:47:25 + 3609s gap  29s] epoch 7/40 | train 0.3206 | 504s | F1 0.011 prod_rec 0.016 anls 0.368 valid 1.00
+3647.4s 71 [08:47:25 + 3609s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch007_loss0.3206.pt (105 MB)
+3648.3s 72 [dataset] version: ocr_vlm_epoch007_loss0.3206.pt
+3657.7s 73 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+3770.6s 74 [08:49:28 + 3732s gap 123s]   epoch 8 batch 200/834 loss 0.3089 (1.6 it/s)
+3891.8s 75 [08:51:29 + 3853s gap 121s]   epoch 8 batch 400/834 loss 0.3191 (1.7 it/s)
+4012.9s 76 [08:53:30 + 3974s gap 121s]   epoch 8 batch 600/834 loss 0.3151 (1.7 it/s)
+4132.1s 77 [08:55:30 + 4094s gap 119s]   epoch 8 batch 800/834 loss 0.3176 (1.7 it/s)
+4161.7s 78 [08:55:59 + 4123s gap  30s] epoch 8/40 | train 0.3175 | 504s | F1 0.011 prod_rec 0.039 anls 0.381 valid 1.00
+4161.9s 79 [08:56:00 + 4124s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch008_loss0.3175.pt (105 MB)
+4162.8s 80 [dataset] version: ocr_vlm_epoch008_loss0.3175.pt
+4171.8s 81 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+4285.5s 82 [08:58:03 + 4247s gap 124s]   epoch 9 batch 200/834 loss 0.3204 (1.6 it/s)
+4407.5s 83 [09:00:05 + 4369s gap 122s]   epoch 9 batch 400/834 loss 0.3124 (1.6 it/s)
+4527.5s 84 [09:02:05 + 4489s gap 120s]   epoch 9 batch 600/834 loss 0.3080 (1.7 it/s)
+4648.9s 85 [09:04:07 + 4611s gap 121s]   epoch 9 batch 800/834 loss 0.3255 (1.6 it/s)
+4678.8s 86 [09:04:36 + 4640s gap  30s] epoch 9/40 | train 0.3152 | 507s | F1 0.011 prod_rec 0.054 anls 0.417 valid 1.00
+4679.0s 87 [09:04:37 + 4641s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch009_loss0.3152.pt (105 MB)
+4680.2s 88 [dataset] version: ocr_vlm_epoch009_loss0.3152.pt
+4689.4s 89 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+4800.2s 90 [09:06:38 + 4762s gap 121s]   epoch 10 batch 200/834 loss 0.3121 (1.7 it/s)
+4921.2s 91 [09:08:39 + 4883s gap 121s]   epoch 10 batch 400/834 loss 0.3070 (1.7 it/s)
+5040.4s 92 [09:10:38 + 5002s gap 119s]   epoch 10 batch 600/834 loss 0.3166 (1.7 it/s)
+5160.3s 93 [09:12:38 + 5122s gap 120s]   epoch 10 batch 800/834 loss 0.3140 (1.7 it/s)
+5189.6s 94 [09:13:07 + 5151s gap  29s] epoch 10/40 | train 0.3133 | 501s | F1 0.000 prod_rec 0.008 anls 0.300 valid 1.00
+5189.7s 95 [09:13:07 + 5151s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch010_loss0.3133.pt (105 MB)
+5190.5s 96 [dataset] version: ocr_vlm_epoch010_loss0.3133.pt
+5200.2s 97 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+5309.9s 98 [09:15:08 + 5272s gap 120s]   epoch 11 batch 200/834 loss 0.2997 (1.7 it/s)
+5429.4s 99 [09:17:07 + 5391s gap 120s]   epoch 11 batch 400/834 loss 0.3187 (1.7 it/s)
+5548.7s 100 [09:19:06 + 5510s gap 119s]   epoch 11 batch 600/834 loss 0.3149 (1.7 it/s)
+5668.1s 101 [09:21:06 + 5630s gap 119s]   epoch 11 batch 800/834 loss 0.3221 (1.7 it/s)
+5697.2s 102 [09:21:35 + 5659s gap  29s] epoch 11/40 | train 0.3119 | 498s | F1 0.000 prod_rec 0.000 anls 0.284 valid 1.00
+5697.4s 103 [09:21:35 + 5659s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch011_loss0.3119.pt (105 MB)
+5698.3s 104 [dataset] version: ocr_vlm_epoch011_loss0.3119.pt
+5708.0s 105 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+5817.9s 106 [09:23:35 + 5779s gap 120s]   epoch 12 batch 200/834 loss 0.3158 (1.7 it/s)
+5935.8s 107 [09:25:33 + 5897s gap 118s]   epoch 12 batch 400/834 loss 0.3176 (1.7 it/s)
+6055.1s 108 [09:27:33 + 6017s gap 119s]   epoch 12 batch 600/834 loss 0.3042 (1.7 it/s)
+6174.0s 109 [09:29:32 + 6136s gap 119s]   epoch 12 batch 800/834 loss 0.3084 (1.7 it/s)
+6203.2s 110 [09:30:01 + 6165s gap  29s] epoch 12/40 | train 0.3106 | 496s | F1 0.012 prod_rec 0.023 anls 0.382 valid 1.00
+6203.4s 111 [09:30:01 + 6165s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch012_loss0.3106.pt (105 MB)
+6204.1s 112 [dataset] version: ocr_vlm_epoch012_loss0.3106.pt
+6213.4s 113 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+6324.0s 114 [09:32:02 + 6286s gap 121s]   epoch 13 batch 200/834 loss 0.3069 (1.7 it/s)
+6441.6s 115 [09:33:59 + 6403s gap 118s]   epoch 13 batch 400/834 loss 0.3087 (1.7 it/s)
+6562.6s 116 [09:36:00 + 6524s gap 121s]   epoch 13 batch 600/834 loss 0.3002 (1.7 it/s)
+6683.2s 117 [09:38:01 + 6645s gap 121s]   epoch 13 batch 800/834 loss 0.3153 (1.7 it/s)
+6712.4s 118 [09:38:30 + 6674s gap  29s] epoch 13/40 | train 0.3092 | 500s | F1 0.000 prod_rec 0.008 anls 0.321 valid 1.00
+6712.6s 119 [09:38:30 + 6674s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch013_loss0.3092.pt (105 MB)
+6713.4s 120 [dataset] version: ocr_vlm_epoch013_loss0.3092.pt
+6723.3s 121 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+6832.8s 122 [09:40:30 + 6794s gap 120s]   epoch 14 batch 200/834 loss 0.3043 (1.7 it/s)
+6952.3s 123 [09:42:30 + 6914s gap 119s]   epoch 14 batch 400/834 loss 0.3109 (1.7 it/s)
+7072.6s 124 [09:44:30 + 7034s gap 120s]   epoch 14 batch 600/834 loss 0.3075 (1.7 it/s)
+7192.5s 125 [09:46:30 + 7154s gap 120s]   epoch 14 batch 800/834 loss 0.3111 (1.7 it/s)
+7221.6s 126 [09:46:59 + 7183s gap  29s] epoch 14/40 | train 0.3083 | 500s | F1 0.016 prod_rec 0.023 anls 0.392 valid 1.00
+7221.8s 127 [09:46:59 + 7183s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch014_loss0.3083.pt (105 MB)
+7222.7s 128 [dataset] version: ocr_vlm_epoch014_loss0.3083.pt
+7232.1s 129 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+7341.5s 130 [09:48:59 + 7303s gap 120s]   epoch 15 batch 200/834 loss 0.3012 (1.7 it/s)
+7461.4s 131 [09:50:59 + 7423s gap 120s]   epoch 15 batch 400/834 loss 0.3133 (1.7 it/s)
+7583.3s 132 [09:53:01 + 7545s gap 122s]   epoch 15 batch 600/834 loss 0.3027 (1.6 it/s)
+7700.9s 133 [09:54:58 + 7662s gap 118s]   epoch 15 batch 800/834 loss 0.3105 (1.7 it/s)
+7731.3s 134 [09:55:29 + 7693s gap  30s] epoch 15/40 | train 0.3071 | 499s | F1 0.011 prod_rec 0.031 anls 0.373 valid 1.00
+7731.4s 135 [09:55:29 + 7693s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch015_loss0.3071.pt (105 MB)
+7732.6s 136 [dataset] version: ocr_vlm_epoch015_loss0.3071.pt
+7742.6s 137 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+7854.0s 138 [09:57:32 + 7816s gap 123s]   epoch 16 batch 200/834 loss 0.3075 (1.6 it/s)
+7974.2s 139 [09:59:32 + 7936s gap 120s]   epoch 16 batch 400/834 loss 0.3045 (1.7 it/s)
+8093.7s 140 [10:01:31 + 8055s gap 119s]   epoch 16 batch 600/834 loss 0.3114 (1.7 it/s)
+8214.4s 141 [10:03:32 + 8176s gap 121s]   epoch 16 batch 800/834 loss 0.3076 (1.7 it/s)
+8243.3s 142 [10:04:01 + 8205s gap  29s] epoch 16/40 | train 0.3060 | 502s | F1 0.012 prod_rec 0.008 anls 0.355 valid 1.00
+8243.5s 143 [10:04:01 + 8205s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch016_loss0.3060.pt (105 MB)
+8244.4s 144 [dataset] version: ocr_vlm_epoch016_loss0.3060.pt
+8254.4s 145 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+8364.1s 146 [10:06:02 + 8326s gap 121s]   epoch 17 batch 200/834 loss 0.3053 (1.7 it/s)
+8484.3s 147 [10:08:02 + 8446s gap 120s]   epoch 17 batch 400/834 loss 0.3033 (1.7 it/s)
+8603.6s 148 [10:10:01 + 8565s gap 119s]   epoch 17 batch 600/834 loss 0.2927 (1.7 it/s)
+8723.6s 149 [10:12:01 + 8685s gap 120s]   epoch 17 batch 800/834 loss 0.3021 (1.7 it/s)
+8753.9s 150 [10:12:31 + 8715s gap  30s] epoch 17/40 | train 0.3047 | 500s | F1 0.000 prod_rec 0.016 anls 0.320 valid 1.00
+8754.0s 151 [10:12:32 + 8716s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch017_loss0.3047.pt (105 MB)
+8755.2s 152 [dataset] version: ocr_vlm_epoch017_loss0.3047.pt
+8765.1s 153 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+8875.3s 154 [10:14:33 + 8837s gap 121s]   epoch 18 batch 200/834 loss 0.3066 (1.7 it/s)
+8995.7s 155 [10:16:33 + 8957s gap 120s]   epoch 18 batch 400/834 loss 0.3038 (1.7 it/s)
+9117.0s 156 [10:18:35 + 9079s gap 121s]   epoch 18 batch 600/834 loss 0.2944 (1.6 it/s)
+9236.1s 157 [10:20:34 + 9198s gap 119s]   epoch 18 batch 800/834 loss 0.3063 (1.7 it/s)
+9266.4s 158 [10:21:04 + 9228s gap  30s] epoch 18/40 | train 0.3029 | 502s | F1 0.011 prod_rec 0.008 anls 0.346 valid 1.00
+9266.5s 159 [10:21:04 + 9228s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch018_loss0.3029.pt (105 MB)
+9267.5s 160 [dataset] version: ocr_vlm_epoch018_loss0.3029.pt
+9277.4s 161 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+9388.3s 162 [10:23:06 + 9350s gap 122s]   epoch 19 batch 200/834 loss 0.2964 (1.6 it/s)
+9508.4s 163 [10:25:06 + 9470s gap 120s]   epoch 19 batch 400/834 loss 0.2995 (1.7 it/s)
+9627.9s 164 [10:27:05 + 9590s gap 119s]   epoch 19 batch 600/834 loss 0.2963 (1.7 it/s)
+9747.6s 165 [10:29:05 + 9709s gap 120s]   epoch 19 batch 800/834 loss 0.2950 (1.7 it/s)
+9776.7s 166 [10:29:34 + 9738s gap  29s] epoch 19/40 | train 0.2999 | 501s | F1 0.000 prod_rec 0.000 anls 0.291 valid 1.00
+9776.9s 167 [10:29:34 + 9739s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch019_loss0.2999.pt (105 MB)
+9777.7s 168 [dataset] version: ocr_vlm_epoch019_loss0.2999.pt
+9787.5s 169 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+9900.1s 170 [10:31:38 + 9862s gap 123s]   epoch 20 batch 200/834 loss 0.2985 (1.6 it/s)
+10020.7s 171 [10:33:38 + 9982s gap 121s]   epoch 20 batch 400/834 loss 0.2937 (1.7 it/s)
+10139.0s 172 [10:35:37 +10101s gap 118s]   epoch 20 batch 600/834 loss 0.2996 (1.7 it/s)
+10258.1s 173 [10:37:36 +10220s gap 119s]   epoch 20 batch 800/834 loss 0.3020 (1.7 it/s)
+10288.6s 174 [10:38:06 +10250s gap  31s] epoch 20/40 | train 0.2969 | 501s | F1 0.011 prod_rec 0.016 anls 0.360 valid 1.00
+10288.7s 175 [10:38:06 +10250s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch020_loss0.2969.pt (105 MB)
+10289.8s 176 [dataset] version: ocr_vlm_epoch020_loss0.2969.pt
+10300.6s 177 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+10408.6s 178 [10:40:06 +10370s gap 120s]   epoch 21 batch 200/834 loss 0.2943 (1.7 it/s)
+10527.5s 179 [10:42:05 +10489s gap 119s]   epoch 21 batch 400/834 loss 0.2940 (1.7 it/s)
+10647.3s 180 [10:44:05 +10609s gap 120s]   epoch 21 batch 600/834 loss 0.2829 (1.7 it/s)
+10767.4s 181 [10:46:05 +10729s gap 120s]   epoch 21 batch 800/834 loss 0.2852 (1.7 it/s)
+10796.8s 182 [10:46:34 +10758s gap  29s] epoch 21/40 | train 0.2941 | 499s | F1 0.023 prod_rec 0.023 anls 0.407 valid 1.00
+10796.9s 183 [10:46:35 +10759s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch021_loss0.2941.pt (105 MB)
+10798.0s 184 [dataset] version: ocr_vlm_epoch021_loss0.2941.pt
+10807.8s 185 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+10918.1s 186 [10:48:36 +10880s gap 121s]   epoch 22 batch 200/834 loss 0.2965 (1.7 it/s)
+11038.6s 187 [10:50:36 +11000s gap 120s]   epoch 22 batch 400/834 loss 0.2949 (1.7 it/s)
+11158.0s 188 [10:52:36 +11120s gap 119s]   epoch 22 batch 600/834 loss 0.2920 (1.7 it/s)
+11279.1s 189 [10:54:37 +11241s gap 121s]   epoch 22 batch 800/834 loss 0.2975 (1.7 it/s)
+11309.1s 190 [10:55:07 +11271s gap  30s] epoch 22/40 | train 0.2913 | 502s | F1 0.023 prod_rec 0.039 anls 0.431 valid 1.00
+11309.2s 191 [10:55:07 +11271s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch022_loss0.2913.pt (105 MB)
+11310.2s 192 [dataset] version: ocr_vlm_epoch022_loss0.2913.pt
+11319.6s 193 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+11430.2s 194 [10:57:08 +11392s gap 121s]   epoch 23 batch 200/834 loss 0.2931 (1.7 it/s)
+11550.3s 195 [10:59:08 +11512s gap 120s]   epoch 23 batch 400/834 loss 0.2881 (1.7 it/s)
+11669.6s 196 [11:01:07 +11631s gap 119s]   epoch 23 batch 600/834 loss 0.2939 (1.7 it/s)
+11788.8s 197 [11:03:06 +11750s gap 119s]   epoch 23 batch 800/834 loss 0.2871 (1.7 it/s)
+11819.4s 198 [11:03:37 +11781s gap  31s] epoch 23/40 | train 0.2890 | 500s | F1 0.023 prod_rec 0.031 anls 0.409 valid 1.00
+11819.6s 199 [11:03:37 +11781s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch023_loss0.2890.pt (105 MB)
+11820.4s 200 [dataset] version: ocr_vlm_epoch023_loss0.2890.pt
+11830.4s 201 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+11938.3s 202 [11:05:36 +11900s gap 119s]   epoch 24 batch 200/834 loss 0.2875 (1.7 it/s)
+12058.0s 203 [11:07:36 +12020s gap 120s]   epoch 24 batch 400/834 loss 0.2848 (1.7 it/s)
+12176.0s 204 [11:09:34 +12138s gap 118s]   epoch 24 batch 600/834 loss 0.2793 (1.7 it/s)
+12295.6s 205 [11:11:33 +12257s gap 120s]   epoch 24 batch 800/834 loss 0.2909 (1.7 it/s)
+12324.6s 206 [11:12:02 +12286s gap  29s] epoch 24/40 | train 0.2877 | 495s | F1 0.034 prod_rec 0.023 anls 0.441 valid 1.00
+12324.8s 207 [11:12:02 +12286s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch024_loss0.2877.pt (105 MB)
+12325.7s 208 [dataset] version: ocr_vlm_epoch024_loss0.2877.pt
+12335.5s 209 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+12446.3s 210 [11:14:04 +12408s gap 121s]   epoch 25 batch 200/834 loss 0.2908 (1.6 it/s)
+12565.7s 211 [11:16:03 +12527s gap 119s]   epoch 25 batch 400/834 loss 0.2801 (1.7 it/s)
+12683.8s 212 [11:18:01 +12645s gap 118s]   epoch 25 batch 600/834 loss 0.2828 (1.7 it/s)
+12801.6s 213 [11:19:59 +12763s gap 118s]   epoch 25 batch 800/834 loss 0.2863 (1.7 it/s)
+12830.8s 214 [11:20:28 +12792s gap  29s] epoch 25/40 | train 0.2860 | 495s | F1 0.012 prod_rec 0.031 anls 0.376 valid 1.00
+12831.0s 215 [11:20:29 +12793s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch025_loss0.2860.pt (105 MB)
+12831.8s 216 [dataset] version: ocr_vlm_epoch025_loss0.2860.pt
+12841.5s 217 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+12950.7s 218 [11:22:28 +12912s gap 120s]   epoch 26 batch 200/834 loss 0.2846 (1.7 it/s)
+13069.3s 219 [11:24:27 +13031s gap 119s]   epoch 26 batch 400/834 loss 0.2829 (1.7 it/s)
+13187.1s 220 [11:26:25 +13149s gap 118s]   epoch 26 batch 600/834 loss 0.2973 (1.7 it/s)
+13305.4s 221 [11:28:23 +13267s gap 118s]   epoch 26 batch 800/834 loss 0.2839 (1.7 it/s)
+13333.7s 222 [11:28:51 +13295s gap  28s] epoch 26/40 | train 0.2854 | 493s | F1 0.017 prod_rec 0.031 anls 0.408 valid 1.00
+13333.8s 223 [11:28:51 +13295s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch026_loss0.2854.pt (105 MB)
+13334.7s 224 [dataset] version: ocr_vlm_epoch026_loss0.2854.pt
+13344.7s 225 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+13452.9s 226 [11:30:51 +13415s gap 119s]   epoch 27 batch 200/834 loss 0.2799 (1.7 it/s)
+13570.0s 227 [11:32:48 +13532s gap 117s]   epoch 27 batch 400/834 loss 0.2825 (1.7 it/s)
+13688.4s 228 [11:34:46 +13650s gap 118s]   epoch 27 batch 600/834 loss 0.2811 (1.7 it/s)
+13807.0s 229 [11:36:45 +13769s gap 119s]   epoch 27 batch 800/834 loss 0.2892 (1.7 it/s)
+13837.5s 230 [11:37:15 +13799s gap  31s] epoch 27/40 | train 0.2841 | 493s | F1 0.034 prod_rec 0.062 anls 0.498 valid 1.00
+13837.6s 231 [11:37:15 +13799s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch027_loss0.2841.pt (105 MB)
+13838.3s 232 [dataset] version: ocr_vlm_epoch027_loss0.2841.pt
+13847.6s 233 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+13956.9s 234 [11:39:15 +13919s gap 119s]   epoch 28 batch 200/834 loss 0.2759 (1.7 it/s)
+14075.5s 235 [11:41:13 +14037s gap 119s]   epoch 28 batch 400/834 loss 0.2852 (1.7 it/s)
+14192.4s 236 [11:43:10 +14154s gap 117s]   epoch 28 batch 600/834 loss 0.2825 (1.7 it/s)
+14311.1s 237 [11:45:09 +14273s gap 119s]   epoch 28 batch 800/834 loss 0.2828 (1.7 it/s)
+14340.9s 238 [11:45:38 +14302s gap  30s] epoch 28/40 | train 0.2826 | 493s | F1 0.045 prod_rec 0.124 anls 0.589 valid 1.00
+14341.0s 239 [11:45:39 +14303s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch028_loss0.2826.pt (105 MB)
+14342.1s 240 [dataset] version: ocr_vlm_epoch028_loss0.2826.pt
+14352.0s 241 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+14462.2s 242 [11:47:40 +14424s gap 121s]   epoch 29 batch 200/834 loss 0.2754 (1.7 it/s)
+14579.7s 243 [11:49:37 +14541s gap 118s]   epoch 29 batch 400/834 loss 0.2860 (1.7 it/s)
+14698.0s 244 [11:51:36 +14660s gap 118s]   epoch 29 batch 600/834 loss 0.2785 (1.7 it/s)
+14816.6s 245 [11:53:34 +14778s gap 119s]   epoch 29 batch 800/834 loss 0.2731 (1.7 it/s)
+14845.9s 246 [11:54:03 +14807s gap  29s] epoch 29/40 | train 0.2799 | 496s | F1 0.057 prod_rec 0.116 anls 0.610 valid 1.00
+14846.0s 247 [11:54:04 +14808s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch029_loss0.2799.pt (105 MB)
+14847.1s 248 [dataset] version: ocr_vlm_epoch029_loss0.2799.pt
+14856.5s 249 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+14963.8s 250 [11:56:01 +14925s gap 118s]   epoch 30 batch 200/834 loss 0.2857 (1.7 it/s)
+15083.0s 251 [11:58:01 +15045s gap 119s]   epoch 30 batch 400/834 loss 0.2794 (1.7 it/s)
+15200.4s 252 [11:59:58 +15162s gap 117s]   epoch 30 batch 600/834 loss 0.2775 (1.7 it/s)
+15319.1s 253 [12:01:57 +15281s gap 119s]   epoch 30 batch 800/834 loss 0.2648 (1.7 it/s)
+15347.0s 254 [12:02:25 +15309s gap  28s] epoch 30/40 | train 0.2760 | 492s | F1 0.062 prod_rec 0.093 anls 0.593 valid 1.00
+15347.1s 255 [12:02:25 +15309s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch030_loss0.2760.pt (105 MB)
+15348.0s 256 [dataset] version: ocr_vlm_epoch030_loss0.2760.pt
+15357.6s 257 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+15466.5s 258 [12:04:24 +15428s gap 119s]   epoch 31 batch 200/834 loss 0.2734 (1.7 it/s)
+15584.6s 259 [12:06:22 +15546s gap 118s]   epoch 31 batch 400/834 loss 0.2726 (1.7 it/s)
+15703.0s 260 [12:08:21 +15665s gap 118s]   epoch 31 batch 600/834 loss 0.2736 (1.7 it/s)
+15822.2s 261 [12:10:20 +15784s gap 119s]   epoch 31 batch 800/834 loss 0.2657 (1.7 it/s)
+15851.3s 262 [12:10:49 +15813s gap  29s] epoch 31/40 | train 0.2717 | 494s | F1 0.046 prod_rec 0.163 anls 0.606 valid 1.00
+15851.4s 263 [12:10:49 +15813s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch031_loss0.2717.pt (105 MB)
+15852.3s 264 [dataset] version: ocr_vlm_epoch031_loss0.2717.pt
+15862.0s 265 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+15971.3s 266 [12:12:49 +15933s gap 120s]   epoch 32 batch 200/834 loss 0.2683 (1.7 it/s)
+16090.3s 267 [12:14:48 +16052s gap 119s]   epoch 32 batch 400/834 loss 0.2744 (1.7 it/s)
+16208.3s 268 [12:16:46 +16170s gap 118s]   epoch 32 batch 600/834 loss 0.2545 (1.7 it/s)
+16327.4s 269 [12:18:45 +16289s gap 119s]   epoch 32 batch 800/834 loss 0.2590 (1.7 it/s)
+16356.9s 270 [12:19:14 +16319s gap  29s] epoch 32/40 | train 0.2675 | 496s | F1 0.046 prod_rec 0.217 anls 0.643 valid 1.00
+16357.0s 271 [12:19:15 +16319s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch032_loss0.2675.pt (105 MB)
+16357.9s 272 [dataset] version: ocr_vlm_epoch032_loss0.2675.pt
+16367.7s 273 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+16476.8s 274 [12:21:14 +16438s gap 120s]   epoch 33 batch 200/834 loss 0.2631 (1.7 it/s)
+16595.5s 275 [12:23:13 +16557s gap 119s]   epoch 33 batch 400/834 loss 0.2601 (1.7 it/s)
+16715.4s 276 [12:25:13 +16677s gap 120s]   epoch 33 batch 600/834 loss 0.2730 (1.7 it/s)
+16836.3s 277 [12:27:14 +16798s gap 121s]   epoch 33 batch 800/834 loss 0.2565 (1.7 it/s)
+16866.5s 278 [12:27:44 +16828s gap  30s] epoch 33/40 | train 0.2630 | 499s | F1 0.086 prod_rec 0.240 anls 0.745 valid 1.00
+16866.6s 279 [12:27:44 +16828s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch033_loss0.2630.pt (105 MB)
+16867.6s 280 [dataset] version: ocr_vlm_epoch033_loss0.2630.pt
+16877.2s 281 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+16986.7s 282 [12:29:44 +16948s gap 120s]   epoch 34 batch 200/834 loss 0.2694 (1.7 it/s)
+17105.4s 283 [12:31:43 +17067s gap 119s]   epoch 34 batch 400/834 loss 0.2562 (1.7 it/s)
+17224.6s 284 [12:33:42 +17186s gap 119s]   epoch 34 batch 600/834 loss 0.2583 (1.7 it/s)
+17342.3s 285 [12:35:40 +17304s gap 118s]   epoch 34 batch 800/834 loss 0.2620 (1.7 it/s)
+17371.2s 286 [12:36:09 +17333s gap  29s] epoch 34/40 | train 0.2586 | 495s | F1 0.124 prod_rec 0.302 anls 0.845 valid 1.00
+17371.3s 287 [12:36:09 +17333s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch034_loss0.2586.pt (105 MB)
+17372.5s 288 [dataset] version: ocr_vlm_epoch034_loss0.2586.pt
+17381.7s 289 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+17490.1s 290 [12:38:08 +17452s gap 119s]   epoch 35 batch 200/834 loss 0.2551 (1.7 it/s)
+17606.9s 291 [12:40:04 +17568s gap 117s]   epoch 35 batch 400/834 loss 0.2564 (1.7 it/s)
+17725.8s 292 [12:42:03 +17687s gap 119s]   epoch 35 batch 600/834 loss 0.2474 (1.7 it/s)
+17847.5s 293 [12:44:05 +17809s gap 122s]   epoch 35 batch 800/834 loss 0.2411 (1.6 it/s)
+17876.6s 294 [12:44:34 +17838s gap  29s] epoch 35/40 | train 0.2538 | 496s | F1 0.109 prod_rec 0.333 anls 0.798 valid 1.00
+17876.8s 295 [12:44:34 +17838s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch035_loss0.2538.pt (105 MB)
+17877.9s 296 [dataset] version: ocr_vlm_epoch035_loss0.2538.pt
+17887.5s 297 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+17997.8s 298 [12:46:35 +17959s gap 121s]   epoch 36 batch 200/834 loss 0.2591 (1.7 it/s)
+18115.0s 299 [12:48:33 +18077s gap 117s]   epoch 36 batch 400/834 loss 0.2582 (1.7 it/s)
+18230.8s 300 [12:50:28 +18192s gap 116s]   epoch 36 batch 600/834 loss 0.2581 (1.7 it/s)
+18350.3s 301 [12:52:28 +18312s gap 119s]   epoch 36 batch 800/834 loss 0.2370 (1.7 it/s)
+18379.7s 302 [12:52:57 +18341s gap  29s] epoch 36/40 | train 0.2489 | 493s | F1 0.114 prod_rec 0.357 anls 0.820 valid 1.00
+18379.8s 303 [12:52:57 +18341s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch036_loss0.2489.pt (105 MB)
+18380.5s 304 [dataset] version: ocr_vlm_epoch036_loss0.2489.pt
+18390.0s 305 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+18500.4s 306 [12:54:58 +18462s gap 121s]   epoch 37 batch 200/834 loss 0.2388 (1.7 it/s)
+18620.0s 307 [12:56:58 +18582s gap 120s]   epoch 37 batch 400/834 loss 0.2440 (1.7 it/s)
+18737.1s 308 [12:58:55 +18699s gap 117s]   epoch 37 batch 600/834 loss 0.2523 (1.7 it/s)
+18854.7s 309 [13:00:52 +18816s gap 118s]   epoch 37 batch 800/834 loss 0.2337 (1.7 it/s)
+18883.7s 310 [13:01:21 +18845s gap  29s] epoch 37/40 | train 0.2431 | 494s | F1 0.109 prod_rec 0.403 anls 0.838 valid 1.00
+18883.9s 311 [13:01:21 +18845s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch037_loss0.2431.pt (105 MB)
+18885.0s 312 [dataset] version: ocr_vlm_epoch037_loss0.2431.pt
+18894.3s 313 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+19004.4s 314 [13:03:22 +18966s gap 121s]   epoch 38 batch 200/834 loss 0.2501 (1.7 it/s)
+19121.7s 315 [13:05:19 +19083s gap 117s]   epoch 38 batch 400/834 loss 0.2386 (1.7 it/s)
+19240.3s 316 [13:07:18 +19202s gap 119s]   epoch 38 batch 600/834 loss 0.2364 (1.7 it/s)
+19358.2s 317 [13:09:16 +19320s gap 118s]   epoch 38 batch 800/834 loss 0.2404 (1.7 it/s)
+19387.7s 318 [13:09:45 +19349s gap  29s] epoch 38/40 | train 0.2369 | 494s | F1 0.148 prod_rec 0.527 anls 0.888 valid 1.00
+19387.8s 319 [13:09:45 +19349s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch038_loss0.2369.pt (105 MB)
+19388.8s 320 [dataset] version: ocr_vlm_epoch038_loss0.2369.pt
+19399.1s 321 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+19506.0s 322 [13:11:44 +19468s gap 118s]   epoch 39 batch 200/834 loss 0.2286 (1.7 it/s)
+19624.0s 323 [13:13:42 +19586s gap 118s]   epoch 39 batch 400/834 loss 0.2338 (1.7 it/s)
+19741.2s 324 [13:15:39 +19703s gap 117s]   epoch 39 batch 600/834 loss 0.2301 (1.7 it/s)
+19860.0s 325 [13:17:38 +19822s gap 119s]   epoch 39 batch 800/834 loss 0.2346 (1.7 it/s)
+19888.2s 326 [13:18:06 +19850s gap  28s] epoch 39/40 | train 0.2314 | 491s | F1 0.121 prod_rec 0.550 anls 0.862 valid 1.00
+19888.3s 327 [13:18:06 +19850s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch039_loss0.2314.pt (105 MB)
+19889.0s 328 [dataset] version: ocr_vlm_epoch039_loss0.2314.pt
+19898.3s 329 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+20005.5s 330 [13:20:03 +19967s gap 117s]   epoch 40 batch 200/834 loss 0.2350 (1.7 it/s)
+20123.8s 331 [13:22:01 +20085s gap 118s]   epoch 40 batch 400/834 loss 0.2296 (1.7 it/s)
+20241.7s 332 [13:23:59 +20203s gap 118s]   epoch 40 batch 600/834 loss 0.2411 (1.7 it/s)
+20369.9s 333 [13:26:08 +20332s gap 128s]   epoch 40 batch 800/834 loss 0.2189 (1.6 it/s)
+20400.2s 334 [13:26:38 +20362s gap  30s] epoch 40/40 | train 0.2265 | 502s | F1 0.148 prod_rec 0.558 anls 0.904 valid 1.00
+20400.4s 335 [13:26:38 +20362s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch040_loss0.2265.pt (105 MB)
+20401.4s 336 [dataset] version: ocr_vlm_epoch040_loss0.2265.pt
+20411.3s 337 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+20411.3s 338 [13:26:49 +20373s gap  11s] Training done
+20411.3s 339 Training done
+20411.3s 340 Files in /kaggle/working/ocr_ckpts :
+20411.3s 341 dataset-metadata.json                         0.0 MB
+20411.3s 342 ocr_vlm_epoch038_loss0.2369.pt              104.9 MB
+20411.3s 343 ocr_vlm_epoch039_loss0.2314.pt              104.9 MB
+20411.3s 344 ocr_vlm_epoch040_loss0.2265.pt              104.9 MB
+20411.3s 345 tokenizer.json                                0.0 MB
+20411.3s 346 
+20411.3s 347 Durable copy -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+20414.4s 348 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+20414.4s 349 cells[i][c] = re.sub('\\\\\|', '|', cell)
+20414.6s 350 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+20414.6s 351 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+20415.2s 352 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+20415.5s 353 [NbConvertApp] Writing 55653 bytes to __notebook__.ipynb
+20417.8s 354 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+20418.7s 355 [NbConvertApp] Writing 351156 bytes to __results__.html
