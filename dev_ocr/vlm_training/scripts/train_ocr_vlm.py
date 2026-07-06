@@ -42,26 +42,59 @@ from receipt_vlm.utils.metrics import evaluate_tickets  # noqa: E402
 # Data: on-the-fly synthetic (module-level factory so DataLoader workers can fork it).
 
 
-def _render_factory(seed: int, ticket, locale: str, distort: bool, intensity: str):
+def _render_factory(seed: int, ticket, locale: str, distort: bool, intensity: str, return_text: bool):
     def render():
         return render_receipt_image(
             ticket, seed=seed, diverse=True, distort=distort,
-            distort_intensity=intensity, locale=locale,
+            distort_intensity=intensity, locale=locale, return_text=return_text,
         )
     return render
 
 
-def build_synthetic_samples(n, langs, seed, distort, intensity) -> list[ReceiptSample]:
+def build_synthetic_samples(n, langs, seed, distort, intensity, return_text) -> list[ReceiptSample]:
     samples: list[ReceiptSample] = []
     for i in range(n):
         locale = langs[i % len(langs)]
         s = seed + i
         ticket = generate_ticket(seed=s, locale=locale)
         samples.append(ReceiptSample(
-            image=_render_factory(s, ticket, locale, distort, intensity),
+            image=_render_factory(s, ticket, locale, distort, intensity, return_text),
             ticket=ticket, source="synthetic",
         ))
     return samples
+
+
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _cer(pred: str, gold: str) -> float:
+    return _levenshtein(pred, gold) / max(1, len(gold))
+
+
+def _wer(pred: str, gold: str) -> float:
+    a, b = pred.split(), gold.split()
+    if a == b:
+        return 0.0
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1] / max(1, len(b))
 
 
 # ----------------------------------------------------------------------
@@ -107,7 +140,7 @@ def _prune_checkpoints(ckpt_dir: Path, keep_last: int) -> None:
 
 
 @torch.no_grad()
-def _quick_eval(model, samples, device, max_len, limit) -> dict:
+def _eval_schema(model, samples, device, max_len, limit) -> dict:
     model.eval()
     subset = samples[:limit]
     px = torch.stack([
@@ -119,8 +152,25 @@ def _quick_eval(model, samples, device, max_len, limit) -> dict:
     return metrics
 
 
+@torch.no_grad()
+def _eval_transcription(model, samples, device, max_len, limit) -> dict:
+    """READ eval: generate text, compare to the gold visible transcription (CER / WER)."""
+    model.eval()
+    imgs, golds = [], []
+    for s in samples[:limit]:
+        img, text = s.image()  # transcription samples render (image, text) together
+        imgs.append(torch.from_numpy(prepare_ocr_pixels(img)))
+        golds.append(text)
+    preds = model.generate(torch.stack(imgs).to(device), max_len=max_len, return_text=True)
+    cer = sum(_cer(p, g) for p, g in zip(preds, golds)) / len(golds)
+    wer = sum(_wer(p, g) for p, g in zip(preds, golds)) / len(golds)
+    return {"cer": cer, "wer": wer}
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--target", default="transcription", choices=("transcription", "schema"),
+                   help="Stage A READ = transcription (all visible text); Stage B = schema (fields)")
     p.add_argument("--n", type=int, default=20000, help="synthetic receipts per epoch")
     p.add_argument("--languages", default="fr,en,es,de,it")
     p.add_argument("--epochs", type=int, default=40)
@@ -158,11 +208,13 @@ def main() -> None:
     if not tok_path.is_file():
         tokenizer.save(tok_path)
 
-    print(f"langs {langs} | n/epoch {args.n} | vocab {tokenizer.vocab_size} | device {device}", flush=True)
+    print(f"target {args.target} | langs {langs} | n/epoch {args.n} | "
+          f"vocab {tokenizer.vocab_size} | device {device}", flush=True)
 
-    dataset = OcrDataset(build_synthetic_samples(args.n, langs, args.seed, args.distort,
-                                                 args.distort_intensity),
-                         tokenizer, IMG_H, IMG_W, args.max_len)
+    return_text = args.target == "transcription"
+    samples = build_synthetic_samples(args.n, langs, args.seed, args.distort,
+                                      args.distort_intensity, return_text)
+    dataset = OcrDataset(samples, tokenizer, IMG_H, IMG_W, args.max_len, target_mode=args.target)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
                         num_workers=args.num_workers, collate_fn=make_ocr_collate(tokenizer.pad_id),
                         pin_memory=(device == "cuda"), persistent_workers=args.num_workers > 0)
@@ -214,9 +266,13 @@ def main() -> None:
 
         line = f"epoch {epoch+1}/{args.epochs} | train {avg:.4f} | {time.time()-start:.0f}s"
         if args.eval_every and (epoch + 1) % args.eval_every == 0:
-            m = _quick_eval(model, dataset.samples, device, args.eval_max_len, args.eval_n)
-            line += (f" | F1 {m['field_f1']:.3f} prod_rec {m['product_recall']:.3f} "
-                     f"anls {m['anls']:.3f} valid {m['valid']:.2f}")
+            if args.target == "transcription":
+                m = _eval_transcription(model, dataset.samples, device, args.eval_max_len, args.eval_n)
+                line += f" | CER {m['cer']:.3f} WER {m['wer']:.3f}"
+            else:
+                m = _eval_schema(model, dataset.samples, device, args.eval_max_len, args.eval_n)
+                line += (f" | F1 {m['field_f1']:.3f} prod_rec {m['product_recall']:.3f} "
+                         f"anls {m['anls']:.3f} valid {m['valid']:.2f}")
         print(line, flush=True)
 
         _save_checkpoint(ckpt_dir, model, optimizer, epoch + 1, avg)

@@ -12,8 +12,18 @@ import datetime
 import io
 import json
 import random
+import re
 from pathlib import Path
 from typing import Optional
+
+# A line that is only separators / whitespace (====, ----, ....) carries no text.
+_SEPARATOR_LINE = re.compile(r"^[\s\-=*#._]*$")
+
+
+def _lines_to_transcription(lines: list[str]) -> str:
+    """Joined visible text of a rendered receipt (drops separator-only lines) — the READ target."""
+    kept = [ln.strip() for ln in lines if not _SEPARATOR_LINE.match(ln)]
+    return "\n".join(ln for ln in kept if ln)
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
@@ -708,7 +718,8 @@ def render_receipt_image(
     distort_intensity: str = "medium",
     locale: Optional[str] = None,
     distort_variations: "set[str] | None" = None,
-) -> Image.Image:
+    return_text: bool = False,
+):
     """Render a :class:`Ticket` as a PIL receipt image.
 
     Args:
@@ -721,6 +732,8 @@ def render_receipt_image(
         locale: language pack for printed UI words (default French).
         distort_variations: subset of transforms to enable (see
             :func:`distort_receipt_image`); ``None`` = all.
+        return_text: if True, return ``(image, transcription)`` where transcription is the
+            joined visible text actually drawn (the READ / Stage-A pretraining target).
     """
     from receipt_vlm.data.locales import get_locale
 
@@ -756,6 +769,8 @@ def render_receipt_image(
             variations=distort_variations,
         )
 
+    if return_text:
+        return img, _lines_to_transcription(lines)
     return img
 
 

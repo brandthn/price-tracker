@@ -27,20 +27,29 @@ class OcrDataset(Dataset):
         img_h: int = IMG_H,
         img_w: int = IMG_W,
         max_len: int = 640,
+        target_mode: str = "schema",
     ) -> None:
+        if target_mode not in ("schema", "transcription"):
+            raise ValueError(f"target_mode must be schema|transcription, got {target_mode!r}")
         self.samples = samples
         self.tokenizer = tokenizer
         self.img_h, self.img_w = img_h, img_w
         self.max_len = max_len
+        self.target_mode = target_mode
 
     def __len__(self) -> int:
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         sample = self.samples[idx]
-        image = _load_image(sample.image)
+        if self.target_mode == "transcription":
+            # sample.image is a callable rendering (image, transcription) together, so the
+            # target matches the exact pixels (Stage-A READ: image -> all visible text).
+            image, target = sample.image()
+        else:  # schema (Stage-B / M0): image -> linearized canonical schema
+            image = _load_image(sample.image)
+            target = ticket_to_linear(sample.ticket)
         pixels = prepare_ocr_pixels(image, self.img_h, self.img_w)
-        target = ticket_to_linear(sample.ticket)
         ids = self.tokenizer.encode(target)[: self.max_len]
         if ids[-1] != self.tokenizer.eos_id:  # keep EOS after truncation
             ids[-1] = self.tokenizer.eos_id
