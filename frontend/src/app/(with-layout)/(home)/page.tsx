@@ -4,12 +4,14 @@ import {
   getInflationMap,
   getNationalIndex,
   getRankings,
+  type Granularity,
 } from "@/lib/api/indices";
 import type { InflationIndex } from "@/lib/api/types";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { FranceMap } from "@/components/charts/france-map";
 import { MoversList } from "@/components/charts/movers-list";
 import { DeltaPill } from "@/components/ui/delta-pill";
+import { GranularityToggle } from "@/components/ui/granularity-toggle";
 import { formatDateLong, formatNumber } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
@@ -18,13 +20,23 @@ export const dynamic = "force-dynamic";
 // de lecteur — « ça augmente de combien ? », « où ? », « sur quoi ? ».
 // Toutes les sources sont indépendantes (Promise.allSettled) : une table
 // Gold vide ou une erreur BQ ne fait jamais tomber la page entière.
-export default async function ObservatoirePage() {
+// La granularité (semaine/mois) est portée par le searchParam `?g=` et
+// propagée à toutes les requêtes.
+export default async function ObservatoirePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ g?: string }>;
+}) {
+  const { g } = await searchParams;
+  const gran: Granularity = g === "month" ? "month" : "week";
+  const perStep = gran === "month" ? "d'un mois à l'autre" : "d'une semaine à l'autre";
+
   const [nationalR, mapR, upR, downR, shameR] = await Promise.allSettled([
-    getNationalIndex(),
-    getInflationMap(),
-    getRankings(8, "up"),
-    getRankings(8, "down"),
-    getHallOfShame(5),
+    getNationalIndex(gran),
+    getInflationMap(gran),
+    getRankings(8, "up", gran),
+    getRankings(8, "down", gran),
+    getHallOfShame(5, gran),
   ]);
 
   const national = settled(nationalR);
@@ -33,19 +45,18 @@ export default async function ObservatoirePage() {
   const down = settled(downR);
   const shame = settled(shameR);
 
-  const apiDown =
-    !national && !map && !up && !down && !shame;
+  const apiDown = !national && !map && !up && !down && !shame;
 
   return (
     <>
-      <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-heading-5 font-bold text-dark dark:text-white sm:text-heading-4">
-            L&apos;inflation en France, cette semaine
+            L&apos;inflation en France
           </h1>
           <p className="mt-1 max-w-xl text-sm text-dark-5 dark:text-dark-6">
-            Des prix réellement relevés en magasin — pas des moyennes
-            abstraites. Suivez ce qui monte, ce qui baisse, et où.
+            Suivi des prix à partir de relevés en magasin : indice d&apos;ensemble,
+            évolutions par produit et lecture régionale.
           </p>
         </div>
         <Link
@@ -56,6 +67,13 @@ export default async function ObservatoirePage() {
         </Link>
       </div>
 
+      <div className="mb-6 flex items-center gap-3">
+        <GranularityToggle value={gran} />
+        <span className="text-xs text-dark-5 dark:text-dark-6">
+          Granularité de lecture
+        </span>
+      </div>
+
       {apiDown && (
         <div className="mb-6 rounded-2xl border border-red-light bg-red-light-6 p-5 text-sm text-red dark:border-red-dark dark:bg-red/10">
           L&apos;observatoire est momentanément indisponible. Réessayez dans
@@ -64,7 +82,7 @@ export default async function ObservatoirePage() {
       )}
 
       {/* ── Indice national ─────────────────────────────────────────── */}
-      <NationalIndexCard index={national} />
+      <NationalIndexCard index={national} granularity={gran} />
 
       {/* ── Carte + mouvements ──────────────────────────────────────── */}
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
@@ -73,7 +91,7 @@ export default async function ObservatoirePage() {
             Et près de chez vous ?
           </h2>
           <p className="mb-4 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-            Variation des prix sur 4 semaines, par département
+            Variation des prix par département
             {map?.period && <> · relevés jusqu&apos;au {formatDateLong(map.period)}</>}
           </p>
           {map && map.values.length > 0 ? (
@@ -92,7 +110,7 @@ export default async function ObservatoirePage() {
               Ce qui monte
             </h2>
             <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-              Les plus fortes hausses d&apos;une semaine à l&apos;autre
+              Les plus fortes hausses {perStep}
             </p>
             <MoversList
               items={up?.items ?? []}
@@ -105,7 +123,7 @@ export default async function ObservatoirePage() {
               Ce qui baisse
             </h2>
             <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-              Les baisses à saisir en ce moment
+              Les baisses à saisir {perStep}
             </p>
             <MoversList
               items={down?.items ?? []}
@@ -119,11 +137,11 @@ export default async function ObservatoirePage() {
       {shame && shame.items.length > 0 && (
         <section className="mt-6 rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
           <h2 className="text-lg font-bold text-dark dark:text-white">
-            Les hausses qui font mal
+            Les hausses les plus visibles
           </h2>
           <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-            Produits très relevés ET en forte hausse — ceux que tout le monde
-            voit passer en caisse
+            Produits très relevés et en forte hausse — ceux qui pèsent le plus en
+            caisse
           </p>
           <MoversList items={shame.items} emptyMessage="" />
         </section>
@@ -134,12 +152,11 @@ export default async function ObservatoirePage() {
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h2 className="text-lg font-bold text-dark dark:text-white">
-              Et vous, votre inflation ?
+              Et vos dépenses ?
             </h2>
             <p className="mt-1 max-w-lg text-sm text-dark-5 dark:text-dark-6">
-              Photographiez vos tickets de caisse : PriceTracker suit votre
-              panier réel, vos produits habituels et vos dépenses mois par
-              mois.
+              Ajoutez vos tickets de caisse : PriceTracker suit votre panier
+              réel, vos produits habituels et vos dépenses mois par mois.
             </p>
           </div>
           <Link
@@ -154,11 +171,18 @@ export default async function ObservatoirePage() {
   );
 }
 
-function NationalIndexCard({ index }: { index: InflationIndex | null }) {
+function NationalIndexCard({
+  index,
+  granularity,
+}: {
+  index: InflationIndex | null;
+  granularity: Granularity;
+}) {
   const hasSeries = !!index && index.series.length >= 2;
   const deltaPct =
     hasSeries && index.current != null ? index.current - 100 : null;
   const lastPoint = hasSeries ? index.series[index.series.length - 1] : null;
+  const stepLabel = granularity === "month" ? "ce mois" : "cette semaine";
 
   return (
     <section className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
@@ -190,8 +214,7 @@ function NationalIndexCard({ index }: { index: InflationIndex | null }) {
                 {lastPoint?.sample_size != null && (
                   <>
                     {" "}
-                    · {formatNumber(lastPoint.sample_size)} relevés cette
-                    semaine
+                    · {formatNumber(lastPoint.sample_size)} relevés {stepLabel}
                   </>
                 )}
               </p>
@@ -214,7 +237,7 @@ function NationalIndexCard({ index }: { index: InflationIndex | null }) {
               }))}
               unit="index"
               baseline={100}
-              ariaLabel="Indice d'inflation PriceTracker, semaine par semaine (base 100)"
+              ariaLabel="Indice d'inflation PriceTracker (base 100)"
             />
           </div>
         )}

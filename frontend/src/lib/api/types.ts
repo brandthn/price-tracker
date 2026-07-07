@@ -94,6 +94,7 @@ export interface Product {
   ecoscore: string | null;
   image_url: string | null;
   off_found: boolean;
+  catalog: boolean;
   source: string | null;
 }
 
@@ -123,6 +124,8 @@ export interface RankingItem {
   ean: string | null;
   produit_nom: string | null;
   brand: string | null;
+  image_url: string | null;
+  in_catalog: boolean;
   pct_change: number;
   price_eur_current: number | null;
   price_eur_previous: number | null;
