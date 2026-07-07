@@ -72,11 +72,39 @@ _DATA = Path(__file__).resolve().parents[1].parent / "data"
 REAL_TRAIN_SETS = ("wildreceipt", "expressexpense_srd")
 
 
+def _has_data(d: Path) -> bool:
+    return (d / "raw").is_dir() and (d / "labels").is_dir()
+
+
+def _resolve_real_base(base: Path) -> Path:
+    """Find the dir actually holding ``raw/`` + ``labels/``. A Kaggle Dataset upload may nest the
+    extracted zip one level down, or leave the zip unextracted — handle both so a layout quirk
+    doesn't waste a GPU run."""
+    if _has_data(base):
+        return base
+    if base.is_dir():  # Kaggle sometimes nests extracted contents in a subfolder
+        for sub in sorted(p for p in base.iterdir() if p.is_dir()):
+            if _has_data(sub):
+                return sub
+    zips = sorted(base.glob("*.zip")) if base.is_dir() else []
+    if zips:  # unextracted zip attached as-is
+        import zipfile
+        work = Path("/kaggle/working")
+        dest = (work if work.is_dir() else base.parent) / "_real_data_extracted"
+        dest.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(zips[0]) as z:
+            z.extractall(dest)
+        for cand in (dest, *(p for p in dest.iterdir() if p.is_dir())):
+            if _has_data(cand):
+                return cand
+    return base  # fall through; caller reports + lists contents
+
+
 def build_real_train_samples(repeat: int, data_dir: str | None = None) -> list[ReceiptSample]:
     """Load the real train splits (schema target only). ``repeat`` oversamples the small real
     set so it isn't drowned by the on-the-fly synthetic each epoch. ``data_dir`` overrides the
     base holding ``raw/<name>`` + ``labels/<name>`` (e.g. an attached Kaggle Dataset path)."""
-    base = Path(data_dir) if data_dir else _DATA
+    base = _resolve_real_base(Path(data_dir) if data_dir else _DATA)
     real: list[ReceiptSample] = []
     for name in REAL_TRAIN_SETS:
         images_dir, labels_dir = base / "raw" / name, base / "labels" / name
@@ -87,7 +115,11 @@ def build_real_train_samples(repeat: int, data_dir: str | None = None) -> list[R
         print(f"  [real] {name}: {len(got)} train receipts", flush=True)
         real.extend(got)
     if not real:
-        raise SystemExit(f"--real set but no real samples found under {base} (raw/ + labels/).")
+        listing = ", ".join(sorted(p.name for p in base.iterdir())) if base.is_dir() else "<not a dir>"
+        raise SystemExit(
+            f"--real set but no real samples under {base} (need raw/<name> + labels/<name>).\n"
+            f"  contents of {base}: {listing}\n"
+            f"  point --real-data-dir at the dir that directly contains raw/ and labels/.")
     return real * max(1, repeat)
 
 

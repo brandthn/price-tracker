@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import time
 from pathlib import Path
@@ -35,18 +36,53 @@ from receipt_vlm.data.schema import Ticket  # noqa: E402
 from receipt_vlm.data.synthetic import generate_ticket, render_receipt_image  # noqa: E402
 from receipt_vlm.data.tokenizer import CharTokenizer  # noqa: E402
 from receipt_vlm.models.ocr_vlm import OcrVLM  # noqa: E402
-from receipt_vlm.utils.metrics import evaluate_tickets  # noqa: E402
+from receipt_vlm.utils.metrics import evaluate_tickets, levenshtein  # noqa: E402
 
-# Real datasets with the {splits,review_status}.json convention. Paths are resolved relative to
-# dev_ocr/data (parents[2] == dev_ocr). SRD's test split is Groq-pseudo-labelled (unreviewed),
-# so it is only included with --include-unreviewed.
+
+def _read_text(t: Ticket) -> str:
+    """All readable text of a ticket (store + product names, in order), normalized to lowercase
+    alphanumerics. Drops spaces/punctuation/currency so it survives WildReceipt's space-stripped
+    gold and cross-currency prices — a pure 'did the glyphs get read' signal."""
+    parts = [t.chaine_supermarche] + [p.nom_produit for p in t.produits]
+    return re.sub(r"[^a-z0-9]", "", " ".join(parts).lower())
+
+
+def _read_accuracy(preds: list[Ticket], golds: list[Ticket]) -> float:
+    """Mean char-level read accuracy = 1 - CER over the concatenated readable text (order-preserving,
+    field-segmentation-agnostic). Complements field_f1/product_recall, which exact-match-penalize a
+    near-correct read to 0."""
+    scores = []
+    for pred, gold in zip(preds, golds):
+        g = _read_text(gold)
+        if not g:
+            continue
+        scores.append(max(0.0, 1.0 - levenshtein(_read_text(pred), g) / len(g)))
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def score(preds: list[Ticket], golds: list[Ticket]) -> dict:
+    """evaluate_tickets + the read-accuracy column."""
+    m = evaluate_tickets(preds, golds)
+    m["read_acc"] = _read_accuracy(preds, golds)
+    return m
+
+# Real datasets with the {splits,review_status}.json convention, under a base holding
+# raw/<name> + labels/<name>. Default base is dev_ocr/data (parents[2] == dev_ocr); override with
+# --data-dir (e.g. an attached Kaggle Dataset). SRD is unreviewed → only with --include-unreviewed.
 _DATA = Path(__file__).resolve().parents[2] / "data"
-DEFAULT_DATASETS = {
-    "cord_v2": (_DATA / "raw/cord_v2", _DATA / "labels/cord_v2"),
-    "wildreceipt": (_DATA / "raw/wildreceipt", _DATA / "labels/wildreceipt"),
-    "trainingdatapro": (_DATA / "raw/trainingdatapro", _DATA / "labels/trainingdatapro"),
-    "expressexpense_srd": (_DATA / "raw/expressexpense_srd", _DATA / "labels/expressexpense_srd"),
-}
+DATASET_NAMES = ("cord_v2", "wildreceipt", "trainingdatapro", "expressexpense_srd")
+
+
+def _resolve_data_base(data_dir: Optional[str]) -> Path:
+    """Find the dir actually holding raw/ + labels/. Handles a --data-dir that points a level above
+    (Kaggle nests inputs under /kaggle/input/datasets/<slug>/...) via a recursive search."""
+    base = Path(data_dir) if data_dir else _DATA
+    if (base / "raw").is_dir() and (base / "labels").is_dir():
+        return base
+    for labels in base.glob("**/labels") if base.is_dir() else []:
+        if (labels.parent / "raw").is_dir():
+            return labels.parent
+    return base  # fall through; per-dataset load will report missing dirs
 
 
 def _resolve_tokenizer(checkpoint: Path, explicit: Optional[str]) -> Path:
@@ -95,10 +131,11 @@ def build_synthetic(n: int, langs: list[str], seed: int) -> list[ReceiptSample]:
 
 
 ROWS = (
+    ("read_acc", "Read acc (1-CER)"),
+    ("product_recall", "Product recall"),
     ("field_f1", "Field F1"),
     ("field_precision", "Field precision"),
     ("field_recall", "Field recall"),
-    ("product_recall", "Product recall"),
     ("anls", "ANLS"),
     ("price_mae", "Price MAE"),
     ("date_accuracy", "Date exact match"),
@@ -143,7 +180,10 @@ def main() -> None:
     p.add_argument("--tokenizer", default=None, help="default: tokenizer*.json next to checkpoint")
     p.add_argument("--split", default="test")
     p.add_argument("--datasets", nargs="*", default=["cord_v2", "wildreceipt", "trainingdatapro"],
-                   help="keys from DEFAULT_DATASETS")
+                   help=f"dataset keys: {DATASET_NAMES}")
+    p.add_argument("--data-dir", default=None,
+                   help="base holding raw/<name>+labels/<name> (e.g. attached Kaggle Dataset); "
+                        "defaults to dev_ocr/data")
     p.add_argument("--include-unreviewed", action="store_true",
                    help="keep unreviewed labels (adds SRD's pseudo-labelled test split)")
     p.add_argument("--synthetic", type=int, default=0, help="also eval N held-out synthetic")
@@ -166,16 +206,26 @@ def main() -> None:
           f"vocab {tokenizer.vocab_size} | max_len {max_len} | device {args.device}\n"
           f"checkpoint {checkpoint.name} | tokenizer {tok_path.name}")
 
+    data_base = _resolve_data_base(args.data_dir)
+    if args.datasets:
+        print(f"data base: {data_base}")
     results: list[tuple[str, dict]] = []
     all_preds: list[Ticket] = []
     all_golds: list[Ticket] = []
 
     for key in args.datasets:
-        if key not in DEFAULT_DATASETS:
-            raise SystemExit(f"unknown dataset {key!r}; choices: {sorted(DEFAULT_DATASETS)}")
-        images_dir, labels_dir = DEFAULT_DATASETS[key]
+        if key not in DATASET_NAMES:
+            raise SystemExit(f"unknown dataset {key!r}; choices: {sorted(DATASET_NAMES)}")
+        images_dir, labels_dir = data_base / "raw" / key, data_base / "labels" / key
         req = False if args.include_unreviewed else None  # None -> reviewed on the test split
-        samples = load_real_samples(images_dir, labels_dir, split=args.split, require_reviewed=req)
+        if not labels_dir.is_dir():
+            print(f"[{key}] not under {data_base} — skipping")
+            continue
+        try:
+            samples = load_real_samples(images_dir, labels_dir, split=args.split, require_reviewed=req)
+        except FileNotFoundError as e:  # e.g. splits.json absent for this source
+            print(f"[{key}] skipping: {e}")
+            continue
         if args.limit:
             samples = samples[:args.limit]
         if not samples:
@@ -184,7 +234,7 @@ def main() -> None:
         print(f"[{key}] {len(samples)} receipts...")
         t0 = time.time()
         preds = predict(model, samples, args.device, args.batch_size, max_len)
-        metrics = evaluate_tickets(preds, [s.ticket for s in samples])
+        metrics = score(preds, [s.ticket for s in samples])
         print(f"[{key}] done in {time.time()-t0:.0f}s")
         results.append((key, metrics))
         all_preds.extend(preds)
@@ -196,11 +246,11 @@ def main() -> None:
         samples = build_synthetic(args.synthetic, langs, args.synthetic_seed)
         print(f"[synthetic] {len(samples)} held-out receipts...")
         preds = predict(model, samples, args.device, args.batch_size, max_len)
-        results.append(("synthetic", evaluate_tickets(preds, [s.ticket for s in samples])))
+        results.append(("synthetic", score(preds, [s.ticket for s in samples])))
         dump_examples("synthetic", samples, preds, args.examples)
 
     if len(all_golds) > 1 and len([r for r in results if r[0] != "synthetic"]) > 1:
-        results.insert(0, ("REAL-all", evaluate_tickets(all_preds, all_golds)))
+        results.insert(0, ("REAL-all", score(all_preds, all_golds)))
 
     if not results:
         raise SystemExit("No samples evaluated.")

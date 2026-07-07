@@ -1,0 +1,42 @@
+{
+  "REAL-all": {
+    "field_f1": 0.0,
+    "field_precision": 0.0,
+    "field_recall": 0.0,
+    "anls": 0.18308399102536493,
+    "price_mae": 32.74,
+    "product_recall": 0.001869158878504673,
+    "date_accuracy": 0.0,
+    "n_samples": 433.0
+  },
+  "wildreceipt": {
+    "field_f1": 0.0,
+    "field_precision": 0.0,
+    "field_recall": 0.0,
+    "anls": 0.18376491622680924,
+    "price_mae": 32.74,
+    "product_recall": 0.001943634596695821,
+    "date_accuracy": 0.0,
+    "n_samples": 424.0
+  },
+  "trainingdatapro": {
+    "field_f1": 0.0,
+    "field_precision": 0.0,
+    "field_recall": 0.0,
+    "anls": 0.13512740183792818,
+    "price_mae": 0.0,
+    "product_recall": 0.0,
+    "date_accuracy": 0.0,
+    "n_samples": 9.0
+  },
+  "synthetic": {
+    "field_f1": 0.06827309236947791,
+    "field_precision": 0.06741573033707865,
+    "field_recall": 0.06915254237288136,
+    "anls": 0.762698411005366,
+    "price_mae": 0.21973118279569892,
+    "product_recall": 0.33574007220216606,
+    "date_accuracy": 0.0,
+    "n_samples": 128.0
+  }
+}
