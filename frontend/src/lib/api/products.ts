@@ -1,5 +1,10 @@
 import { apiFetch } from "./client";
-import type { Product, ProductSearchResult, Substitute } from "./types";
+import type {
+  Product,
+  ProductPrices,
+  ProductSearchResult,
+  Substitute,
+} from "./types";
 
 export function searchProducts(
   q: string,
@@ -19,4 +24,10 @@ export function getSubstitutes(ean: string, k = 5): Promise<Substitute[]> {
   );
 }
 
-export type { Product, Substitute };
+export function getProductPrices(ean: string): Promise<ProductPrices> {
+  return apiFetch<ProductPrices>(
+    `/products/${encodeURIComponent(ean)}/prices`,
+  );
+}
+
+export type { Product, ProductPrices, Substitute };

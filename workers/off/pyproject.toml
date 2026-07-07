@@ -20,6 +20,10 @@ dependencies = [
     "google-cloud-aiplatform==1.74.0",
     "google-auth==2.36.0",
     "tenacity==9.0.0",
+    # kNN all-pairs en mémoire (BLAS) pour le calcul batch des substituts (Étape 2)
+    # — plus rapide/exact/robuste qu'un ANN pgvector en join corrélé. Déjà présent
+    # (transitif via aiplatform), rendu explicite ici.
+    "numpy==2.4.6",
 ]
 
 [dependency-groups]

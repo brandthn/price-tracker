@@ -73,6 +73,33 @@ def test_parse_found_product_carries_embedding_fields() -> None:
     assert p.quantity == "1 kg"
 
 
+def test_parse_carries_normalized_quantity_fields() -> None:
+    """Socle unité : product_quantity (numérique, en g/ml chez OFF) +
+    product_quantity_unit sont récupérés bruts (le cast/normalisation a lieu à
+    l'écriture via quantity.normalize_quantity). OFF renvoie parfois un nombre."""
+    payload = {
+        "status": 1,
+        "product": {
+            "product_name_fr": "Coca-Cola",
+            "brands": "Coca-Cola",
+            "quantity": "1,5 L",
+            "product_quantity": 1500,  # nombre côté API
+            "product_quantity_unit": "ml",
+        },
+    }
+    p = _to_off_product("5449000000996", payload)
+    assert p.quantity == "1,5 L"  # texte libre → quantity_raw
+    assert p.product_quantity == "1500"  # stocké en texte (parité dump VARCHAR)
+    assert p.product_quantity_unit == "ml"
+
+
+def test_parse_missing_quantity_fields_default_none() -> None:
+    payload = {"status": 1, "product": {"product_name_fr": "Sel"}}
+    p = _to_off_product("0000000000000", payload)
+    assert p.product_quantity is None
+    assert p.product_quantity_unit is None
+
+
 def test_parse_not_found() -> None:
     p = _to_off_product("999", {"status": 0, "status_verbose": "no match"})
     assert p.found is False

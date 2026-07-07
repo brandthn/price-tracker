@@ -24,10 +24,6 @@ class InflationIndexOut(BaseModel):
     )
     current: float | None = Field(default=None, description="Valeur la plus récente.")
     series: list[IndexPoint] = Field(default_factory=list)
-    insee_comparison: float | None = Field(
-        default=None,
-        description="Indice INSEE COICOP correspondant à la même période, si dispo.",
-    )
 
 
 class RankingItem(BaseModel):

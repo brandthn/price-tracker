@@ -26,9 +26,12 @@ logger = get_logger(__name__)
 
 # Champs explicitement demandés à OFF — limite la taille de la réponse et
 # rend le contrat de schéma explicite côté worker.
-# generic_name / labels_tags / quantity servent UNIQUEMENT à construire le texte
-# d'embedding « balanced » (cf. embedding_text.build_embedding_text) — ils ne
-# sont PAS persistés en base. Ils existent aussi dans le dump OFF, d'où la parité.
+# - generic_name / labels_tags / quantity servent au texte d'embedding « balanced »
+#   (cf. embedding_text.build_embedding_text) ; `quantity` est EN PLUS persisté
+#   tel quel dans products.quantity_raw (affichage/audit).
+# - product_quantity + product_quantity_unit : socle unité (§5.2) — persistés
+#   normalisés (g→kg, ml→L) dans products.quantity_value / quantity_unit.
+# Tous existent aussi dans le dump OFF, d'où la parité API↔dump.
 _FIELDS = ",".join(
     [
         "code",
@@ -40,6 +43,8 @@ _FIELDS = ",".join(
         "categories_tags",
         "labels_tags",
         "quantity",
+        "product_quantity",
+        "product_quantity_unit",
         "nutriscore_grade",
         "nova_group",
         "ecoscore_grade",
@@ -53,11 +58,17 @@ _FIELDS = ",".join(
 class OFFProduct:
     """Vue normalisée des champs OFF utilisés par le worker.
 
-    Les 4 derniers champs (`generic_name`, `categories_tags`, `labels_tags`,
-    `quantity`) ne sont **pas persistés** en base : ils servent uniquement à
-    construire le texte d'embedding via `embedding_text.build_embedding_text`.
-    Ils ont un défaut pour que les constructions « tombstone » et la
-    reconstruction depuis l'artefact (load_artifact) restent inchangées.
+    `generic_name` / `categories_tags` / `labels_tags` servent uniquement à
+    construire le texte d'embedding (`embedding_text.build_embedding_text`) et ne
+    sont pas persistés tels quels.
+
+    Les champs quantité SONT persistés (socle unité, Étape 1 reco) :
+    - `quantity` (texte libre OFF) → products.quantity_raw + texte d'embedding ;
+    - `product_quantity` + `product_quantity_unit` (colonnes OFF normalisées) →
+      products.quantity_value / quantity_unit via `quantity.normalize_quantity`.
+
+    Tous ont un défaut pour que les « tombstone » et la reconstruction depuis
+    l'artefact (load_artifact) restent inchangées.
     """
 
     ean: str
@@ -71,11 +82,24 @@ class OFFProduct:
     ecoscore: str | None
     image_url: str | None
     found: bool
-    # --- champs texte-embedding uniquement (non persistés) ---
+    # --- champs texte-embedding (non persistés tels quels) ---
     generic_name: str | None = None
     categories_tags: list[str] | None = None  # hiérarchie brute (en:/fr:), général->spécifique
     labels_tags: list[str] | None = None  # brut (en:/fr:)
-    quantity: str | None = None
+    # --- socle unité (persisté) ---
+    quantity: str | None = None  # texte libre OFF (« 500 g ») → quantity_raw + embedding
+    product_quantity: str | None = None  # numérique OFF (g ou ml), VARCHAR côté OFF
+    product_quantity_unit: str | None = None  # 'g' | 'ml' (rarement 'kg'/'l')
+
+
+def _str_or_none(v: Any) -> str | None:
+    """OFF renvoie `product_quantity` tantôt en nombre, tantôt en string. On le
+    stocke en texte (parité avec le dump, VARCHAR) ; le cast float a lieu au
+    calcul (`quantity.normalize_quantity`)."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s or None
 
 
 def _parse_categories(tags: list[str] | None) -> tuple[str | None, str | None, str | None]:
@@ -123,11 +147,14 @@ def _to_off_product(ean: str, payload: dict[str, Any]) -> OFFProduct:
         ecoscore=(product.get("ecoscore_grade") or "").upper() or None,
         image_url=product.get("image_front_url") or product.get("image_url") or None,
         found=True,
-        # champs texte-embedding (non persistés) — normalisés à parité avec le dump
+        # champs texte-embedding — normalisés à parité avec le dump
         generic_name=product.get("generic_name_fr") or product.get("generic_name") or None,
         categories_tags=product.get("categories_tags") or None,
         labels_tags=product.get("labels_tags") or None,
+        # socle unité — bruts OFF, normalisés à l'écriture (pg.normalize_quantity)
         quantity=(product.get("quantity") or "").strip() or None,
+        product_quantity=_str_or_none(product.get("product_quantity")),
+        product_quantity_unit=(product.get("product_quantity_unit") or "").strip() or None,
     )
 
 

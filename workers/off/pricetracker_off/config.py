@@ -58,6 +58,26 @@ class Settings(BaseSettings):
     )
     prt_vertex_output_dim: int = Field(default=768)
 
+    # Reco substituts (Étape 2) — knobs à régler sur 20-30 paires réelles -----
+    # Prix : médian/EAN depuis open_prices_clean. Décision Étape 0 : fenêtre
+    # large + seuil bas (la CTE weekly d'indices, per-week min 3, écrase à ~27).
+    prt_reco_price_window_weeks: int = Field(default=52)
+    prt_reco_price_min_obs: int = Field(default=1)
+    prt_reco_knn_k: int = Field(
+        default=40, description="Voisins kNN sur-fetchés par source (on filtre ensuite prix + moins cher)."
+    )
+    prt_reco_top_n: int = Field(default=8, description="Substituts retenus par source.")
+    prt_reco_max_per_brand: int = Field(
+        default=2, description="Plafond de substituts d'une même marque (diversité)."
+    )
+    # Score : catégorie dominante, embedding borné (cf. substitutions.ScoreWeights).
+    prt_reco_w_cat: float = Field(default=0.75)
+    prt_reco_w_emb: float = Field(default=0.50)
+    prt_reco_cos_floor: float = Field(default=0.35)
+    prt_reco_cos_ref: float = Field(default=0.75)
+    prt_reco_tier1_cat: float = Field(default=0.80)
+    prt_reco_tier2_cat: float = Field(default=0.30)
+
     # Cloud SQL -----------------------------------------------------------
     prt_pg_host: str = Field(default="")
     prt_pg_port: int = Field(default=5432)

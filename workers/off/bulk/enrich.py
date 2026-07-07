@@ -65,6 +65,8 @@ SELECT
     p.categories_tags           AS categories_tags,     -- VARCHAR[] (général -> spécifique)
     p.labels_tags               AS labels_tags,         -- VARCHAR[]
     p.quantity                  AS quantity,
+    p.product_quantity          AS product_quantity,     -- VARCHAR numérique (g ou ml)
+    p.product_quantity_unit     AS product_quantity_unit, -- 'g' | 'ml'
     p.nutriscore_grade          AS nutriscore_grade,
     p.nova_group                AS nova_group,
     p.environmental_score_grade AS ecoscore_grade,
@@ -175,11 +177,16 @@ def _row_to_product(row: dict) -> OFFProduct:
         ecoscore=(row.get("ecoscore_grade") or "").upper() or None,
         image_url=_pick_image_url(ean, row.get("images")),
         found=True,
-        # champs texte-embedding (non persistés) — normalisés à parité avec l'API
+        # champs texte-embedding — normalisés à parité avec l'API
         generic_name=_as_text(row.get("generic_name")) or None,
         categories_tags=row.get("categories_tags") or None,
         labels_tags=row.get("labels_tags") or None,
+        # socle unité — bruts OFF (VARCHAR dans le dump), normalisés à l'écriture
         quantity=(row.get("quantity") or "").strip() or None,
+        product_quantity=(str(row["product_quantity"]).strip() or None)
+        if row.get("product_quantity") is not None
+        else None,
+        product_quantity_unit=(row.get("product_quantity_unit") or "").strip() or None,
     )
 
 
