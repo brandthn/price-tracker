@@ -169,17 +169,28 @@ async def compute() -> dict[str, object]:
         min_obs=settings.prt_reco_price_min_obs,
     )
 
+    # Pool dimensionné pour la concurrence des requêtes kNN par-source.
     pool = await open_pool(
         host=settings.prt_pg_host,
         port=settings.prt_pg_port,
         db=settings.prt_pg_db,
         user=settings.prt_pg_user,
         password=settings.prt_pg_password,
-        max_size=settings.prt_pg_pool_size,
+        max_size=max(settings.prt_pg_pool_size, settings.prt_reco_knn_concurrency),
     )
     try:
         products = await fetch_scorable_products(pool)
-        pairs = await fetch_knn_pairs(pool, k=settings.prt_reco_knn_k)
+        # Sources = produits scorables AYANT un prix (sans prix, pas d'économie à
+        # calculer → inutile de chercher leurs voisins).
+        sources = [
+            (ean, p["quantity_unit"]) for ean, p in products.items() if ean in prices
+        ]
+        pairs = await fetch_knn_pairs(
+            pool,
+            sources=sources,
+            k=settings.prt_reco_knn_k,
+            concurrency=settings.prt_reco_knn_concurrency,
+        )
         rows, sample, tier_counts = _build_rows(products, prices, pairs, settings)
         written = await write_substitutions(pool, rows)
     finally:
@@ -190,6 +201,7 @@ async def compute() -> dict[str, object]:
     result = {
         "priced_eans": len(prices),
         "scorable_products": len(products),
+        "priced_sources": len(sources),
         "knn_pairs": len(pairs),
         "substitutions_written": written,
         "sources_with_substitutes": sources_with_subs,

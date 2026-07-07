@@ -11,6 +11,7 @@ encode côté Python.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
@@ -271,42 +272,47 @@ async def fetch_scorable_products(pool: asyncpg.Pool) -> dict[str, dict[str, Any
     return out
 
 
-async def fetch_knn_pairs(pool: asyncpg.Pool, *, k: int) -> list[tuple[str, str, float]]:
-    """kNN pgvector plein-catalogue : pour chaque source, ses `k` voisins par
-    cosinus d'embedding, restreints à la **même dimension d'unité** (kg↔kg,
-    L↔L). Renvoie `[(source_ean, target_ean, cosine)]`.
+async def fetch_knn_pairs(
+    pool: asyncpg.Pool,
+    *,
+    sources: Sequence[tuple[str, str]],
+    k: int,
+    concurrency: int = 8,
+) -> list[tuple[str, str, float]]:
+    """kNN pgvector **par source** (boucle concurrente) → `[(source_ean,
+    target_ean, cosine)]`.
 
-    Signal PRIMAIRE de génération de candidats (la catégorie ne filtre pas ici,
-    elle scorera ensuite). `1 - (a <=> b)` = similarité cosinus (pgvector).
-    On sur-fetch `k` (le filtre « a un prix + moins cher » réduit ensuite).
+    ⚠️ Volontairement PAS un `CROSS JOIN LATERAL` plein-catalogue : en join
+    corrélé, le planner n'utilise pas l'index ANN pgvector → force brute O(N²)
+    (timeout). On refait la MÊME forme de requête que l'endpoint live
+    (`products.get_substitutes`), index-friendly, une fois par source, `concurrency`
+    en parallèle.
+
+    `sources` = `[(source_ean, quantity_unit)]`. Voisins restreints à la **même
+    dimension d'unité** (kg↔kg, L↔L) ; on sur-fetch `k` (le filtre « a un prix +
+    moins cher » réduit ensuite). `1 - (a <=> b)` = similarité cosinus.
     """
     sql = """
-    SELECT s.ean AS source_ean, n.ean AS target_ean,
-           1 - (s.embedding <=> n.embedding) AS cosine
-    FROM products s
-    CROSS JOIN LATERAL (
-        SELECT p.ean, p.embedding
-        FROM products p
-        WHERE p.ean <> s.ean
-          AND p.embedding IS NOT NULL
-          AND p.quantity_value IS NOT NULL
-          AND p.quantity_unit = s.quantity_unit
-        ORDER BY p.embedding <=> s.embedding
-        LIMIT $1
-    ) n
-    WHERE s.embedding IS NOT NULL
-      AND s.quantity_value IS NOT NULL
-      AND s.quantity_unit IS NOT NULL
+    WITH t AS (SELECT embedding FROM products WHERE ean = $1)
+    SELECT p.ean AS target_ean, 1 - (p.embedding <=> t.embedding) AS cosine
+    FROM products p, t
+    WHERE p.ean <> $1
+      AND p.embedding IS NOT NULL
+      AND p.quantity_value IS NOT NULL
+      AND p.quantity_unit = $2
+    ORDER BY p.embedding <=> t.embedding
+    LIMIT $3
     """
-    async with pool.acquire() as conn:
-        # Recall ANN : ivfflat scanne `probes` listes (défaut 1 = rapide, recall
-        # faible). On élargit pour la qualité des voisins (batch, pas latence).
-        # SET LOCAL → borné à la transaction (pas de fuite sur la conn poolée).
-        async with conn.transaction():
-            await conn.execute("SET LOCAL ivfflat.probes = 10")
-            rows = await conn.fetch(sql, k, timeout=1200)
-    pairs = [(r["source_ean"], r["target_ean"], float(r["cosine"])) for r in rows]
-    logger.info("pg_fetch_knn_done", pairs=len(pairs), k=k)
+    sem = asyncio.Semaphore(concurrency)
+
+    async def _one(ean: str, unit: str) -> list[tuple[str, str, float]]:
+        async with sem, pool.acquire() as conn:
+            rows = await conn.fetch(sql, ean, unit, k, timeout=120)
+        return [(ean, r["target_ean"], float(r["cosine"])) for r in rows]
+
+    chunks = await asyncio.gather(*(_one(e, u) for e, u in sources))
+    pairs = [p for chunk in chunks for p in chunk]
+    logger.info("pg_fetch_knn_done", sources=len(sources), pairs=len(pairs), k=k)
     return pairs
 
 

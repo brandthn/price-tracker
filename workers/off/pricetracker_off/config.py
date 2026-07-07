@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     prt_reco_knn_k: int = Field(
         default=40, description="Voisins kNN sur-fetchés par source (on filtre ensuite prix + moins cher)."
     )
+    prt_reco_knn_concurrency: int = Field(
+        default=8,
+        description="Requêtes kNN par-source lancées en parallèle (= taille du pool PG du job).",
+    )
     prt_reco_top_n: int = Field(default=8, description="Substituts retenus par source.")
     prt_reco_max_per_brand: int = Field(
         default=2, description="Plafond de substituts d'une même marque (diversité)."

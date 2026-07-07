@@ -11,6 +11,11 @@ d'enrichissement) : pour chaque produit source, ses substituts **moins chers au
 €/unité** et **comparables** (kNN pgvector + accord catégoriel), avec un score de
 confiance et un tier. Recompute = TRUNCATE + INSERT (comme les tables Gold).
 
+On la DROP puis recrée : c'est un cache dérivé SANS consommateur live
+(vérifié : le backend n'y touche pas — l'endpoint live `/products/{ean}/substitutes`
+lit pgvector directement, aucun router `recommendations` n'est enregistré) et le
+worker la régénère intégralement.
+
 Score (philosophie) : catégorie = signal haute confiance, embedding = filet borné.
 - `tier` 1 « sûr » / 2 « probable » / 3 « élargi » (piloté par la catégorie) ;
 - `score` = confiance ∈ [0,1] ; `cosine`, `cat_agreement` = ses composantes ;
@@ -30,6 +35,9 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Remplace la table console de Maty (ancien schéma sans `tier`) — cache dérivé
+    # sans consommateur live, régénéré par le worker. Sur un fresh DB : no-op.
+    op.execute("DROP TABLE IF EXISTS product_substitutions")
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS product_substitutions (
