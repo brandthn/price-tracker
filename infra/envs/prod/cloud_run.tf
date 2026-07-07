@@ -203,9 +203,12 @@ module "run_worker_ocr_llm" {
     GOOGLE_CLOUD_PROJECT = var.project_id
     PRT_GCP_REGION       = var.region
 
-    # Modèle Groq de la seconde passe. Défaut = même modèle que le tier-1
-    # (fiabilité) ; pointer vers un modèle plus performant ensuite.
-    PRT_OCR_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+    # Seconde passe (re-OCR sur 👎) via Vertex AI Gemini. Le tier-1 reste sur
+    # Groq ; la diversité de modèle est volontaire (second avis indépendant).
+    PRT_OCR_MODEL        = "gemini-2.5-flash"
+    PRT_OCR_ENGINE_LABEL = "gemini"
+    # Endpoint Vertex — "global" couvre gemini-2.5-flash.
+    PRT_VERTEX_LOCATION = "global"
 
     PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
     PRT_PG_PORT      = "5432"

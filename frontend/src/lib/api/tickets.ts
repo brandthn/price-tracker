@@ -4,6 +4,7 @@ import type {
   FeedbackResponse,
   Ticket,
   TicketDetail,
+  TicketImageURLResponse,
   TicketItemPatch,
   TicketsListResponse,
   UploadURLResponse,
@@ -31,6 +32,15 @@ export function listTickets(
 
 export function getTicket(id: string): Promise<TicketDetail> {
   return apiFetch<TicketDetail>(`/tickets/${id}`, { authenticated: true });
+}
+
+// Signed URL de lecture (GET) de l'image du ticket, pour l'afficher côté UI.
+export function getTicketImageURL(
+  id: string,
+): Promise<TicketImageURLResponse> {
+  return apiFetch<TicketImageURLResponse>(`/tickets/${id}/image-url`, {
+    authenticated: true,
+  });
 }
 
 export function patchTicketItems(

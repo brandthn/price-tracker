@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth import AuthenticatedUser, verify_bearer
 from ..config import get_settings
 from ..db import get_session
-from ..gcs import generate_ticket_upload_url
+from ..gcs import generate_ticket_read_url, generate_ticket_upload_url
 from ..logging import get_logger
 from ..models.ocr_feedback import OcrFeedback
 from ..models.prix_extraits import PrixExtrait
@@ -24,6 +24,7 @@ from ..schemas.tickets import (
     FeedbackResponse,
     PrixExtraitOut,
     TicketDetailOut,
+    TicketImageURLResponse,
     TicketItemsPatchRequest,
     TicketOut,
     TicketsListResponse,
@@ -35,6 +36,28 @@ from ..services.user_provisioning import get_or_create_user
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+
+
+def _line_paid_amount(item: PrixExtrait) -> float | None:
+    """Montant effectivement payé pour une ligne (source de vérité du total).
+
+    Priorité : correction utilisateur (`price_eur`) > total ligne OCR
+    (`line_total`) > prix unitaire × quantité. Une ligne sans aucun montant
+    n'entre pas dans le total.
+    """
+    if item.price_eur is not None:
+        return float(item.price_eur)
+    if item.line_total is not None:
+        return float(item.line_total)
+    if item.unit_price is not None:
+        qty = float(item.quantity) if item.quantity is not None else 1.0
+        return float(item.unit_price) * qty
+    return None
+
+
+def _recompute_total(items: list[PrixExtrait]) -> float | None:
+    amounts = [a for a in (_line_paid_amount(i) for i in items) if a is not None]
+    return round(sum(amounts), 2) if amounts else None
 
 
 @router.post(
@@ -147,6 +170,36 @@ async def get_ticket(
     return out
 
 
+@router.get("/{ticket_id}/image-url", response_model=TicketImageURLResponse)
+async def get_ticket_image_url(
+    ticket_id: uuid.UUID,
+    user: AuthenticatedUser = Depends(verify_bearer),
+    session: AsyncSession = Depends(get_session),
+) -> TicketImageURLResponse:
+    """Signed URL de lecture (GET) de l'image du ticket, pour l'afficher côté UI.
+
+    404 identique pour "non trouvé" et "appartient à un autre user" (pas de leak).
+    404 aussi si le ticket n'a pas encore d'objet GCS (upload jamais finalisé).
+    """
+    db_user = await get_or_create_user(session, user)
+    ticket = await session.get(Ticket, ticket_id)
+    if ticket is None or ticket.user_id != db_user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ticket not found.")
+    if not ticket.gcs_path:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ticket image not available.")
+
+    try:
+        signed = await asyncio.to_thread(generate_ticket_read_url, gcs_path=ticket.gcs_path)
+    except (RuntimeError, ValueError) as exc:
+        logger.error("signed_read_url_failed", ticket_id=str(ticket_id), error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Signed read URL generation failed.",
+        ) from exc
+
+    return TicketImageURLResponse(read_url=signed.read_url, expires_at=signed.expires_at)
+
+
 @router.patch("/{ticket_id}/items", response_model=TicketDetailOut)
 async def patch_ticket_items(
     ticket_id: uuid.UUID,
@@ -224,9 +277,9 @@ async def patch_ticket_items(
             )
             await session.execute(stmt)
 
-    ticket.status = "validated"
-    await session.commit()
-
+    # Recalcule le total du ticket sur TOUTES ses lignes (le select flush les
+    # corrections en attente) : sans ça, `total_eur` reste figé à la valeur OCR
+    # et ne reflète jamais les corrections humaines.
     items = (
         await session.execute(
             select(PrixExtrait)
@@ -234,6 +287,10 @@ async def patch_ticket_items(
             .order_by(PrixExtrait.line_index)
         )
     ).scalars().all()
+    ticket.total_eur = _recompute_total(list(items))
+    ticket.status = "validated"
+    await session.commit()
+
     await session.refresh(ticket)
     out = TicketDetailOut.model_validate(ticket)
     out.items = [PrixExtraitOut.model_validate(i) for i in items]

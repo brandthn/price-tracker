@@ -35,6 +35,22 @@ export function ItemsValidator({
     [drafts],
   );
 
+  // Total recalculé en direct = somme des prix payés (le prix affiché est le
+  // montant payé de la ligne, pas un prix unitaire à multiplier).
+  const liveTotal = useMemo(
+    () =>
+      drafts.reduce((acc, d) => {
+        const n = Number.parseFloat(d.price_eur.replace(",", "."));
+        return acc + (Number.isFinite(n) ? n : 0);
+      }, 0),
+    [drafts],
+  );
+  const validatedCount = useMemo(
+    () =>
+      initialItems.filter((i) => i.validated_by_user).length,
+    [initialItems],
+  );
+
   const isEmpty = initialItems.length === 0;
   const isAwaitingOcr =
     ticketStatus === "pending" ||
@@ -82,11 +98,11 @@ export function ItemsValidator({
         </h3>
         {isAwaitingOcr ? (
           <p className="text-dark-6">
-            Analyse en cours… recharge la page dans quelques instants.
+            Lecture en cours. Rechargez la page dans quelques instants.
           </p>
         ) : (
           <p className="text-dark-6">
-            Aucun article n&apos;a pu être extrait de ce ticket.
+            Aucun article n&apos;a pu être lu sur ce ticket.
           </p>
         )}
       </div>
@@ -95,10 +111,13 @@ export function ItemsValidator({
 
   return (
     <div className="rounded-[10px] bg-white shadow-1 dark:bg-gray-dark">
-      <div className="flex items-center justify-between gap-3 border-b border-stroke p-4 dark:border-dark-3">
-        <h3 className="text-heading-6 font-bold text-dark dark:text-white">
-          Articles ({drafts.length})
-        </h3>
+      {/* Synthèse live : total = Σ prix payés, recalculée à chaque correction. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stroke p-4 dark:border-dark-3">
+        <div className="flex flex-wrap items-center gap-6">
+          <Stat label="Total" value={`${liveTotal.toFixed(2)} €`} strong />
+          <Stat label="Articles" value={String(drafts.length)} />
+          <Stat label="Vérifiés" value={`${validatedCount}/${drafts.length}`} />
+        </div>
         <button
           type="button"
           onClick={submit}
@@ -117,12 +136,10 @@ export function ItemsValidator({
         <table className="w-full text-sm">
           <thead className="border-b border-stroke text-left text-xs uppercase text-dark-6 dark:border-dark-3">
             <tr>
-              <th className="px-4 py-3 font-medium">#</th>
-              <th className="px-4 py-3 font-medium">Texte brut</th>
-              <th className="px-4 py-3 font-medium">Produit</th>
+              <th className="px-4 py-3 font-medium">Article</th>
               <th className="px-4 py-3 font-medium">EAN</th>
               <th className="px-4 py-3 font-medium">Qté</th>
-              <th className="px-4 py-3 font-medium text-right">Prix (€)</th>
+              <th className="px-4 py-3 font-medium text-right">Prix payé (€)</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -130,8 +147,7 @@ export function ItemsValidator({
             {drafts.map((d) => {
               // Garde défensive : si le state local se désynchronise du serveur
               // (ex: lignes ré-écrites avec de nouveaux ids après un re-OCR),
-              // on saute la ligne au lieu de crasher tout l'arbre. Le `key` sur
-              // le composant (cf. page.tsx) remonte normalement avec les bons ids.
+              // on saute la ligne au lieu de crasher tout l'arbre.
               const original = initialItems.find((i) => i.id === d.id);
               if (!original) return null;
               return (
@@ -141,23 +157,21 @@ export function ItemsValidator({
                     d.dirty ? "bg-yellow-light/10 dark:bg-yellow-dark/10" : ""
                   }
                 >
-                  <td className="px-4 py-3 text-dark-6">{original.line_index}</td>
-                  <td className="px-4 py-3 max-w-[200px]">
-                    <div className="truncate font-mono text-xs text-dark-6">
-                      {original.raw_text}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <input
-                      className="w-full rounded border border-stroke bg-transparent px-2 py-1 text-sm dark:border-dark-3"
+                      className="w-full min-w-[160px] rounded border border-stroke bg-transparent px-2 py-1 text-sm dark:border-dark-3"
                       value={d.produit_nom}
                       onChange={(e) =>
                         update(d.id, { produit_nom: e.target.value })
                       }
-                      placeholder="—"
+                      placeholder={original.raw_text || "Nom du produit"}
                     />
+                    {/* Texte lu sur le ticket, en contexte. */}
+                    <div className="mt-1 truncate font-mono text-[11px] text-dark-6">
+                      {original.raw_text}
+                    </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <input
                       className="w-32 rounded border border-stroke bg-transparent px-2 py-1 font-mono text-xs dark:border-dark-3"
                       value={d.ean}
@@ -166,10 +180,10 @@ export function ItemsValidator({
                       maxLength={13}
                     />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.001"
                       min="0"
                       className="w-20 rounded border border-stroke bg-transparent px-2 py-1 text-sm dark:border-dark-3"
                       value={d.quantity}
@@ -178,7 +192,7 @@ export function ItemsValidator({
                       }
                     />
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right align-top">
                     <input
                       type="number"
                       step="0.01"
@@ -190,11 +204,11 @@ export function ItemsValidator({
                       }
                     />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     {original.validated_by_user ? (
-                      <span className="text-xs text-green">✓ Validé</span>
+                      <span className="text-xs text-green">✓ Vérifié</span>
                     ) : original.needs_validation ? (
-                      <span className="text-xs text-orange-light">À valider</span>
+                      <span className="text-xs text-orange-light">À vérifier</span>
                     ) : (
                       <span className="text-xs text-dark-6">—</span>
                     )}
@@ -204,6 +218,37 @@ export function ItemsValidator({
             })}
           </tbody>
         </table>
+      </div>
+
+      <p className="border-t border-stroke px-4 py-3 text-xs text-dark-6 dark:border-dark-3">
+        Le « prix payé » est le montant de la ligne tel qu&apos;imprimé sur le
+        ticket (colonne Montant), pas le prix unitaire. Le total se recalcule à
+        chaque correction.
+      </p>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-xs uppercase text-dark-6">{label}</div>
+      <div
+        className={
+          strong
+            ? "text-heading-6 font-bold text-dark dark:text-white"
+            : "text-sm font-medium text-dark dark:text-white"
+        }
+      >
+        {value}
       </div>
     </div>
   );
@@ -233,7 +278,7 @@ function emptyToNull(s: string): string | null {
 }
 
 function parseNumberOrNull(s: string): number | null {
-  const trimmed = s.trim();
+  const trimmed = s.trim().replace(",", ".");
   if (trimmed === "") return null;
   const n = Number.parseFloat(trimmed);
   return Number.isFinite(n) ? n : null;

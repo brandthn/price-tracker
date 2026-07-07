@@ -1,7 +1,8 @@
-"""Map le dict canonique receipt_ocr → row shapes Cloud SQL.
+"""Map le dict Gemini → row shapes Cloud SQL (`tickets` / `prix_extraits`).
 
-Identique au mapper du worker tier-1 : les deux workers produisent la même forme
-de sortie pour `tickets` / `prix_extraits`.
+Schéma produit attendu : ``nom_produit``, ``quantite``, ``prix_unitaire``,
+``montant_ttc`` (total payé de la ligne). Produit la même forme de sortie DB que
+le worker tier-1 (``quantity`` / ``unit_price`` / ``line_total``).
 """
 
 from __future__ import annotations
@@ -20,6 +21,16 @@ def _parse_ticket_date(raw: str) -> date | None:
         return None
 
 
+def _line_total(item: dict) -> Decimal:
+    """Montant payé de la ligne : ``montant_ttc`` si présent, sinon PU × quantité."""
+    montant = item.get("montant_ttc")
+    if montant is not None:
+        return Decimal(str(montant))
+    unit = Decimal(str(item.get("prix_unitaire") or 0))
+    qty = Decimal(str(item.get("quantite") or 1))
+    return unit * qty
+
+
 def map_ticket_fields(
     ocr_result: dict,
     ticket_id: str,
@@ -28,18 +39,16 @@ def map_ticket_fields(
     duration_ms: int,
     confidence: float,
 ) -> dict[str, Any]:
-    """Colonnes pour ``UPDATE tickets`` au succès OCR."""
+    """Colonnes pour ``UPDATE tickets`` au succès OCR.
+
+    Total = somme des montants payés des lignes (source de vérité du ticket).
+    """
     ticket = ocr_result.get("ticket") or {}
     produits = ticket.get("produits") or []
 
-    line_totals: list[Decimal] = []
-    for item in produits:
-        if not isinstance(item, dict):
-            continue
-        unit = Decimal(str(item.get("prix_unitaire_ou_kg") or 0))
-        qty = Decimal(str(item.get("unites") or 1))
-        line_totals.append(unit * qty)
-
+    line_totals = [
+        _line_total(item) for item in produits if isinstance(item, dict)
+    ]
     total_amount = sum(line_totals, Decimal("0")) if line_totals else None
 
     return {
@@ -64,9 +73,13 @@ def map_prix_extraits_rows(ocr_result: dict, ticket_id: str) -> list[dict[str, A
         raw_text = (item.get("nom_produit") or "").strip()
         if not raw_text:
             continue
-        unit_price = float(item.get("prix_unitaire_ou_kg") or 0)
-        quantity = float(item.get("unites") or 1)
-        line_total = round(unit_price * quantity, 2)
+
+        quantity = float(item.get("quantite") or 1) or 1.0
+        line_total = round(float(_line_total(item)), 2)
+        unit_price = float(item.get("prix_unitaire") or 0)
+        # Prix unitaire absent mais montant + quantité connus → on le dérive.
+        if unit_price == 0 and quantity:
+            unit_price = round(line_total / quantity, 2)
 
         rows.append(
             {
