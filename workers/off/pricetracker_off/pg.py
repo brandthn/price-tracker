@@ -11,12 +11,12 @@ encode côté Python.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
 import asyncpg
+import numpy as np
 
 from .logging import get_logger
 from .off_client import OFFProduct
@@ -243,24 +243,37 @@ async def update_reco_columns(
 # --- Étape 2 : calcul des paires substitut→produit -------------------------
 
 
-async def fetch_scorable_products(pool: asyncpg.Pool) -> dict[str, dict[str, Any]]:
+async def fetch_scorable_products(
+    pool: asyncpg.Pool,
+) -> tuple[dict[str, dict[str, Any]], list[str], np.ndarray]:
     """Produits candidats au scoring : embedding + quantité normalisée présents
-    (sans quoi ni kNN ni €/unité). Renvoie `{ean: {name, brand, category_l3,
-    categories_tags, quantity_value(float), quantity_unit}}`."""
+    (sans quoi ni kNN ni €/unité).
+
+    Renvoie `(meta, eans, embeddings)` :
+    - `meta` = `{ean: {name, brand, category_l3, categories_tags,
+      quantity_value(float), quantity_unit}}` (pour le scoring) ;
+    - `eans` = ordre stable, aligné avec `embeddings` ;
+    - `embeddings` = matrice `(N, 768)` float32 (pour le kNN BLAS en mémoire —
+      on sort les vecteurs de pgvector, cf. `knn.compute_knn_pairs`).
+    """
     sql = """
     SELECT ean, name, brand, category_l3, categories_tags,
-           quantity_value, quantity_unit
+           quantity_value, quantity_unit, embedding::text AS emb
     FROM products
     WHERE embedding IS NOT NULL
       AND quantity_value IS NOT NULL
       AND quantity_unit IS NOT NULL
     """
-    out: dict[str, dict[str, Any]] = {}
     async with pool.acquire() as conn:
-        rows = await conn.fetch(sql, timeout=180)
+        rows = await conn.fetch(sql, timeout=300)
+
+    meta: dict[str, dict[str, Any]] = {}
+    eans: list[str] = []
+    vectors: list[np.ndarray] = []
     for r in rows:
         tags = r["categories_tags"]
-        out[r["ean"]] = {
+        ean = r["ean"]
+        meta[ean] = {
             "name": r["name"],
             "brand": r["brand"],
             "category_l3": r["category_l3"],
@@ -268,52 +281,13 @@ async def fetch_scorable_products(pool: asyncpg.Pool) -> dict[str, dict[str, Any
             "quantity_value": float(r["quantity_value"]),
             "quantity_unit": r["quantity_unit"],
         }
-    logger.info("pg_fetch_scorable_done", products=len(out))
-    return out
+        eans.append(ean)
+        # pgvector `::text` = "[0.1,0.2,...]" → vecteur float32.
+        vectors.append(np.fromstring(r["emb"][1:-1], sep=",", dtype=np.float32))
 
-
-async def fetch_knn_pairs(
-    pool: asyncpg.Pool,
-    *,
-    sources: Sequence[tuple[str, str]],
-    k: int,
-    concurrency: int = 8,
-) -> list[tuple[str, str, float]]:
-    """kNN pgvector **par source** (boucle concurrente) → `[(source_ean,
-    target_ean, cosine)]`.
-
-    ⚠️ Volontairement PAS un `CROSS JOIN LATERAL` plein-catalogue : en join
-    corrélé, le planner n'utilise pas l'index ANN pgvector → force brute O(N²)
-    (timeout). On refait la MÊME forme de requête que l'endpoint live
-    (`products.get_substitutes`), index-friendly, une fois par source, `concurrency`
-    en parallèle.
-
-    `sources` = `[(source_ean, quantity_unit)]`. Voisins restreints à la **même
-    dimension d'unité** (kg↔kg, L↔L) ; on sur-fetch `k` (le filtre « a un prix +
-    moins cher » réduit ensuite). `1 - (a <=> b)` = similarité cosinus.
-    """
-    sql = """
-    WITH t AS (SELECT embedding FROM products WHERE ean = $1)
-    SELECT p.ean AS target_ean, 1 - (p.embedding <=> t.embedding) AS cosine
-    FROM products p, t
-    WHERE p.ean <> $1
-      AND p.embedding IS NOT NULL
-      AND p.quantity_value IS NOT NULL
-      AND p.quantity_unit = $2
-    ORDER BY p.embedding <=> t.embedding
-    LIMIT $3
-    """
-    sem = asyncio.Semaphore(concurrency)
-
-    async def _one(ean: str, unit: str) -> list[tuple[str, str, float]]:
-        async with sem, pool.acquire() as conn:
-            rows = await conn.fetch(sql, ean, unit, k, timeout=120)
-        return [(ean, r["target_ean"], float(r["cosine"])) for r in rows]
-
-    chunks = await asyncio.gather(*(_one(e, u) for e, u in sources))
-    pairs = [p for chunk in chunks for p in chunk]
-    logger.info("pg_fetch_knn_done", sources=len(sources), pairs=len(pairs), k=k)
-    return pairs
+    embeddings = np.vstack(vectors) if vectors else np.empty((0, 0), dtype=np.float32)
+    logger.info("pg_fetch_scorable_done", products=len(eans))
+    return meta, eans, embeddings
 
 
 async def write_substitutions(

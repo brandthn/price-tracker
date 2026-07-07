@@ -32,13 +32,9 @@ from typing import Any
 
 from .bq import fetch_median_prices
 from .config import Settings, get_settings
+from .knn import compute_knn_pairs
 from .logging import configure_logging, get_logger
-from .pg import (
-    fetch_knn_pairs,
-    fetch_scorable_products,
-    open_pool,
-    write_substitutions,
-)
+from .pg import fetch_scorable_products, open_pool, write_substitutions
 from .substitutions import (
     RawCandidate,
     ScoreWeights,
@@ -169,27 +165,25 @@ async def compute() -> dict[str, object]:
         min_obs=settings.prt_reco_price_min_obs,
     )
 
-    # Pool dimensionné pour la concurrence des requêtes kNN par-source.
     pool = await open_pool(
         host=settings.prt_pg_host,
         port=settings.prt_pg_port,
         db=settings.prt_pg_db,
         user=settings.prt_pg_user,
         password=settings.prt_pg_password,
-        max_size=max(settings.prt_pg_pool_size, settings.prt_reco_knn_concurrency),
+        max_size=settings.prt_pg_pool_size,
     )
     try:
-        products = await fetch_scorable_products(pool)
+        products, eans, embeddings = await fetch_scorable_products(pool)
         # Sources = produits scorables AYANT un prix (sans prix, pas d'économie à
-        # calculer → inutile de chercher leurs voisins).
-        sources = [
-            (ean, p["quantity_unit"]) for ean, p in products.items() if ean in prices
-        ]
-        pairs = await fetch_knn_pairs(
-            pool,
-            sources=sources,
-            k=settings.prt_reco_knn_k,
-            concurrency=settings.prt_reco_knn_concurrency,
+        # calculer → inutile de chercher leurs voisins). Candidats = tous.
+        priced_sources = {ean for ean in eans if ean in prices}
+        units = [products[ean]["quantity_unit"] for ean in eans]
+        # kNN EN MÉMOIRE (BLAS) — pas d'ANN pgvector en batch (cf. knn.py).
+        pairs = await asyncio.to_thread(
+            compute_knn_pairs,
+            eans, embeddings, units,
+            source_eans=priced_sources, k=settings.prt_reco_knn_k,
         )
         rows, sample, tier_counts = _build_rows(products, prices, pairs, settings)
         written = await write_substitutions(pool, rows)
@@ -201,7 +195,7 @@ async def compute() -> dict[str, object]:
     result = {
         "priced_eans": len(prices),
         "scorable_products": len(products),
-        "priced_sources": len(sources),
+        "priced_sources": len(priced_sources),
         "knn_pairs": len(pairs),
         "substitutions_written": written,
         "sources_with_substitutes": sources_with_subs,
