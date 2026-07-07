@@ -12,7 +12,8 @@ export default function TicketUploadPage() {
           Ajouter un ticket
         </h1>
         <p className="text-sm text-dark-6">
-          Photographiez votre ticket de caisse — on s&apos;occupe du reste.
+          Photographiez votre ticket de caisse. La lecture des articles est
+          automatique ; vous pourrez la vérifier juste après.
         </p>
       </div>
 

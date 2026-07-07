@@ -1,42 +1,25 @@
-"""OCR tier-2 : appel Groq vision direct + prompt correctif.
+"""OCR tier-2 : appel Vertex AI Gemini + prompt correctif Carrefour.
 
-On bypasse ``receipt_ocr.extract_receipt`` (prompt figé) afin d'injecter
-l'extraction précédente jugée erronée, tout en réutilisant son ``GroqProvider``
-(préparation image + appel vision) et son schéma de sortie → le mapper reste
-identique au worker tier-1.
+On appelle Gemini en vision directe (bypass de ``receipt_ocr.extract_receipt``),
+avec un prompt local qui désambiguïse les colonnes du ticket (code TVA vs
+quantité, montant payé de la ligne) et qui injecte l'extraction précédente jugée
+erronée.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from receipt_ocr.backends.vlm.groq_provider import GroqProvider
-from receipt_ocr.backends.vlm.prompts import RECEIPT_EXTRACTION_PROMPT
-from receipt_ocr.constants import ENV_GROQ_MODEL, ENV_VLM_MODE, VlmMode
-from receipt_ocr.exceptions import ReceiptOcrError
+from .config import get_settings
+from .gemini_provider import GeminiProvider
+from .prompts import CORRECTIVE_TEMPLATE, RECEIPT_EXTRACTION_PROMPT
 
 
 class OcrProcessingError(Exception):
-    """Wraps failures from the receipt_ocr package / Groq call."""
-
-
-_CORRECTIVE_TEMPLATE = """\
-
-ATTENTION — SECONDE ANALYSE.
-Une première analyse automatique a produit l'extraction JSON ci-dessous, que \
-l'utilisateur a signalée comme ERRONÉE :
-
-{previous_json}
-
-Ré-analyse l'image du ticket avec le plus grand soin. Corrige les erreurs \
-(libellés de produits mal lus, prix, quantités, enseigne, date). Ne recopie pas \
-aveuglément l'extraction précédente : vérifie chaque ligne sur l'image. Renvoie \
-UNIQUEMENT le JSON corrigé, au même schéma que ci-dessus.
-"""
+    """Wraps failures from the OCR provider / JSON parsing."""
 
 
 def build_previous_extraction_json(
@@ -44,12 +27,13 @@ def build_previous_extraction_json(
     date_ticket: Any,
     prev_rows: list[dict[str, Any]],
 ) -> str:
-    """Reconstruit l'extraction précédente au schéma receipt_ocr (JSON compact)."""
+    """Reconstruit l'extraction précédente au schéma courant (JSON compact)."""
     produits = [
         {
             "nom_produit": row.get("raw_text") or "",
-            "prix_unitaire_ou_kg": float(row["unit_price"]) if row.get("unit_price") is not None else 0.0,
-            "unites": float(row["quantity"]) if row.get("quantity") is not None else 1,
+            "quantite": float(row["quantity"]) if row.get("quantity") is not None else 1,
+            "prix_unitaire": float(row["unit_price"]) if row.get("unit_price") is not None else 0.0,
+            "montant_ttc": float(row["line_total"]) if row.get("line_total") is not None else 0.0,
         }
         for row in prev_rows
     ]
@@ -67,7 +51,7 @@ def build_prompt(previous_json: str | None) -> str:
     """Prompt d'extraction de base, enrichi du bloc correctif si dispo."""
     if not previous_json:
         return RECEIPT_EXTRACTION_PROMPT
-    return RECEIPT_EXTRACTION_PROMPT + _CORRECTIVE_TEMPLATE.format(previous_json=previous_json)
+    return RECEIPT_EXTRACTION_PROMPT + CORRECTIVE_TEMPLATE.format(previous_json=previous_json)
 
 
 def _parse_json_object(content: str) -> dict:
@@ -83,11 +67,8 @@ def _parse_json_object(content: str) -> dict:
 
 
 def run_ocr(image_bytes: bytes, model: str, previous_json: str | None = None) -> dict:
-    """Seconde passe OCR via Groq. Retourne le dict brut ``{"ticket": {...}}``."""
-    # GroqProvider exige le mode JSON ; on force la sélection du modèle.
-    os.environ[ENV_VLM_MODE] = VlmMode.JSON.value
-    os.environ[ENV_GROQ_MODEL] = model
-
+    """Seconde passe OCR via Gemini. Retourne le dict brut ``{"ticket": {...}}``."""
+    settings = get_settings()
     prompt = build_prompt(previous_json)
 
     tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
@@ -96,10 +77,12 @@ def run_ocr(image_bytes: bytes, model: str, previous_json: str | None = None) ->
         tmp.write(image_bytes)
         tmp.flush()
         tmp.close()
-        provider = GroqProvider(model=model)
+        provider = GeminiProvider(
+            model=model,
+            project=settings.google_cloud_project,
+            location=settings.prt_vertex_location,
+        )
         content = provider.analyze(str(tmp_path), prompt)
         return _parse_json_object(content)
-    except ReceiptOcrError as exc:
-        raise OcrProcessingError(str(exc)) from exc
     finally:
         tmp_path.unlink(missing_ok=True)

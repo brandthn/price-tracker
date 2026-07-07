@@ -18,12 +18,13 @@ class Settings(BaseSettings):
     # GCP -----------------------------------------------------------------
     google_cloud_project: str = Field(default="")
     prt_gcp_region: str = Field(default="europe-west1")
+    # Endpoint Vertex AI pour Gemini. "global" couvre gemini-2.5-flash.
+    prt_vertex_location: str = Field(default="global")
 
     # OCR LLM -------------------------------------------------------------
-    # Modèle Groq vision utilisé pour la seconde passe. Défaut = même modèle que
-    # le tier-1 (fiabilité) ; pointer vers un modèle plus performant ensuite.
-    prt_ocr_model: str = Field(default="meta-llama/llama-4-scout-17b-16e-instruct")
-    prt_ocr_engine_label: str = Field(default="groq")
+    # Modèle Gemini (Vertex AI) utilisé pour la seconde passe (re-OCR sur 👎).
+    prt_ocr_model: str = Field(default="gemini-2.5-flash")
+    prt_ocr_engine_label: str = Field(default="gemini")
     prt_ocr_max_image_mb: int = Field(default=10)
 
     # Cloud SQL -----------------------------------------------------------

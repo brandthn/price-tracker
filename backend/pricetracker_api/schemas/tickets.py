@@ -26,6 +26,11 @@ class TicketUploadURLResponse(BaseModel):
     content_type: ContentType
 
 
+class TicketImageURLResponse(BaseModel):
+    read_url: str
+    expires_at: datetime.datetime
+
+
 class PrixExtraitOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

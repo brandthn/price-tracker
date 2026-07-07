@@ -69,6 +69,11 @@ export interface UploadURLResponse {
   content_type: "image/jpeg" | "image/png";
 }
 
+export interface TicketImageURLResponse {
+  read_url: string;
+  expires_at: string;
+}
+
 export interface TicketItemPatch {
   id: string;
   ean?: string | null;
