@@ -20,8 +20,9 @@ construction").
 from __future__ import annotations
 
 import asyncio
+from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from google.cloud import bigquery
 
 from .. import bq
@@ -61,18 +62,35 @@ def _build_index(scope: str, rows: list[dict]) -> InflationIndexOut:
 
 
 @router.get("/national", response_model=InflationIndexOut)
-async def get_national() -> InflationIndexOut:
+async def get_national(
+    granularity: Literal["week", "month"] = Query(default="week"),
+) -> InflationIndexOut:
     settings = get_settings()
+    # Grain temporel : semaine (défaut) ou mois. Les `index_value` étant déjà
+    # base-100 par enseigne/semaine, agréger par mois reste une moyenne
+    # pondérée base-100 — pas de rebase à refaire.
+    period = (
+        "week_start_date"
+        if granularity == "week"
+        else "DATE_TRUNC(week_start_date, MONTH)"
+    )
     sql = f"""
+    WITH agg AS (
+      SELECT
+        {period} AS date,
+        SAFE_DIVIDE(SUM(index_value * observations), SUM(observations)) AS value,
+        SUM(observations) AS sample_size
+      FROM {bq.qualified(settings.prt_bq_dataset_gold, _INDICES_TABLE)}
+      WHERE country_code = 'FR' AND index_value IS NOT NULL
+      GROUP BY date
+    )
     SELECT
-      week_start_date AS date,
-      SAFE_DIVIDE(SUM(index_value * observations), SUM(observations)) AS value,
-      SUM(observations) AS sample_size,
-      CAST(MIN(week_start_date) OVER () AS STRING) AS base_period
-    FROM {bq.qualified(settings.prt_bq_dataset_gold, _INDICES_TABLE)}
-    WHERE country_code = 'FR' AND index_value IS NOT NULL
-    GROUP BY week_start_date
-    ORDER BY week_start_date
+      date,
+      value,
+      sample_size,
+      CAST(MIN(date) OVER () AS STRING) AS base_period
+    FROM agg
+    ORDER BY date
     """
     rows = await asyncio.to_thread(bq.query_dicts_safe, sql, context="indices_national")
     return _build_index("national", rows)

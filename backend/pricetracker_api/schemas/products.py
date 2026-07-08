@@ -24,6 +24,11 @@ class ProductOut(BaseModel):
     ecoscore: str | None = None
     image_url: str | None = None
     off_found: bool = False
+    catalog: bool = Field(
+        default=True,
+        description="True si l'EAN existe dans Cloud SQL `products`. False = fiche "
+        "« prix seulement » (EAN connu par ses relevés Silver, hors catalogue).",
+    )
     source: str | None = None
 
 

@@ -108,22 +108,39 @@ async def get_product(
     session: AsyncSession = Depends(get_session),
 ) -> ProductOut:
     row = await session.get(Product, ean)
-    if row is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"EAN {ean!r} not in catalog.")
-    return ProductOut(
-        ean=row.ean,
-        name=row.name,
-        brand=row.brand,
-        category_l1=row.category_l1,
-        category_l2=row.category_l2,
-        category_l3=row.category_l3,
-        nutriscore=row.nutriscore,
-        nova=row.nova,
-        ecoscore=row.ecoscore,
-        image_url=row.image_url,
-        off_found=bool(row.off_found),
-        source=row.source,
+    if row is not None:
+        return ProductOut(
+            ean=row.ean,
+            name=row.name,
+            brand=row.brand,
+            category_l1=row.category_l1,
+            category_l2=row.category_l2,
+            category_l3=row.category_l3,
+            nutriscore=row.nutriscore,
+            nova=row.nova,
+            ecoscore=row.ecoscore,
+            image_url=row.image_url,
+            off_found=bool(row.off_found),
+            catalog=True,
+            source=row.source,
+        )
+
+    # Hors catalogue : un EAN peut n'exister que par ses relevés Silver (codes
+    # magasin d'Open Prices, produits jamais enrichis). Plutôt qu'un 404 qui
+    # casse le clic depuis l'observatoire, on renvoie une fiche « prix seulement »
+    # (200, catalog=false) dès qu'au moins un prix existe. 404 seulement si
+    # l'EAN n'est nulle part.
+    settings = get_settings()
+    src = bq.qualified(settings.prt_bq_dataset_silver, "open_prices_clean")
+    exists = await asyncio.to_thread(
+        bq.query_dicts_safe,
+        f"SELECT 1 AS ok FROM {src} WHERE product_code = @ean LIMIT 1",
+        params=[bigquery.ScalarQueryParameter("ean", "STRING", ean)],
+        context=f"product_price_only_probe_{ean}",
     )
+    if exists:
+        return ProductOut(ean=ean, off_found=False, catalog=False)
+    raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"EAN {ean!r} not in catalog.")
 
 
 @router.get("/{ean}/prices", response_model=ProductPricesOut)

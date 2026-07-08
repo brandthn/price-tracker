@@ -40,7 +40,10 @@ export default async function ProductDetailPage({
   const substitutes: Substitute[] =
     subsR.status === "fulfilled" ? subsR.value : [];
 
-  const offMissing = !product.off_found;
+  // Deux états dégradés distincts : hors catalogue (aucune fiche, suivi par
+  // les seuls prix) vs. au catalogue mais enrichissement OFF non abouti.
+  const priceOnly = !product.catalog;
+  const offMissing = product.catalog && !product.off_found;
   const hasSeries = !!prices && prices.series.length >= 2;
   const bestStore = prices?.by_store[0] ?? null;
 
@@ -53,7 +56,9 @@ export default async function ProductDetailPage({
       <div className="mb-6 mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-heading-5 font-bold text-dark dark:text-white sm:text-heading-4">
-            {product.name ?? <em>Produit sans nom</em>}
+            {product.name ?? (
+              <em>{priceOnly ? "Produit non référencé" : "Produit sans nom"}</em>
+            )}
           </h1>
           <p className="mt-1 text-sm text-dark-5 dark:text-dark-6">
             {product.brand && (
@@ -77,6 +82,13 @@ export default async function ProductDetailPage({
           </div>
         )}
       </div>
+
+      {priceOnly && (
+        <div className="mb-6 rounded-xl border border-dashed border-stroke bg-gray-1 p-4 text-sm text-dark-5 dark:border-dark-3 dark:bg-dark-2 dark:text-dark-6">
+          Ce produit n&apos;est pas encore au catalogue : il est suivi
+          uniquement par ses relevés de prix ci-dessous.
+        </div>
+      )}
 
       {offMissing && (
         <div className="mb-6 rounded-xl border border-dashed border-stroke bg-gray-1 p-4 text-sm text-dark-5 dark:border-dark-3 dark:bg-dark-2 dark:text-dark-6">
@@ -106,7 +118,11 @@ export default async function ProductDetailPage({
             )}
           </div>
 
-          <div className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
+          <div
+            className={`rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark ${
+              priceOnly ? "hidden" : ""
+            }`}
+          >
             <h2 className="mb-4 text-lg font-bold text-dark dark:text-white">
               Identité
             </h2>
