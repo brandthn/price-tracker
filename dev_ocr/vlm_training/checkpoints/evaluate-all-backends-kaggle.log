@@ -1,0 +1,441 @@
+12.0s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+12.0s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+12.0s 3 0.00s - to python to disable frozen modules.
+12.0s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+12.9s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+12.9s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+12.9s 7 0.00s - to python to disable frozen modules.
+12.9s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+23.8s 9 CUDA: True Tesla T4
+24.6s 10 Train package: /kaggle/working/repo/dev_ocr/vlm_training
+32.8s 11 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.7/80.7 kB 2.9 MB/s eta 0:00:00
+33.0s 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.7/80.7 kB 2.9 MB/s eta 0:00:00
+33.2s 13 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 43.6/43.6 kB 1.6 MB/s eta 0:00:00
+33.4s 14 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 43.6/43.6 kB 1.6 MB/s eta 0:00:00
+34.1s 15 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 71.0/71.0 kB 3.5 MB/s eta 0:00:00
+34.3s 16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 71.0/71.0 kB 3.5 MB/s eta 0:00:00
+35.0s 17 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 146.8/146.8 kB 6.4 MB/s eta 0:00:00
+35.2s 18 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 146.8/146.8 kB 6.4 MB/s eta 0:00:00
+37.3s 19 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 194.8/194.8 MB 9.0 MB/s eta 0:00:00
+37.3s 20 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.5/65.5 kB 2.9 MB/s eta 0:00:00
+37.4s 21 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 53.9 MB/s eta 0:00:00
+37.4s 22 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 767.5/767.5 kB 28.2 MB/s eta 0:00:00
+37.5s 23 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 194.8/194.8 MB 9.0 MB/s eta 0:00:00
+37.5s 24 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.5/65.5 kB 2.9 MB/s eta 0:00:00
+37.5s 25 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 53.9 MB/s eta 0:00:00
+37.5s 26 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 767.5/767.5 kB 28.2 MB/s eta 0:00:00
+38.4s 27 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 68.7/68.7 MB 23.8 MB/s eta 0:00:00
+38.4s 28 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 63.0/63.0 kB 3.7 MB/s eta 0:00:00
+38.5s 29 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.0/6.0 MB 70.2 MB/s eta 0:00:00
+38.6s 30 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 68.7/68.7 MB 23.8 MB/s eta 0:00:00
+38.6s 31 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 63.0/63.0 kB 3.7 MB/s eta 0:00:00
+38.6s 32 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.0/6.0 MB 70.2 MB/s eta 0:00:00
+38.6s 33 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.7/3.7 MB 68.4 MB/s eta 0:00:00
+38.7s 34 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.8/135.8 kB 7.3 MB/s eta 0:00:00
+38.7s 35 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 417.8/417.8 kB 18.4 MB/s eta 0:00:00
+38.7s 36 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.0/80.0 kB 4.1 MB/s eta 0:00:00
+38.8s 37 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.7/3.7 MB 68.4 MB/s eta 0:00:00
+38.8s 38 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.8/135.8 kB 7.3 MB/s eta 0:00:00
+38.8s 39 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 417.8/417.8 kB 18.4 MB/s eta 0:00:00
+38.8s 40 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.0/80.0 kB 4.1 MB/s eta 0:00:00
+66.6s 41 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+66.6s 42 google-adk 1.29.0 requires google-cloud-bigquery-storage>=2.0.0, which is not installed.
+66.6s 43 ydata-profiling 4.18.4 requires PyYAML<6.1,>=6.0.3, but you have pyyaml 6.0.2 which is incompatible.
+66.8s 44 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+66.8s 45 google-adk 1.29.0 requires google-cloud-bigquery-storage>=2.0.0, which is not installed.
+66.8s 46 ydata-profiling 4.18.4 requires PyYAML<6.1,>=6.0.3, but you have pyyaml 6.0.2 which is incompatible.
+66.8s 47 
+66.8s 48 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+66.8s 49 google-adk 1.29.0 requires google-cloud-bigquery-storage>=2.0.0, which is not installed.
+66.8s 50 ydata-profiling 4.18.4 requires PyYAML<6.1,>=6.0.3, but you have pyyaml 6.0.2 which is incompatible.
+68.4s 51 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 143.7/143.7 kB 3.1 MB/s eta 0:00:00
+68.6s 52 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 143.7/143.7 kB 3.1 MB/s eta 0:00:00
+75.1s 53 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.7/16.7 MB 79.0 MB/s eta 0:00:00
+75.3s 54 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.7/16.7 MB 79.0 MB/s eta 0:00:00
+75.3s 55 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 18.7/18.7 MB 75.2 MB/s eta 0:00:00
+75.4s 56 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 86.6 MB/s eta 0:00:00
+75.5s 57 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 72.8 MB/s eta 0:00:00
+75.5s 58 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 566.4/566.4 kB 27.3 MB/s eta 0:00:00
+75.5s 59 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 18.7/18.7 MB 75.2 MB/s eta 0:00:00
+75.5s 60 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 86.6 MB/s eta 0:00:00
+75.5s 61 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 72.8 MB/s eta 0:00:00
+75.5s 62 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 566.4/566.4 kB 27.3 MB/s eta 0:00:00
+87.1s 63 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+87.1s 64 bigframes 2.39.0 requires google-cloud-bigquery-storage<3.0.0,>=2.30.0, which is not installed.
+87.1s 65 paddlex 3.7.2 requires numpy<2.4,>=1.24, but you have numpy 2.5.1 which is incompatible.
+87.1s 66 ydata-profiling 4.18.4 requires numpy<2.4,>=1.22, but you have numpy 2.5.1 which is incompatible.
+87.1s 67 ydata-profiling 4.18.4 requires PyYAML<6.1,>=6.0.3, but you have pyyaml 6.0.2 which is incompatible.
+87.1s 68 google-colab 1.0.0 requires jupyter-server==2.14.0, but you have jupyter-server 2.12.5 which is incompatible.
+87.1s 69 google-colab 1.0.0 requires pandas==2.2.2, but you have pandas 2.3.3 which is incompatible.
+87.1s 70 dopamine-rl 4.1.2 requires gym<=0.25.2, but you have gym 0.26.2 which is incompatible.
+87.1s 71 moviepy 1.0.3 requires decorator<5.0,>=4.0.2, but you have decorator 5.3.1 which is incompatible.
+87.1s 72 transformers 5.0.0 requires huggingface-hub<2.0,>=1.3.0, but you have huggingface-hub 0.36.2 which is incompatible.
+87.1s 73 transformers 5.0.0 requires tokenizers<=0.23.0,>=0.22.0, but you have tokenizers 0.20.3 which is incompatible.
+87.1s 74 numba 0.60.0 requires numpy<2.1,>=1.22, but you have numpy 2.5.1 which is incompatible.
+87.3s 75 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+87.3s 76 bigframes 2.39.0 requires google-cloud-bigquery-storage<3.0.0,>=2.30.0, which is not installed.
+87.3s 77 paddlex 3.7.2 requires numpy<2.4,>=1.24, but you have numpy 2.5.1 which is incompatible.
+87.3s 78 ydata-profiling 4.18.4 requires numpy<2.4,>=1.22, but you have numpy 2.5.1 which is incompatible.
+87.3s 79 ydata-profiling 4.18.4 requires PyYAML<6.1,>=6.0.3, but you have pyyaml 6.0.2 which is incompatible.
+87.3s 80 google-colab 1.0.0 requires jupyter-server==2.14.0, but you have jupyter-server 2.12.5 which is incompatible.
+87.3s 81 google-colab 1.0.0 requires pandas==2.2.2, but you have pandas 2.3.3 which is incompatible.
+87.3s 82 dopamine-rl 4.1.2 requires gym<=0.25.2, but you have gym 0.26.2 which is incompatible.
+87.3s 83 moviepy 1.0.3 requires decorator<5.0,>=4.0.2, but you have decorator 5.3.1 which is incompatible.
+87.3s 84 transformers 5.0.0 requires huggingface-hub<2.0,>=1.3.0, but you have huggingface-hub 0.36.2 which is incompatible.
+87.3s 85 transformers 5.0.0 requires tokenizers<=0.23.0,>=0.22.0, but you have tokenizers 0.20.3 which is incompatible.
+87.3s 86 numba 0.60.0 requires numpy<2.1,>=1.22, but you have numpy 2.5.1 which is incompatible.
+87.3s 87 
+87.3s 88 ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+87.3s 89 bigframes 2.39.0 requires google-cloud-bigquery-storage<3.0.0,>=2.30.0, which is not installed.
+87.3s 90 paddlex 3.7.2 requires numpy<2.4,>=1.24, but you have numpy 2.5.1 which is incompatible.
+87.3s 91 ydata-profiling 4.18.4 requires numpy<2.4,>=1.22, but you have numpy 2.5.1 which is incompatible.
+87.3s 92 ydata-profiling 4.18.4 requires PyYAML<6.1,>=6.0.3, but you have pyyaml 6.0.2 which is incompatible.
+87.3s 93 google-colab 1.0.0 requires jupyter-server==2.14.0, but you have jupyter-server 2.12.5 which is incompatible.
+87.3s 94 google-colab 1.0.0 requires pandas==2.2.2, but you have pandas 2.3.3 which is incompatible.
+87.3s 95 dopamine-rl 4.1.2 requires gym<=0.25.2, but you have gym 0.26.2 which is incompatible.
+87.3s 96 moviepy 1.0.3 requires decorator<5.0,>=4.0.2, but you have decorator 5.3.1 which is incompatible.
+87.3s 97 transformers 5.0.0 requires huggingface-hub<2.0,>=1.3.0, but you have huggingface-hub 0.36.2 which is incompatible.
+87.3s 98 transformers 5.0.0 requires tokenizers<=0.23.0,>=0.22.0, but you have tokenizers 0.20.3 which is incompatible.
+87.3s 99 numba 0.60.0 requires numpy<2.1,>=1.22, but you have numpy 2.5.1 which is incompatible.
+112.5s 100 Install OK
+112.9s 101 Groq key: loaded
+112.9s 102 FR_IMAGES  -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-french-eval/images_tickets_caisse
+112.9s 103 FR_LABELS  -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-french-eval/real_labels
+112.9s 104 HYBRID     -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-hybrid-ckpt/receipt_vlm_500m_merged.pt
+112.9s 105 OCRVLM     -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-eval-ckpts/ocr_vlm_epoch050_loss0.3619.pt
+112.9s 106 OCRVLM_TOK -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-eval-ckpts/tokenizer.json
+112.9s 107 MOONDREAM  -> None
+112.9s 108 
+112.9s 109 ################  paddle  ################
+115.3s 110 Common test set: 18 French receipts | device cuda
+115.3s 111 
+115.3s 112 === paddle ===
+115.5s 113 Common test set: 18 French receipts | device cuda
+115.5s 114 
+115.5s 115 === paddle ===
+155.6s 116 /usr/local/lib/python3.12/dist-packages/paddle/utils/cpp_extension/extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+155.6s 117 warnings.warn(warning_message)
+155.6s 118 WARNING: OMP_NUM_THREADS set to 2, not 1. The computation speed will not be optimized if you use data parallel. It will fail if this PaddlePaddle binary is compiled with OpenBlas since OpenBlas does not support multi-threads.
+155.6s 119 PLEASE USE OMP_NUM_THREADS WISELY.
+155.8s 120 /usr/local/lib/python3.12/dist-packages/paddle/utils/cpp_extension/extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+155.8s 121 warnings.warn(warning_message)
+155.8s 122 WARNING: OMP_NUM_THREADS set to 2, not 1. The computation speed will not be optimized if you use data parallel. It will fail if this PaddlePaddle binary is compiled with OpenBlas since OpenBlas does not support multi-threads.
+155.8s 123 PLEASE USE OMP_NUM_THREADS WISELY.
+155.8s 124 
+155.8s 125 /usr/local/lib/python3.12/dist-packages/paddle/utils/cpp_extension/extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+155.8s 126 warnings.warn(warning_message)
+155.8s 127 WARNING: OMP_NUM_THREADS set to 2, not 1. The computation speed will not be optimized if you use data parallel. It will fail if this PaddlePaddle binary is compiled with OpenBlas since OpenBlas does not support multi-threads.
+155.8s 128 PLEASE USE OMP_NUM_THREADS WISELY.
+156.1s 129 [32mCreating model: ('PP-OCRv6_medium_det', None, 'paddle_dynamic')[0m
+156.1s 130 [33mChecking connectivity to the model hosters, this may take a while. To bypass this check, set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` to `True`.[0m
+156.3s 131 [32mCreating model: ('PP-OCRv6_medium_det', None, 'paddle_dynamic')[0m
+156.3s 132 [33mChecking connectivity to the model hosters, this may take a while. To bypass this check, set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` to `True`.[0m
+156.3s 133 
+156.3s 134 [32mCreating model: ('PP-OCRv6_medium_det', None, 'paddle_dynamic')[0m
+156.3s 135 [33mChecking connectivity to the model hosters, this may take a while. To bypass this check, set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` to `True`.[0m
+159.5s 136 [32mUsing official model (PP-OCRv6_medium_det_safetensors), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors`.[0m
+159.7s 137 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s][32mUsing official model (PP-OCRv6_medium_det_safetensors), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors`.[0m
+159.7s 138 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]
+159.7s 139 [32mUsing official model (PP-OCRv6_medium_det_safetensors), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors`.[0m
+160.2s 140 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:01,  3.24it/s]Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:01,  3.24it/s]
+162.1s 141 Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:01,  3.24it/s]Fetching 6 files:  83%|████████▎ | 5/6 [00:02<00:00,  2.01it/s]Fetching 6 files: 100%|██████████| 6/6 [00:02<00:00,  2.47it/s]
+162.3s 142 Fetching 6 files:  83%|████████▎ | 5/6 [00:02<00:00,  2.01it/s]Fetching 6 files: 100%|██████████| 6/6 [00:02<00:00,  2.47it/s]
+162.3s 143 
+162.3s 144 Fetching 6 files:  83%|████████▎ | 5/6 [00:02<00:00,  2.01it/s]Fetching 6 files: 100%|██████████| 6/6 [00:02<00:00,  2.47it/s]
+162.5s 145 [32mLoading configuration file /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors/config.json[0m
+162.5s 146 [32mLoading weights file /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors/model.safetensors[0m
+162.7s 147 [32mLoading configuration file /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors/config.json[0m
+162.7s 148 [32mLoading weights file /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors/model.safetensors[0m
+162.7s 149 
+162.7s 150 [32mLoading configuration file /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors/config.json[0m
+162.7s 151 [32mLoading weights file /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors/model.safetensors[0m
+163.4s 152 [32mLoaded weights file from disk, setting weights to model.[0m
+163.4s 153 [32mAll model checkpoint weights were used when initializing PPOCRV6MediumDet.
+163.4s 154 [0m
+163.4s 155 [32mAll the weights of PPOCRV6MediumDet were initialized from the model checkpoint at /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors.
+163.4s 156 If your task is similar to the task the model of the checkpoint was trained on, you can already use PPOCRV6MediumDet for predictions without further training.[0m
+163.4s 157 [32mCreating model: ('PP-OCRv6_medium_rec', None, 'paddle_dynamic')[0m
+163.4s 158 [32mUsing official model (PP-OCRv6_medium_rec_safetensors), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors`.[0m
+163.6s 159 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s][32mLoaded weights file from disk, setting weights to model.[0m
+163.6s 160 [32mAll model checkpoint weights were used when initializing PPOCRV6MediumDet.
+163.6s 161 [0m
+163.6s 162 [32mAll the weights of PPOCRV6MediumDet were initialized from the model checkpoint at /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors.
+163.6s 163 If your task is similar to the task the model of the checkpoint was trained on, you can already use PPOCRV6MediumDet for predictions without further training.[0m
+163.6s 164 [32mCreating model: ('PP-OCRv6_medium_rec', None, 'paddle_dynamic')[0m
+163.6s 165 [32mUsing official model (PP-OCRv6_medium_rec_safetensors), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors`.[0m
+163.6s 166 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]
+163.6s 167 [32mLoaded weights file from disk, setting weights to model.[0m
+163.6s 168 [32mAll model checkpoint weights were used when initializing PPOCRV6MediumDet.
+163.6s 169 [0m
+163.6s 170 [32mAll the weights of PPOCRV6MediumDet were initialized from the model checkpoint at /root/.paddlex/official_models/PP-OCRv6_medium_det_safetensors.
+163.6s 171 If your task is similar to the task the model of the checkpoint was trained on, you can already use PPOCRV6MediumDet for predictions without further training.[0m
+163.6s 172 [32mCreating model: ('PP-OCRv6_medium_rec', None, 'paddle_dynamic')[0m
+163.6s 173 [32mUsing official model (PP-OCRv6_medium_rec_safetensors), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors`.[0m
+163.8s 174 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:00,  8.40it/s]Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:00,  8.40it/s]
+166.0s 175 Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:00,  8.40it/s]Fetching 6 files:  83%|████████▎ | 5/6 [00:02<00:00,  1.91it/s]Fetching 6 files: 100%|██████████| 6/6 [00:02<00:00,  2.40it/s]
+166.2s 176 Fetching 6 files:  83%|████████▎ | 5/6 [00:02<00:00,  1.91it/s]Fetching 6 files: 100%|██████████| 6/6 [00:02<00:00,  2.40it/s]
+166.2s 177 
+166.2s 178 Fetching 6 files:  83%|████████▎ | 5/6 [00:02<00:00,  1.91it/s]Fetching 6 files: 100%|██████████| 6/6 [00:02<00:00,  2.40it/s]
+166.6s 179 [32mLoading configuration file /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors/config.json[0m
+166.6s 180 [32mLoading weights file /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors/model.safetensors[0m
+166.8s 181 [32mLoading configuration file /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors/config.json[0m
+166.8s 182 [32mLoading weights file /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors/model.safetensors[0m
+166.8s 183 
+166.8s 184 [32mLoading configuration file /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors/config.json[0m
+166.8s 185 [32mLoading weights file /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors/model.safetensors[0m
+167.2s 186 [32mLoaded weights file from disk, setting weights to model.[0m
+167.4s 187 [32mLoaded weights file from disk, setting weights to model.[0m
+167.4s 188 
+167.4s 189 [32mLoaded weights file from disk, setting weights to model.[0m
+167.7s 190 [32mAll model checkpoint weights were used when initializing PPOCRV6SmallRec.
+167.7s 191 [0m
+167.7s 192 [32mAll the weights of PPOCRV6SmallRec were initialized from the model checkpoint at /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors.
+167.7s 193 If your task is similar to the task the model of the checkpoint was trained on, you can already use PPOCRV6SmallRec for predictions without further training.[0m
+167.9s 194 [32mAll model checkpoint weights were used when initializing PPOCRV6SmallRec.
+167.9s 195 [0m
+167.9s 196 [32mAll the weights of PPOCRV6SmallRec were initialized from the model checkpoint at /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors.
+167.9s 197 If your task is similar to the task the model of the checkpoint was trained on, you can already use PPOCRV6SmallRec for predictions without further training.[0m
+167.9s 198 
+167.9s 199 [32mAll model checkpoint weights were used when initializing PPOCRV6SmallRec.
+167.9s 200 [0m
+167.9s 201 [32mAll the weights of PPOCRV6SmallRec were initialized from the model checkpoint at /root/.paddlex/official_models/PP-OCRv6_medium_rec_safetensors.
+167.9s 202 If your task is similar to the task the model of the checkpoint was trained on, you can already use PPOCRV6SmallRec for predictions without further training.[0m
+2914.0s 203 [paddle] done in 2799s
+2914.0s 204 
+2914.0s 205 Metric              paddle
+2914.0s 206 --------------------------------
+2914.0s 207 Read acc (1-CER)    0.111
+2914.0s 208 Valid (non-empty)   0.833
+2914.0s 209 Product recall      0.106
+2914.0s 210 Field F1            0.109
+2914.0s 211 ANLS                0.186
+2914.0s 212 Price MAE           0.000
+2914.0s 213 Date exact match    0.000
+2914.0s 214 n                   18
+2914.0s 215 
+2914.0s 216 Results written to /kaggle/working/cmp_paddle.json
+2914.2s 217 [paddle] done in 2799s
+2914.2s 218 
+2914.2s 219 Metric              paddle
+2914.2s 220 --------------------------------
+2914.2s 221 Read acc (1-CER)    0.111
+2914.2s 222 Valid (non-empty)   0.833
+2914.2s 223 Product recall      0.106
+2914.2s 224 Field F1            0.109
+2914.2s 225 ANLS                0.186
+2914.2s 226 Price MAE           0.000
+2914.2s 227 Date exact match    0.000
+2914.2s 228 n                   18
+2914.2s 229 
+2914.2s 230 Results written to /kaggle/working/cmp_paddle.json
+2919.5s 231 
+2919.5s 232 ################  ppocrv4  ################
+2922.3s 233 Common test set: 18 French receipts | device cuda
+2922.3s 234 
+2922.3s 235 === ppocrv4 ===
+2922.6s 236 Common test set: 18 French receipts | device cuda
+2922.6s 237 
+2922.6s 238 === ppocrv4 ===
+2933.0s 239 /kaggle/working/repo/dev_ocr/src/receipt_ocr/backends/paddle_backend.py:177: UserWarning: `lang` and `ocr_version` will be ignored when model names or model directories are not `None`.
+2933.0s 240 return self._PaddleOCR(**init_kwargs)
+2933.2s 241 /kaggle/working/repo/dev_ocr/src/receipt_ocr/backends/paddle_backend.py:177: UserWarning: `lang` and `ocr_version` will be ignored when model names or model directories are not `None`.
+2933.2s 242 return self._PaddleOCR(**init_kwargs)
+2933.2s 243 
+2933.2s 244 /kaggle/working/repo/dev_ocr/src/receipt_ocr/backends/paddle_backend.py:177: UserWarning: `lang` and `ocr_version` will be ignored when model names or model directories are not `None`.
+2933.2s 245 return self._PaddleOCR(**init_kwargs)
+2933.4s 246 /usr/local/lib/python3.12/dist-packages/paddle/utils/cpp_extension/extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+2933.4s 247 warnings.warn(warning_message)
+2933.5s 248 WARNING: OMP_NUM_THREADS set to 2, not 1. The computation speed will not be optimized if you use data parallel. It will fail if this PaddlePaddle binary is compiled with OpenBlas since OpenBlas does not support multi-threads.
+2933.5s 249 PLEASE USE OMP_NUM_THREADS WISELY.
+2933.6s 250 /usr/local/lib/python3.12/dist-packages/paddle/utils/cpp_extension/extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+2933.6s 251 warnings.warn(warning_message)
+2933.6s 252 WARNING: OMP_NUM_THREADS set to 2, not 1. The computation speed will not be optimized if you use data parallel. It will fail if this PaddlePaddle binary is compiled with OpenBlas since OpenBlas does not support multi-threads.
+2933.6s 253 PLEASE USE OMP_NUM_THREADS WISELY.
+2933.6s 254 
+2933.6s 255 /usr/local/lib/python3.12/dist-packages/paddle/utils/cpp_extension/extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+2933.6s 256 warnings.warn(warning_message)
+2933.6s 257 WARNING: OMP_NUM_THREADS set to 2, not 1. The computation speed will not be optimized if you use data parallel. It will fail if this PaddlePaddle binary is compiled with OpenBlas since OpenBlas does not support multi-threads.
+2933.6s 258 PLEASE USE OMP_NUM_THREADS WISELY.
+2933.9s 259 [32mCreating model: ('PP-OCRv4_mobile_det', None, 'paddle_static')[0m
+2933.9s 260 [33mChecking connectivity to the model hosters, this may take a while. To bypass this check, set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` to `True`.[0m
+2934.1s 261 [32mCreating model: ('PP-OCRv4_mobile_det', None, 'paddle_static')[0m
+2934.1s 262 [33mChecking connectivity to the model hosters, this may take a while. To bypass this check, set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` to `True`.[0m
+2934.1s 263 
+2934.1s 264 [32mCreating model: ('PP-OCRv4_mobile_det', None, 'paddle_static')[0m
+2934.1s 265 [33mChecking connectivity to the model hosters, this may take a while. To bypass this check, set `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK` to `True`.[0m
+2937.5s 266 [32mUsing official model (PP-OCRv4_mobile_det), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv4_mobile_det`.[0m
+2937.7s 267 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s][32mUsing official model (PP-OCRv4_mobile_det), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv4_mobile_det`.[0m
+2937.7s 268 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]
+2937.7s 269 [32mUsing official model (PP-OCRv4_mobile_det), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv4_mobile_det`.[0m
+2938.0s 270 Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:00,  6.35it/s]Fetching 6 files:  33%|███▎      | 2/6 [00:00<00:00,  7.56it/s]Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:00,  6.35it/s]Fetching 6 files:  33%|███▎      | 2/6 [00:00<00:00,  7.56it/s]
+2938.8s 271 Fetching 6 files:  17%|█▋        | 1/6 [00:00<00:00,  6.35it/s]Fetching 6 files:  33%|███▎      | 2/6 [00:00<00:00,  7.56it/s]Fetching 6 files:  83%|████████▎ | 5/6 [00:01<00:00,  4.11it/s]Fetching 6 files: 100%|██████████| 6/6 [00:01<00:00,  5.29it/s]
+2939.0s 272 [32mCreating model: ('PP-OCRv6_medium_rec', None, 'paddle_static')[0m
+2939.0s 273 [32mUsing official model (PP-OCRv6_medium_rec), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_rec`.[0m
+2939.0s 274 Fetching 6 files:  83%|████████▎ | 5/6 [00:01<00:00,  4.11it/s]Fetching 6 files: 100%|██████████| 6/6 [00:01<00:00,  5.29it/s]
+2939.0s 275 [32mCreating model: ('PP-OCRv6_medium_rec', None, 'paddle_static')[0m
+2939.0s 276 [32mUsing official model (PP-OCRv6_medium_rec), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_rec`.[0m
+2939.0s 277 
+2939.0s 278 Fetching 6 files:  83%|████████▎ | 5/6 [00:01<00:00,  4.11it/s]Fetching 6 files: 100%|██████████| 6/6 [00:01<00:00,  5.29it/s]
+2939.0s 279 [32mCreating model: ('PP-OCRv6_medium_rec', None, 'paddle_static')[0m
+2939.0s 280 [32mUsing official model (PP-OCRv6_medium_rec), the model files will be automatically downloaded and saved in `/root/.paddlex/official_models/PP-OCRv6_medium_rec`.[0m
+2939.2s 281 Fetching 5 files:   0%|          | 0/5 [00:00<?, ?it/s]Fetching 5 files:  20%|██        | 1/5 [00:00<00:00,  6.44it/s]Fetching 5 files:   0%|          | 0/5 [00:00<?, ?it/s]Fetching 5 files:  20%|██        | 1/5 [00:00<00:00,  6.44it/s]
+2940.5s 282 Fetching 5 files:   0%|          | 0/5 [00:00<?, ?it/s]Fetching 5 files:  20%|██        | 1/5 [00:00<00:00,  6.44it/s]Fetching 5 files:  80%|████████  | 4/5 [00:01<00:00,  2.62it/s]Fetching 5 files: 100%|██████████| 5/5 [00:01<00:00,  3.43it/s]
+2940.7s 283 Fetching 5 files:  80%|████████  | 4/5 [00:01<00:00,  2.62it/s]Fetching 5 files: 100%|██████████| 5/5 [00:01<00:00,  3.43it/s]
+2940.7s 284 
+2940.7s 285 Fetching 5 files:  80%|████████  | 4/5 [00:01<00:00,  2.62it/s]Fetching 5 files: 100%|██████████| 5/5 [00:01<00:00,  3.43it/s]
+3194.2s 286 [ppocrv4] done in 272s
+3194.2s 287 
+3194.2s 288 Metric              ppocrv4
+3194.2s 289 --------------------------------
+3194.2s 290 Read acc (1-CER)    0.074
+3194.2s 291 Valid (non-empty)   0.722
+3194.2s 292 Product recall      0.071
+3194.2s 293 Field F1            0.025
+3194.2s 294 ANLS                0.147
+3194.2s 295 Price MAE           0.392
+3194.2s 296 Date exact match    0.000
+3194.2s 297 n                   18
+3194.2s 298 
+3194.2s 299 Results written to /kaggle/working/cmp_ppocrv4.json
+3194.4s 300 [ppocrv4] done in 272s
+3194.4s 301 
+3194.4s 302 Metric              ppocrv4
+3194.4s 303 --------------------------------
+3194.4s 304 Read acc (1-CER)    0.074
+3194.4s 305 Valid (non-empty)   0.722
+3194.4s 306 Product recall      0.071
+3194.4s 307 Field F1            0.025
+3194.4s 308 ANLS                0.147
+3194.4s 309 Price MAE           0.392
+3194.4s 310 Date exact match    0.000
+3194.4s 311 n                   18
+3194.4s 312 
+3194.4s 313 Results written to /kaggle/working/cmp_ppocrv4.json
+3196.0s 314 
+3196.0s 315 ################  hybrid  ################
+3198.3s 316 Common test set: 18 French receipts | device cuda
+3198.3s 317 
+3198.3s 318 === hybrid ===
+3198.5s 319 Common test set: 18 French receipts | device cuda
+3198.5s 320 
+3198.5s 321 === hybrid ===
+3217.3s 322 [hybrid] SKIPPED: cannot import name 'is_offline_mode' from 'huggingface_hub' (/usr/local/lib/python3.12/dist-packages/huggingface_hub/__init__.py)
+3217.3s 323 No backend produced results.
+3217.5s 324 [hybrid] SKIPPED: cannot import name 'is_offline_mode' from 'huggingface_hub' (/usr/local/lib/python3.12/dist-packages/huggingface_hub/__init__.py)
+3217.5s 325 No backend produced results.
+3217.5s 326 
+3217.5s 327 No backend produced results.
+3218.3s 328 [hybrid] subprocess failed (rc 1) -> skipped
+3218.3s 329 
+3218.3s 330 ################  groq  ################
+3220.5s 331 Common test set: 18 French receipts | device cuda
+3220.5s 332 
+3220.5s 333 === groq ===
+3220.7s 334 Common test set: 18 French receipts | device cuda
+3220.7s 335 
+3220.7s 336 === groq ===
+3387.5s 337 [groq] done in 167s
+3387.5s 338 
+3387.5s 339 Metric              groq
+3387.5s 340 --------------------------------
+3387.5s 341 Read acc (1-CER)    0.790
+3387.5s 342 Valid (non-empty)   1.000
+3387.5s 343 Product recall      0.682
+3387.5s 344 Field F1            0.746
+3387.5s 345 ANLS                0.986
+3387.5s 346 Price MAE           0.178
+3387.5s 347 Date exact match    0.944
+3387.5s 348 n                   18
+3387.5s 349 
+3387.5s 350 Results written to /kaggle/working/cmp_groq.json
+3387.7s 351 [groq] done in 167s
+3387.7s 352 
+3387.7s 353 Metric              groq
+3387.7s 354 --------------------------------
+3387.7s 355 Read acc (1-CER)    0.790
+3387.7s 356 Valid (non-empty)   1.000
+3387.7s 357 Product recall      0.682
+3387.7s 358 Field F1            0.746
+3387.7s 359 ANLS                0.986
+3387.7s 360 Price MAE           0.178
+3387.7s 361 Date exact match    0.944
+3387.7s 362 n                   18
+3387.7s 363 
+3387.7s 364 Results written to /kaggle/working/cmp_groq.json
+3388.0s 365 
+3388.0s 366 ################  moondream  ################
+3390.3s 367 Common test set: 18 French receipts | device cuda
+3390.3s 368 
+3390.3s 369 === moondream ===
+3390.4s 370 [moondream] SKIPPED: Moondream unavailable (need moondream pkg + .mf weights): Moondream local weights not found. During development only local inference is enabled (cloud API fallback is off).
+3390.4s 371 1. Download moondream-0_5b-int8.mf and set RECEIPT_VLM_MODEL_PATH, or
+3390.4s 372 2. Place the file in data/models/ or ~/.cache/receipt_ocr/models/.
+3390.4s 373 See README (VLM backend section) for download links.
+3390.4s 374 No backend produced results.
+3390.5s 375 Common test set: 18 French receipts | device cuda
+3390.5s 376 
+3390.5s 377 === moondream ===
+3390.5s 378 [moondream] SKIPPED: Moondream unavailable (need moondream pkg + .mf weights): Moondream local weights not found. During development only local inference is enabled (cloud API fallback is off).
+3390.5s 379 1. Download moondream-0_5b-int8.mf and set RECEIPT_VLM_MODEL_PATH, or
+3390.5s 380 2. Place the file in data/models/ or ~/.cache/receipt_ocr/models/.
+3390.5s 381 See README (VLM backend section) for download links.
+3390.6s 382 No backend produced results.
+3390.6s 383 
+3390.6s 384 No backend produced results.
+3390.9s 385 [moondream] subprocess failed (rc 1) -> skipped
+3390.9s 386 
+3390.9s 387 ################  ocrvlm  ################
+3393.2s 388 Common test set: 18 French receipts | device cuda
+3393.2s 389 
+3393.2s 390 === ocrvlm ===
+3393.4s 391 Common test set: 18 French receipts | device cuda
+3393.4s 392 
+3393.4s 393 === ocrvlm ===
+3405.7s 394 16/18    16/18    18/18                                        [ocrvlm] done in 13s
+3405.7s 395 
+3405.7s 396 Metric              ocrvlm
+3405.7s 397 --------------------------------
+3405.7s 398 Read acc (1-CER)    0.113
+3405.7s 399 Valid (non-empty)   1.000
+3405.7s 400 Product recall      0.000
+3405.7s 401 Field F1            0.000
+3405.7s 402 ANLS                0.166
+3405.7s 403 Price MAE           0.000
+3405.7s 404 Date exact match    0.000
+3405.7s 405 n                   18
+3405.7s 406 
+3405.7s 407 Results written to /kaggle/working/cmp_ocrvlm.json
+3405.8s 408 18/18                                        [ocrvlm] done in 13s
+3405.8s 409 
+3405.8s 410 Metric              ocrvlm
+3405.8s 411 --------------------------------
+3405.8s 412 Read acc (1-CER)    0.113
+3405.8s 413 Valid (non-empty)   1.000
+3405.8s 414 Product recall      0.000
+3405.8s 415 Field F1            0.000
+3405.8s 416 ANLS                0.166
+3405.8s 417 Price MAE           0.000
+3405.8s 418 Date exact match    0.000
+3405.8s 419 n                   18
+3405.8s 420 
+3405.8s 421 Results written to /kaggle/working/cmp_ocrvlm.json
+3406.8s 422 
+3406.8s 423 collected: ['/kaggle/working/cmp_paddle.json', '/kaggle/working/cmp_ppocrv4.json', '/kaggle/working/cmp_groq.json', '/kaggle/working/cmp_ocrvlm.json']
+3406.8s 424 Metric              paddle        ppocrv4       groq          ocrvlm
+3406.8s 425 ----------------------------------------------------------------------------
+3406.8s 426 Read acc (1-CER)    0.111         0.074         0.790         0.113
+3406.8s 427 Valid (non-empty)   0.833         0.722         1.000         1.000
+3406.8s 428 Product recall      0.106         0.071         0.682         0.000
+3406.8s 429 Field F1            0.109         0.025         0.746         0.000
+3406.8s 430 ANLS                0.186         0.147         0.986         0.166
+3406.8s 431 Price MAE           0.000         0.392         0.178         0.000
+3406.8s 432 Date exact match    0.000         0.000         0.944         0.000
+3406.8s 433 n                   18            18            18            18
+3410.7s 434 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+3410.7s 435 cells[i][c] = re.sub('\\\\\|', '|', cell)
+3410.9s 436 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+3410.9s 437 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+3411.8s 438 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+3412.2s 439 [NbConvertApp] Writing 28809 bytes to __notebook__.ipynb
+3415.2s 440 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+3416.3s 441 [NbConvertApp] Writing 321592 bytes to __results__.html

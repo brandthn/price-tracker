@@ -83,19 +83,19 @@ def run_hybrid(samples, cfg):
     from receipt_vlm.data.augmentation import clip_normalize_pil
     from receipt_vlm.models.vlm import ReceiptVLM
 
-    model = ReceiptVLM.from_merged_checkpoint(ckpt, device=cfg["device"])
+    # Force a single dtype: the merged checkpoint mixes float32 (CLIP) and bf16 (SmolLM2), which
+    # otherwise throws "mat1/mat2 dtype mismatch" against float32 pixels. fp32 fits a T4 (~1.8 GB).
+    model = ReceiptVLM.from_merged_checkpoint(ckpt, device=cfg["device"]).float()
 
     def infer(s):
-        px = torch.from_numpy(clip_normalize_pil(Image.open(str(s.image)))).unsqueeze(0).to(cfg["device"])
+        px = torch.from_numpy(clip_normalize_pil(Image.open(str(s.image)))).unsqueeze(0)
+        px = px.to(cfg["device"], dtype=torch.float32)
         return ticket_from_json(model.generate(px, constrained=True)[0])
 
     return _run_per_image(samples, infer, "hybrid")
 
 
 def _run_vlm_provider(samples, provider, name):
-    import os
-
-    os.environ["RECEIPT_VLM_MODE"] = "json"
     from receipt_ocr.backends.vlm.extraction import run_vlm_extraction
     from receipt_ocr.vlm_parse import try_parse_vlm_json
 
@@ -107,6 +107,9 @@ def _run_vlm_provider(samples, provider, name):
 
 
 def run_groq(samples, cfg):
+    import os
+
+    os.environ["RECEIPT_VLM_MODE"] = "json"  # GroqProvider.__init__ validates this — set BEFORE ctor
     from receipt_ocr.env import load_project_env
 
     load_project_env()  # GROQ_API_KEY / groq_key from dev_ocr/.env (or Kaggle Secret in env)
@@ -114,7 +117,7 @@ def run_groq(samples, cfg):
         from receipt_ocr.backends.vlm.groq_provider import GroqProvider
 
         provider = GroqProvider()
-    except Exception as e:  # noqa: BLE001 - missing key / pkg
+    except Exception as e:  # noqa: BLE001 - missing key / pkg / mode
         raise SkipBackend(f"Groq unavailable (key/pkg?): {e}")
     return _run_vlm_provider(samples, provider, "groq")
 
@@ -122,14 +125,15 @@ def run_groq(samples, cfg):
 def run_moondream(samples, cfg):
     import os
 
+    os.environ["RECEIPT_VLM_MODE"] = "json"  # set BEFORE provider ctor (mode validated there)
     if cfg.get("moondream_weights"):
         os.environ.setdefault("MOONDREAM_MODEL_DIR", cfg["moondream_weights"])
     try:
         from receipt_ocr.backends.vlm.moondream_provider import MoondreamProvider
 
-        provider = MoondreamProvider()  # needs local .mf int8 weights
-    except Exception as e:  # noqa: BLE001 - weights not present
-        raise SkipBackend(f"Moondream unavailable (need .mf weights): {e}")
+        provider = MoondreamProvider()  # needs the `moondream` pkg + local .mf int8 weights
+    except Exception as e:  # noqa: BLE001 - pkg/weights not present
+        raise SkipBackend(f"Moondream unavailable (need moondream pkg + .mf weights): {e}")
     return _run_vlm_provider(samples, provider, "moondream")
 
 
