@@ -58,3 +58,6 @@ data/off_bulk/
 service-account*.json
 firebase-admin*.json
 gcp-key*.json
+vertex-sa.json
+*-sa.json
+vertex-*.json

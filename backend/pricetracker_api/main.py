@@ -21,7 +21,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .db import dispose_engine, init_engine
 from .logging import configure_logging, get_logger
-from .routers import indices, observatoire, products, stats, tickets, users
+from .routers import (
+    enseignes,
+    indices,
+    observatoire,
+    products,
+    stats,
+    tickets,
+    users,
+)
 
 
 def _build_app() -> FastAPI:
@@ -56,9 +64,9 @@ def _build_app() -> FastAPI:
         description=(
             "API de PriceTracker — observatoire crowdsourcé de l'inflation "
             "consommateur (France). Vérifie les JWT Firebase. "
-            "Tous les endpoints `/observatoire/*`, `/products/*`, `/indices/national`, "
-            "`/indices/regional/*`, `/stats/*` sont publics ; les autres exigent "
-            "un Bearer JWT Firebase."
+            "Tous les endpoints `/observatoire/*`, `/enseignes/*`, `/products/*`, "
+            "`/indices/national`, `/indices/regional/*`, `/stats/*` sont publics ; "
+            "les autres exigent un Bearer JWT Firebase."
         ),
         lifespan=lifespan,
         docs_url=docs_url,
@@ -84,6 +92,7 @@ def _build_app() -> FastAPI:
     app.include_router(tickets.router)
     app.include_router(indices.router)
     app.include_router(observatoire.router)
+    app.include_router(enseignes.router)
     app.include_router(products.router)
     app.include_router(stats.router)
     app.include_router(users.router)
