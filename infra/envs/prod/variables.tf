@@ -54,7 +54,7 @@ variable "worker_off_image_tag" {
 variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
-  default = "6ef1bda"
+  default = "594d3dd"
 }
 
 variable "backend_auth_enabled" {
