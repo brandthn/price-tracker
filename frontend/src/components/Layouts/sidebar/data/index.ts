@@ -30,6 +30,12 @@ export const NAV_DATA: NavSection[] = [
         icon: Icons.FourCircle,
         items: [],
       },
+      {
+        title: "Enseignes",
+        url: "/enseignes",
+        icon: Icons.Storefront,
+        items: [],
+      },
     ],
   },
   {

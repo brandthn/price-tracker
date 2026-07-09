@@ -27,7 +27,6 @@ import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import bq
@@ -39,6 +38,7 @@ from ..schemas.indices import (
     RankingItem,
     RankingsOut,
 )
+from ..services.catalog import resolve_products
 
 router = APIRouter(prefix="/observatoire", tags=["observatoire"])
 
@@ -63,28 +63,6 @@ def _period_expr(granularity: Granularity) -> str:
 def _silver_fq() -> str:
     settings = get_settings()
     return bq.qualified(settings.prt_bq_dataset_silver, "open_prices_clean")
-
-
-async def _resolve_products(
-    session: AsyncSession, eans: list[str]
-) -> dict[str, dict]:
-    """Batch de résolution nom/marque/image contre Cloud SQL `products`.
-
-    Renvoie {ean: {name, brand, image_url}} pour les seuls EAN présents au
-    catalogue. Les EAN absents ne sont pas dans le dict → traités comme
-    « produit non référencé » (accompagnés de leurs prix côté UI)."""
-    if not eans:
-        return {}
-    result = await session.execute(
-        text(
-            "SELECT ean, name, brand, image_url FROM products WHERE ean = ANY(:eans)"
-        ),
-        {"eans": list(dict.fromkeys(eans))},
-    )
-    return {
-        r["ean"]: {"name": r["name"], "brand": r["brand"], "image_url": r["image_url"]}
-        for r in result.mappings().all()
-    }
 
 
 def _build_rankings(rows: list[dict], resolved: dict[str, dict]) -> list[RankingItem]:
@@ -220,7 +198,7 @@ async def get_rankings(
             context=f"observatoire_rankings_{direction}_{granularity}",
         )
 
-    resolved = await _resolve_products(session, [r["ean"] for r in rows if r.get("ean")])
+    resolved = await resolve_products(session, [r["ean"] for r in rows if r.get("ean")])
     period = rows[0].get("period") if rows else None
     return RankingsOut(period=period, items=_build_rankings(rows, resolved))
 
@@ -254,7 +232,7 @@ async def get_hall_of_shame(
     rows = await asyncio.to_thread(
         bq.query_dicts_safe, sql, context=f"observatoire_hall_of_shame_{granularity}"
     )
-    resolved = await _resolve_products(session, [r["ean"] for r in rows if r.get("ean")])
+    resolved = await resolve_products(session, [r["ean"] for r in rows if r.get("ean")])
     period = rows[0].get("period") if rows else None
     return RankingsOut(period=period, items=_build_rankings(rows, resolved))
 

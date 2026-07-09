@@ -199,3 +199,43 @@ export interface BasketSummary {
   monthly: BasketMonth[];
   top_products: BasketProduct[];
 }
+
+// Comparateur d'enseignes — indice de cherté relative (matched-basket).
+export interface EnseigneSummary {
+  enseigne: string;
+  // null = couverture insuffisante (< min_matched produits comparables).
+  cherte_index: number | null;
+  matched_products: number;
+  observations: number | null;
+}
+
+export interface EnseignesOut {
+  window_weeks: number;
+  min_matched: number;
+  reference_index: number;
+  items: EnseigneSummary[];
+}
+
+export interface EnseigneProductRank {
+  ean: string | null;
+  produit_nom: string | null;
+  brand: string | null;
+  image_url: string | null;
+  in_catalog: boolean;
+  price_eur: number | null;
+  ref_price_eur: number | null;
+  // Écart au prix de référence, en %. −12.0 = 12 % moins cher que la médiane.
+  delta_pct: number;
+}
+
+export interface EnseigneDetailOut {
+  enseigne: string;
+  tracked: boolean;
+  cherte_index: number | null;
+  matched_products: number;
+  observations: number | null;
+  window_weeks: number;
+  min_matched: number;
+  cheaper: EnseigneProductRank[];
+  dearer: EnseigneProductRank[];
+}
