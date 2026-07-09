@@ -14,8 +14,18 @@ export async function generateMetadata({
   params: Promise<{ nom: string }>;
 }): Promise<Metadata> {
   const { nom } = await params;
-  // `nom` est déjà décodé par Next (params de route) → pas de decodeURIComponent.
-  return { title: `${nom} — Enseignes` };
+  return { title: `${decodeEnseigne(nom)} — Enseignes` };
+}
+
+// Les params de route arrivent URL-encodés (« Intermarch%C3%A9 ») : on décode une
+// fois avant tout usage. Défensif : no-op si déjà décodé, ne casse pas sur une
+// séquence % invalide.
+function decodeEnseigne(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 // Fiche enseigne : positionnement prix (indice de cherté) + les produits sur
@@ -28,7 +38,7 @@ export default async function EnseigneDetailPage({
   params: Promise<{ nom: string }>;
 }) {
   const { nom } = await params;
-  const data: EnseigneDetailOut = await getEnseigneDetail(nom);
+  const data: EnseigneDetailOut = await getEnseigneDetail(decodeEnseigne(nom));
 
   if (!data.tracked) {
     return (
@@ -53,7 +63,7 @@ export default async function EnseigneDetailPage({
   const index = data.cherte_index;
   const hasIndex = index != null;
   const delta = hasIndex ? index! - 100 : 0;
-  const positioning = hasIndex ? qualifier(index!) : null;
+  const positioning = hasIndex ? positioningSentence(index!) : null;
 
   return (
     <>
@@ -80,17 +90,16 @@ export default async function EnseigneDetailPage({
               <span className="font-medium text-dark dark:text-white">
                 {data.enseigne}
               </span>{" "}
-              est globalement {positioning} que l&apos;ensemble des enseignes.
-              {data.observations != null && (
-                <>
-                  {" "}
-                  · {formatNumber(data.observations)} relevés sur{" "}
-                  {data.window_weeks} semaines.
-                </>
-              )}
+              est {positioning}.
             </p>
             <p className="mt-2 text-xs text-dark-5 dark:text-dark-6">
-              Indice 100 = niveau médian des enseignes · moins de 100 = moins
+              {data.observations != null && (
+                <>
+                  Base : {formatNumber(data.observations)} relevés sur{" "}
+                  {data.window_weeks} semaines ·{" "}
+                </>
+              )}
+              indice 100 = niveau médian des enseignes · moins de 100 = moins
               chère · plus de 100 = plus chère.
             </p>
           </>
@@ -134,12 +143,14 @@ export default async function EnseigneDetailPage({
   );
 }
 
-// « X % moins chère » / « au niveau médian » / « X % plus chère ».
-function qualifier(index: number): string {
+// Prédicat complet (préposition incluse) pour une phrase correcte dans les 3 cas :
+// « au niveau médian de… », « X % moins chère que… », « X % plus chère que… ».
+function positioningSentence(index: number): string {
   const delta = index - 100;
-  if (Math.abs(delta) < 0.5) return "au niveau médian";
-  if (delta < 0) return `${Math.round(Math.abs(delta))} % moins chère`;
-  return `${Math.round(delta)} % plus chère`;
+  if (Math.abs(delta) < 0.5) return "au niveau médian de l'ensemble des enseignes";
+  if (delta < 0)
+    return `${Math.round(Math.abs(delta))} % moins chère que l'ensemble des enseignes`;
+  return `${Math.round(delta)} % plus chère que l'ensemble des enseignes`;
 }
 
 function BackLink() {
