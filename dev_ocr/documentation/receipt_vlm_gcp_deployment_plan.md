@@ -1,6 +1,25 @@
 # Deploying the receipt VLM in the GCP OCR worker — plan
 
-**Status:** proposal, for team review · **Date:** 2026-06-18
+**Status:** ⛔ **SUPERSEDED** (2026-07-10) · originally: proposal, for team review · **Date:** 2026-06-18
+
+> **What shipped instead.** This document proposed running `receipt-vlm-500m` **inside**
+> `prt-prod-worker-ocr`, on an **NVIDIA L4 GPU**, behind a Terraform `ocr_vlm_enabled` toggle. The
+> team went with the alternative recorded in the block-quote below: **one CPU worker per backend, no
+> toggle** — `workers/ocr-vlm-receipt` for this model, plus five siblings for Paddle, PP-OCRv4,
+> Moondream, Groq and the from-scratch `OcrVLM`.
+>
+> Why: no GPU quota or `modules/cloud_run` GPU support is needed, each engine scales and fails
+> independently, and the existing Groq path is left byte-for-byte untouched. The accepted tradeoff is
+> latency — fp32 CPU inference, bounded by the worker's 540 s timeout and capped at `max_instances = 2`.
+>
+> **The readiness table below was honoured, not discarded.** Every gap it identified was closed in the
+> way it prescribed: HF backbones baked into the image with `HF_HUB_OFFLINE=1` (Cloud Run runs
+> `PRIVATE_RANGES_ONLY`, so the Hub is unreachable at cold start), the 1.8 GB checkpoint distributed
+> via the `*-models` bucket, and `workers/ocr` left alone rather than un-conflicted, since the new
+> workers were cloned from the clean `workers/ocr-llm`.
+>
+> Full record: **Entry 18** in [`../documentation.md`](../documentation.md). Kept for the decision
+> history — read it as "why we considered a GPU", not as instructions.
 
 ## Context
 

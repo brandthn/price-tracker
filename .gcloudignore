@@ -19,6 +19,17 @@
 /dev_ocr/materiaux_dev_ocr/
 /dev_ocr/documentation/
 
+# dev_ocr/vlm_training : les workers ocr-vlm-receipt et ocr-vlm-scratch ont
+# besoin du CODE du modèle (`receipt_vlm/` + pyproject) et de rien d'autre. Les
+# poids et datasets d'entraînement pèsent 4,4 Go et étaient jusqu'ici uploadés
+# dans le contexte de CHAQUE build (y compris ocr-llm, dont l'uv sync ne lit que
+# dev_ocr/src). Les poids d'inférence transitent par le bucket models, pas par
+# l'image. Exclusions ancrées : rien d'autre ne peut matcher.
+/dev_ocr/vlm_training/checkpoints/
+/dev_ocr/vlm_training/colab_upload/
+/dev_ocr/vlm_training/data/
+/dev_ocr/vlm_training/notebooks/
+
 # Secrets — ne JAMAIS uploader dans le bucket Cloud Build.
 vertex-sa.json
 *-sa.json

@@ -2,10 +2,10 @@
 
 Living roadmap for the from-scratch, OCR-free receipt VLM (`OcrVLM`: hand-rolled CNN+transformer
 encoder → autoregressive decoder → linearized schema → `Ticket`; no CLIP, no SmolLM2). Full history is
-in `documentation.md` Entries 16–17; this file is the **resume-from-here** summary + prioritized next
-steps. Update it whenever a step lands.
+in `documentation.md` Entries 16–18 (18 = the Cloud Run worker); this file is the **resume-from-here**
+summary + prioritized next steps. Update it whenever a step lands.
 
-_Last updated: 2026-07-07._
+_Last updated: 2026-07-10._
 
 ## Where we are
 
@@ -72,10 +72,29 @@ Donut inits its decoder from mBART. If from-scratch decoding plateaus on open-vo
 initialize the decoder from a tiny pretrained multilingual LM. Biggest single quality lever held in
 reserve; breaks the "fully from-scratch" purity, so use only if needed.
 
-### 6. Stage C — integrate into the worker (deferred)
-Once real accuracy is useful, wire `OcrVLM` behind the `receipt_ocr` backend interface (a provider like
-`receipt_vlm_provider.py`) so it's selectable via `RECEIPT_OCR_BACKEND`. Not worth doing until the
-numbers justify it.
+### 6. Stage C — integrate into the worker ✅ shipped 2026-07-10 (infrastructure only)
+The worker exists: **`workers/ocr-vlm-scratch`**, deploying `ocr_vlm_epoch050_loss0.3619.pt` (the
+"current best checkpoint" above) plus its character tokenizer, both pulled from the models bucket at
+cold start. Publish `{"ticket_id": "..."}` on the `ocr-vlm-scratch` topic and the model processes that
+ticket, writing the same SQL rows as any other engine — which is exactly what makes a head-to-head
+comparison against Paddle / Groq / Moondream possible on real traffic.
+
+It was **not** wired as a `VlmProvider`, as this step originally assumed. `workers/ocr-vlm-scratch/
+scratch_backend.py` implements the `OcrBackend` interface **directly**. The `VlmProvider` /
+`VlmBackend` layer exists to manage prompts, crop escalation and validation-driven retries; `OcrVLM`
+has none of those — it takes no prompt and decodes the canonical ticket deterministically. Its JSON
+goes straight through `ReceiptParser.parse_text` → `try_parse_vlm_json`, so the heuristic text parser
+never runs.
+
+**The accuracy caveat is unchanged.** Real read_acc is still 0.122 (WildReceipt, Stage B). Shipping
+the worker does not make the model useful — it makes it *measurable* under production conditions.
+Steps 1–4 above are still what stands between this and serving real traffic.
+
+> ⚠️ Loading and generating with this model **froze a local workstation** (Entry 17); it has only ever
+> been evaluated on Kaggle. The worker's tests monkeypatch the model and never load the checkpoint.
+> The first real inference happens on Cloud Run. Keep it that way when you resume.
+
+Details: **Entry 18** in [`../documentation.md`](../documentation.md).
 
 ## How the multi-backend comparison relates
 
