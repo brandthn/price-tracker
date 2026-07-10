@@ -358,6 +358,56 @@ same id on two topics to compare engines on identical input.
 
 `tesseract` and `easyocr` are not deployed — they are still stubs.
 
+### Model artifacts to upload (devops handoff)
+
+Only **three** of the six workers need weights in GCS. Paddle and PP-OCRv4 bake their models into the
+image at build time, and Groq calls a remote API — there is nothing to upload for those, and nothing
+to look for.
+
+Bucket: `gs://price-tracker-prod-01-models`. The object paths are the defaults of
+`infra/envs/prod/variables_ocr_backends.tf` — upload elsewhere and you must override those variables.
+
+| Local file | → GCS object path | Size | Worker |
+|---|---|---|---|
+| `data/models/moondream-0_5b-int8.mf` ⚠️ *generate first* | `vlm/moondream/v1/moondream-0_5b-int8.mf` | ~600 MB | `ocr-vlm-moondream` |
+| `vlm_training/checkpoints/receipt_vlm_500m_merged.pt` | `vlm/receipt-vlm/v1/receipt_vlm_500m_merged.pt` | 1.82 GB | `ocr-vlm-receipt` |
+| `vlm_training/checkpoints/ocr_vlm_epoch050_loss0.3619.pt` | `vlm/ocr-vlm-scratch/v1/ocr_vlm_epoch050_loss0.3619.pt` | 105 MB | `ocr-vlm-scratch` |
+| `vlm_training/checkpoints/tokenizer_20260607_0900.json` | `vlm/ocr-vlm-scratch/v1/tokenizer_20260607_0900.json` | 993 B | `ocr-vlm-scratch` |
+
+The last two are a **pair**: the from-scratch checkpoint is useless without the character tokenizer
+fitted alongside it. Ship them together.
+
+> ⚠️ **The Moondream `.mf` is not in the repo.** `data/models/` is gitignored and empty on a fresh
+> clone. Generate it before uploading, and upload the **decompressed `.mf`**, not the `.mf.gz`:
+>
+> ```bash
+> python scripts/download_moondream_weights.py    # 593 MB .mf.gz from HF → data/models/*.mf
+> ```
+
+From the **monorepo root**:
+
+```bash
+gsutil cp dev_ocr/data/models/moondream-0_5b-int8.mf \
+  gs://price-tracker-prod-01-models/vlm/moondream/v1/
+
+gsutil cp dev_ocr/vlm_training/checkpoints/receipt_vlm_500m_merged.pt \
+  gs://price-tracker-prod-01-models/vlm/receipt-vlm/v1/
+
+gsutil cp dev_ocr/vlm_training/checkpoints/ocr_vlm_epoch050_loss0.3619.pt \
+          dev_ocr/vlm_training/checkpoints/tokenizer_20260607_0900.json \
+          gs://price-tracker-prod-01-models/vlm/ocr-vlm-scratch/v1/
+```
+
+No IAM change is needed — the worker service account already has `object_viewer` on that bucket
+(`infra/envs/prod/storage.tf`). `worker-ocr-vlm-receipt` additionally needs its CLIP + SmolLM2
+backbones **baked into the image**, not uploaded: Cloud Run runs `PRIVATE_RANGES_ONLY` and cannot
+reach the HuggingFace Hub at cold start.
+
+**Version by prefix, never by overwrite.** To ship a new checkpoint, upload under `v2/` and bump the
+matching `*_model_gcs_uri` variable. Overwriting an object in place lets a warm instance keep serving
+the old weights (`ensure_weights` skips the download on a size match) while a cold one picks up the
+new ones. Details and the epoch050-vs-040 rationale: **Entry 19** in [`documentation.md`](documentation.md).
+
 ### The library is a frozen copy of this package
 
 The code shared by those workers lives in **`libs/pricetracker_receipt_pipeline`**: the parser, the
