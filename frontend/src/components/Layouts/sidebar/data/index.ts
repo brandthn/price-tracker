@@ -1,27 +1,57 @@
 import * as Icons from "../icons";
 
-export const NAV_DATA = [
+type NavSubItem = { title: string; url: string };
+
+type NavItem = {
+  title: string;
+  url?: string;
+  icon: (props: { className?: string; "aria-hidden"?: boolean | "true" }) => React.ReactNode;
+  items: NavSubItem[];
+};
+
+type NavSection = { label: string; items: NavItem[] };
+
+// Navigation orientée valeur : observer (données publiques) → mon espace
+// (données personnelles). Le jargon pipeline (OCR, statuts techniques)
+// n'apparaît jamais ici.
+export const NAV_DATA: NavSection[] = [
   {
-    label: "PRICETRACKER",
+    label: "Observer",
     items: [
       {
-        title: "Dashboard",
+        title: "Observatoire",
         url: "/",
-        icon: Icons.HomeIcon,
+        icon: Icons.PieChart,
         items: [],
       },
       {
-        title: "Tickets",
-        icon: Icons.Table,
-        items: [
-          { title: "Mes tickets", url: "/tickets" },
-          { title: "Uploader un ticket", url: "/tickets/upload" },
-        ],
+        title: "Produits & prix",
+        url: "/products",
+        icon: Icons.FourCircle,
+        items: [],
       },
       {
-        title: "Catalogue",
-        icon: Icons.FourCircle,
-        items: [{ title: "Recherche produit", url: "/products" }],
+        title: "Enseignes",
+        url: "/enseignes",
+        icon: Icons.Storefront,
+        items: [],
+      },
+    ],
+  },
+  {
+    label: "Mon espace",
+    items: [
+      {
+        title: "Mon budget",
+        url: "/budget",
+        icon: Icons.User,
+        items: [],
+      },
+      {
+        title: "Mes tickets",
+        url: "/tickets",
+        icon: Icons.Table,
+        items: [],
       },
     ],
   },

@@ -1,9 +1,17 @@
 // Wrapper fetch typé pour l'API backend FastAPI (Cloud Run).
 // Lit `NEXT_PUBLIC_API_BASE_URL` côté serveur ET client (RSC + client components).
-// Mode démo Phase 10 : Bearer accepté tel quel par le backend (`PRT_AUTH_DISABLE=1`).
+//
+// Auth : pour les appels `authenticated`, on forwarde l'ID token Firebase réel
+// (cookie `pt_id_token`, cf. lib/auth/token.ts). Si aucun token n'est présent
+// (utilisateur non connecté) et qu'un `NEXT_PUBLIC_DEMO_BEARER` est défini, on
+// retombe sur ce Bearer démo — utile tant que le backend tourne en
+// `PRT_AUTH_DISABLE=1`. Une fois l'auth backend activée, l'absence de token
+// donnera un 401 propre (l'AuthGuard empêche d'y arriver non connecté).
+
+import { getRequestToken } from "../auth/token";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-const DEMO_BEARER = process.env.NEXT_PUBLIC_DEMO_BEARER ?? "demo";
+const DEMO_BEARER = process.env.NEXT_PUBLIC_DEMO_BEARER ?? "";
 
 if (!API_BASE) {
   // Log au démarrage côté serveur — le frontend reste utilisable pour les pages
@@ -54,7 +62,10 @@ export async function apiFetch<T>(
     headers["Content-Type"] = "application/json";
   }
   if (authenticated) {
-    headers["Authorization"] = `Bearer ${DEMO_BEARER}`;
+    const token = (await getRequestToken()) ?? DEMO_BEARER;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
   }
 
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;

@@ -4,6 +4,8 @@ import { getTicket } from "@/lib/api/tickets";
 import { ApiError } from "@/lib/api/client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ItemsValidator } from "./_components/items-validator";
+import { OcrFeedback } from "./_components/ocr-feedback";
+import { TicketImage } from "./_components/ticket-image";
 
 export const dynamic = "force-dynamic";
 
@@ -22,32 +24,45 @@ export default async function TicketDetailPage({
     throw err;
   }
 
+  const hasOcrResult =
+    ticket.status === "ocr_done" || ticket.status === "validated";
+
   return (
     <>
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link
-            href="/tickets"
-            className="text-sm text-primary hover:underline"
-          >
-            ← Tickets
+          <Link href="/tickets" className="text-sm text-primary hover:underline">
+            ← Mes tickets
           </Link>
           <h1 className="mt-2 text-heading-4 font-bold text-dark dark:text-white">
             {ticket.enseigne ?? "Ticket sans enseigne"}
           </h1>
           <p className="text-sm text-dark-6">
-            {ticket.date_ticket ?? "Date inconnue"} ·{" "}
-            <code className="text-xs">{ticket.id}</code>
+            {ticket.date_ticket ?? "Date inconnue"}
           </p>
         </div>
         <StatusBadge status={ticket.status} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Meta ticket={ticket} />
+        {/* Colonne gauche : la photo du ticket, visible d'emblée. */}
+        <aside className="space-y-4">
+          <TicketImage ticketId={ticket.id} />
+          <ReadingCard ticket={ticket} />
+        </aside>
 
-        <div className="lg:col-span-2">
+        {/* Colonne droite : lecture à vérifier, dépliée. */}
+        <div className="space-y-6 lg:col-span-2">
+          {hasOcrResult && (
+            <OcrFeedback
+              ticketId={ticket.id}
+              initialFeedback={ticket.last_feedback}
+              initialAttempts={ticket.ocr_attempts}
+            />
+          )}
+
           <ItemsValidator
+            key={ticket.updated_at}
             ticketId={ticket.id}
             initialItems={ticket.items}
             ticketStatus={ticket.status}
@@ -58,54 +73,35 @@ export default async function TicketDetailPage({
   );
 }
 
-function Meta({
+function ReadingCard({
   ticket,
 }: {
   ticket: Awaited<ReturnType<typeof getTicket>>;
 }) {
   const hasAnalyse = ticket.ocr_confidence != null || ticket.ocr_error;
-  return (
-    <aside className="space-y-4">
-      {hasAnalyse && (
-        <div className="rounded-[10px] bg-white p-5 shadow-1 dark:bg-gray-dark">
-          <h3 className="mb-3 text-sm font-semibold uppercase text-dark-6">
-            Analyse
-          </h3>
-          <dl className="space-y-2 text-sm">
-            {ticket.ocr_confidence != null && (
-              <Row
-                label="Confiance"
-                value={`${(ticket.ocr_confidence * 100).toFixed(0)}%`}
-              />
-            )}
-            {ticket.ocr_error && (
-              <Row label="Erreur" value={ticket.ocr_error} variant="error" />
-            )}
-          </dl>
-        </div>
-      )}
+  if (!hasAnalyse) return null;
 
-      <div className="rounded-[10px] bg-white p-5 shadow-1 dark:bg-gray-dark">
-        <h3 className="mb-3 text-sm font-semibold uppercase text-dark-6">
-          Synthèse
-        </h3>
-        <dl className="space-y-2 text-sm">
+  return (
+    <div className="rounded-[10px] bg-white p-5 shadow-1 dark:bg-gray-dark">
+      <h3 className="mb-3 text-sm font-semibold uppercase text-dark-6">
+        Lecture du ticket
+      </h3>
+      <dl className="space-y-2 text-sm">
+        {ticket.ocr_confidence != null && (
           <Row
-            label="Total ticket"
-            value={
-              ticket.total_eur != null
-                ? `${ticket.total_eur.toFixed(2)} €`
-                : "—"
-            }
+            label="Qualité de lecture"
+            value={`${(ticket.ocr_confidence * 100).toFixed(0)} %`}
           />
-          <Row label="Lignes" value={String(ticket.items.length)} />
+        )}
+        {ticket.ocr_error && (
           <Row
-            label="Validées"
-            value={String(ticket.items.filter((i) => i.validated_by_user).length)}
+            label="Lecture"
+            value="Échouée — reprenez la photo, bien à plat et nette."
+            variant="error"
           />
-        </dl>
-      </div>
-    </aside>
+        )}
+      </dl>
+    </div>
   );
 }
 

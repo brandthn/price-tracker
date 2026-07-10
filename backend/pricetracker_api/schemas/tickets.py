@@ -26,6 +26,11 @@ class TicketUploadURLResponse(BaseModel):
     content_type: ContentType
 
 
+class TicketImageURLResponse(BaseModel):
+    read_url: str
+    expires_at: datetime.datetime
+
+
 class PrixExtraitOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,6 +50,9 @@ class PrixExtraitOut(BaseModel):
     validated_by_user: bool
 
 
+FeedbackRating = Literal["up", "down"]
+
+
 class TicketOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,8 +63,11 @@ class TicketOut(BaseModel):
     total_eur: float | None
     ocr_confidence: float | None
     ocr_engine: str | None
+    ocr_model: str | None
     ocr_duration_ms: int | None
     ocr_error: str | None
+    ocr_attempts: int
+    last_feedback: FeedbackRating | None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -84,3 +95,19 @@ class TicketsListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class FeedbackRequest(BaseModel):
+    """Avis 👍/👎 de l'utilisateur sur l'output OCR d'un ticket."""
+
+    rating: FeedbackRating
+
+
+class FeedbackResponse(BaseModel):
+    """Renvoyé après un feedback : ticket à jour + indication de re-OCR lancé."""
+
+    ticket: TicketDetailOut
+    retry_triggered: bool = Field(
+        default=False,
+        description="True si un 👎 a déclenché un re-OCR tier-2 (sinon plafond atteint / 👍).",
+    )

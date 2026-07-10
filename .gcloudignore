@@ -10,6 +10,21 @@
 /data/
 /docs/
 
+# dev_ocr : le Dockerfile COPY tout dev_ocr/, mais le build (uv sync) n'a besoin
+# que de src/ + pyproject.toml + README.md. On exclut les poids ML + datasets
+# (350 Mo) et les notebooks (36 Mo) → c'était l'essentiel des 437 MiB uploadés.
+/dev_ocr/data/
+/dev_ocr/notebook_crées/
+/dev_ocr/notebook_trouvés/
+/dev_ocr/materiaux_dev_ocr/
+/dev_ocr/documentation/
+
+# Secrets — ne JAMAIS uploader dans le bucket Cloud Build.
+vertex-sa.json
+*-sa.json
+*.pem
+*.p12
+
 # Python artifacts
 **/__pycache__
 **/*.py[cod]

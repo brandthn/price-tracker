@@ -28,12 +28,15 @@ export default async function TicketsPage({
           <h1 className="text-heading-4 font-bold text-dark dark:text-white">
             Mes tickets
           </h1>
+          <p className="mt-1 text-sm text-dark-5 dark:text-dark-6">
+            Chaque ticket alimente votre budget et l&apos;observatoire.
+          </p>
         </div>
         <Link
           href="/tickets/upload"
-          className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
         >
-          + Uploader
+          + Ajouter un ticket
         </Link>
       </div>
 
@@ -48,14 +51,14 @@ export default async function TicketsPage({
           {payload.items.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm text-dark-6">
-                Aucun ticket. Commence par{" "}
+                Aucun ticket pour l&apos;instant.{" "}
                 <Link
                   href="/tickets/upload"
                   className="text-primary hover:underline"
                 >
-                  uploader le premier
-                </Link>
-                .
+                  Photographiez le premier
+                </Link>{" "}
+                — votre suivi démarre en deux minutes.
               </p>
             </div>
           ) : (

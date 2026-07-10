@@ -15,9 +15,25 @@ from .logging import get_logger
 logger = get_logger(__name__)
 
 
-def _chunks(items: Sequence[Any], size: int) -> Iterable[Sequence[Any]]:
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
+def _batches_by_budget(
+    texts: Sequence[str], max_count: int, max_chars: int
+) -> Iterable[list[str]]:
+    """Regroupe les textes en batches respectant DEUX bornes de l'API Vertex :
+    - `max_count` instances par requête (250) ;
+    - `max_chars` caractères cumulés par requête (proxy du plafond de 20000
+      tokens/requête — le français accentué ~2.9 char/token).
+    Packing glouton ; un texte seul dépassant le budget forme son propre batch."""
+    batch: list[str] = []
+    chars = 0
+    for t in texts:
+        tlen = len(t)
+        if batch and (len(batch) >= max_count or chars + tlen > max_chars):
+            yield batch
+            batch, chars = [], 0
+        batch.append(t)
+        chars += tlen
+    if batch:
+        yield batch
 
 
 class VertexEmbedder:
@@ -33,13 +49,17 @@ class VertexEmbedder:
         location: str,
         model_name: str,
         batch_size: int,
-        task_type: str = "RETRIEVAL_DOCUMENT",
+        task_type: str = "SEMANTIC_SIMILARITY",
         output_dim: int = 768,
+        max_request_chars: int = 45000,
     ) -> None:
         self._project = project
         self._location = location
         self._model_name = model_name
         self._batch_size = max(1, min(batch_size, 250))
+        # Plafond de caractères par requête : ~20000 tokens/requête côté API.
+        # 45000 chars laisse une marge pour le français accentué (~2.9 char/token).
+        self._max_request_chars = max_request_chars
         self._task_type = task_type
         self._output_dim = output_dim
         self._model: Any | None = None
@@ -62,7 +82,9 @@ class VertexEmbedder:
         from vertexai.language_models import TextEmbeddingInput
 
         out: list[list[float]] = []
-        for batch in _chunks(list(texts), self._batch_size):
+        for batch in _batches_by_budget(
+            list(texts), max_count=self._batch_size, max_chars=self._max_request_chars
+        ):
             inputs = [TextEmbeddingInput(text=t, task_type=self._task_type) for t in batch]
             kwargs: dict[str, Any] = {}
             # `text-embedding-004` supporte `output_dimensionality` ; on le

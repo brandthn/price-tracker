@@ -1,7 +1,10 @@
 import { apiFetch } from "./client";
 import type {
+  FeedbackRating,
+  FeedbackResponse,
   Ticket,
   TicketDetail,
+  TicketImageURLResponse,
   TicketItemPatch,
   TicketsListResponse,
   UploadURLResponse,
@@ -31,6 +34,15 @@ export function getTicket(id: string): Promise<TicketDetail> {
   return apiFetch<TicketDetail>(`/tickets/${id}`, { authenticated: true });
 }
 
+// Signed URL de lecture (GET) de l'image du ticket, pour l'afficher côté UI.
+export function getTicketImageURL(
+  id: string,
+): Promise<TicketImageURLResponse> {
+  return apiFetch<TicketImageURLResponse>(`/tickets/${id}/image-url`, {
+    authenticated: true,
+  });
+}
+
 export function patchTicketItems(
   id: string,
   items: TicketItemPatch[],
@@ -38,6 +50,18 @@ export function patchTicketItems(
   return apiFetch<TicketDetail>(`/tickets/${id}/items`, {
     method: "PATCH",
     body: { items },
+    authenticated: true,
+  });
+}
+
+// Boucle de feedback : 👍/👎 sur l'output OCR. Un 👎 déclenche un re-OCR tier-2.
+export function submitFeedback(
+  id: string,
+  rating: FeedbackRating,
+): Promise<FeedbackResponse> {
+  return apiFetch<FeedbackResponse>(`/tickets/${id}/feedback`, {
+    method: "POST",
+    body: { rating },
     authenticated: true,
   });
 }
@@ -59,4 +83,10 @@ export async function uploadToSignedURL(
   }
 }
 
-export type { Ticket, TicketDetail, TicketsListResponse, UploadURLResponse };
+export type {
+  FeedbackResponse,
+  Ticket,
+  TicketDetail,
+  TicketsListResponse,
+  UploadURLResponse,
+};

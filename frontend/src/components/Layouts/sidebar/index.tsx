@@ -149,12 +149,20 @@ export function Sidebar() {
                                 : "/" +
                                   item.title.toLowerCase().split(" ").join("-");
 
+                            // Actif aussi sur les sous-pages (/products/123,
+                            // /tickets/abc) — match par préfixe sauf racine.
+                            const isActive =
+                              href === "/"
+                                ? pathname === "/"
+                                : pathname === href ||
+                                  pathname.startsWith(`${href}/`);
+
                             return (
                               <MenuItem
                                 className="flex items-center gap-3 py-3"
                                 as="link"
                                 href={href}
-                                isActive={pathname === href}
+                                isActive={isActive}
                               >
                                 <item.icon
                                   className="size-6 shrink-0"
@@ -172,6 +180,21 @@ export function Sidebar() {
                 </nav>
               </div>
             ))}
+          </div>
+
+          {/* CTA contributif permanent : le geste central du produit. */}
+          <div className="mt-4 pr-4">
+            <Link
+              href="/tickets/upload"
+              onClick={() => isMobile && toggleSidebar()}
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              <span aria-hidden className="text-lg leading-none">+</span>
+              Ajouter un ticket
+            </Link>
+            <p className="mt-2 text-center text-xs text-dark-5 dark:text-dark-6">
+              Chaque ticket enrichit l&apos;observatoire
+            </p>
           </div>
         </div>
       </aside>

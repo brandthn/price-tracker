@@ -49,12 +49,19 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# OFF bulk dump + enrichment artifacts (gros fichiers régénérables, jamais commit —
+# visibles dans le repo sous data/off_bulk/ pour inspection).
+data/off_bulk/
+
 # Secrets & creds
 *.pem
 *.key
 service-account*.json
 firebase-admin*.json
 gcp-key*.json
+vertex-sa.json
+*-sa.json
+vertex-*.json
 =======
 images_tickets_caisse
 

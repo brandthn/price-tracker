@@ -63,11 +63,13 @@ module "run_backend" {
     GOOGLE_CLOUD_PROJECT = var.project_id
     PRT_GCP_REGION       = var.region
 
-    # Mode démo — bypasse la vérification Firebase JWT.
-    # Maintenu jusqu'à Phase 10 (frontend Next.js + Firebase Web SDK).
-    # Revert : mettre PRT_ENV=prod + PRT_AUTH_DISABLE=0 (ou supprimer la ligne).
-    PRT_ENV          = "dev"
-    PRT_AUTH_DISABLE = "1"
+    # Vérification Firebase JWT : pilotée par `var.backend_auth_enabled`.
+    #   false (défaut) → mode démo (PRT_ENV=dev, PRT_AUTH_DISABLE=1, user fake).
+    #   true           → prod (PRT_ENV=prod, PRT_AUTH_DISABLE=0, vrai per-user).
+    # ⚠️ Ne passer true qu'après déploiement du frontend avec config Firebase.
+    # Cf. docs/phase-11-auth-handoff.md.
+    PRT_ENV          = var.backend_auth_enabled ? "prod" : "dev"
+    PRT_AUTH_DISABLE = var.backend_auth_enabled ? "0" : "1"
 
     PRT_LOG_LEVEL       = "INFO"
     PRT_OPENAPI_ENABLED = "true"
@@ -92,6 +94,11 @@ module "run_backend" {
     PRT_PG_DB        = module.cloud_sql_main.db_name
     PRT_PG_USER      = module.cloud_sql_main.db_user
     PRT_PG_POOL_SIZE = "4"
+
+    # Boucle de feedback : un 👎 publie sur ce topic pour déclencher le re-OCR
+    # tier-2. Plafond d'essais = garde-fou anti-boucle (tier-1=1, tier-2=2).
+    PRT_OCR_RETRY_TOPIC  = module.pubsub.topics["ocr-retry"].name
+    PRT_MAX_OCR_ATTEMPTS = "2"
   }
 
   secret_env = {
@@ -165,6 +172,65 @@ module "run_worker_ocr" {
   }
 
   labels = merge(var.labels, { component = "worker-ocr" })
+}
+
+# --- Worker OCR tier-2 / LLM (Phase 12 — boucle de feedback) --------------
+# Worker OCR **indépendant** déclenché par un 👎 utilisateur : le backend publie
+# le ticket_id sur le topic `ocr-retry`, qui pousse vers le `POST /push` de ce
+# service. Même contrat que worker-ocr (« donne-moi un ticket, je fais l'OCR »),
+# mais avec un LLM Groq + prompt correctif réutilisant l'extraction précédente.
+# Vision cible : tier-1 = VLM/Tesseract maison, tier-2 (ici) = LLM Groq.
+module "run_worker_ocr_llm" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-worker-ocr-llm"
+  image                 = "${module.artifact_registry.docker_registry_url}/worker-ocr-llm:${var.worker_ocr_llm_image_tag}"
+  service_account_email = module.iam.emails["worker"]
+
+  min_instances   = 0
+  max_instances   = 5
+  cpu             = "2"
+  memory          = "2Gi"
+  timeout_seconds = 540
+
+  vpc_subnet = local.cloud_run_subnet
+  vpc_egress = "PRIVATE_RANGES_ONLY"
+  ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+
+    # Seconde passe (re-OCR sur 👎) via Vertex AI Gemini. Le tier-1 reste sur
+    # Groq ; la diversité de modèle est volontaire (second avis indépendant).
+    PRT_OCR_MODEL        = "gemini-2.5-flash"
+    PRT_OCR_ENGINE_LABEL = "gemini"
+    # Endpoint Vertex — "global" couvre gemini-2.5-flash.
+    PRT_VERTEX_LOCATION = "global"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+    GROQ_API_KEY = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-groq-api-key"]
+      version = "latest"
+    }
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-llm" })
 }
 
 # --- Worker Ingestion (Phase 6.1) ----------------------------------------
@@ -288,7 +354,7 @@ module "run_worker_off" {
 
     PRT_VERTEX_MODEL      = "text-embedding-004"
     PRT_VERTEX_BATCH      = "250"
-    PRT_VERTEX_TASK_TYPE  = "RETRIEVAL_DOCUMENT"
+    PRT_VERTEX_TASK_TYPE  = "SEMANTIC_SIMILARITY"
     PRT_VERTEX_OUTPUT_DIM = "768"
 
     PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
@@ -363,7 +429,7 @@ module "run_worker_indices" {
     PRT_INDICES_MIN_OBSERVATIONS       = "3"
     PRT_INDICES_WINDOW_WEEKS_AGGREGATS = "12"
     PRT_INDICES_WINDOW_WEEKS_RANKINGS  = "8"
-    PRT_INDICES_Z_THRESHOLD            = "3.0"
+    PRT_INDICES_Z_THRESHOLD            = "2.0"
     PRT_INDICES_TOP_N_RANKINGS         = "500"
 
     PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
@@ -480,6 +546,7 @@ module "run_worker_alertes" {
 locals {
   worker_run_services = toset([
     module.run_worker_ocr.name,
+    module.run_worker_ocr_llm.name,
     module.run_worker_ingestion.name,
     module.run_worker_off.name,
     module.run_worker_indices.name,
@@ -496,3 +563,4 @@ resource "google_cloud_run_v2_service_iam_member" "worker_sa_invoker" {
   role     = "roles/run.invoker"
   member   = local.worker_sa
 }
+

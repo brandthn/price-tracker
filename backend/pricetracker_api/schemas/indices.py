@@ -24,16 +24,18 @@ class InflationIndexOut(BaseModel):
     )
     current: float | None = Field(default=None, description="Valeur la plus récente.")
     series: list[IndexPoint] = Field(default_factory=list)
-    insee_comparison: float | None = Field(
-        default=None,
-        description="Indice INSEE COICOP correspondant à la même période, si dispo.",
-    )
 
 
 class RankingItem(BaseModel):
     ean: str | None
     produit_nom: str | None
     brand: str | None
+    image_url: str | None = None
+    in_catalog: bool = Field(
+        default=True,
+        description="True si l'EAN est au catalogue Cloud SQL `products`. "
+        "False = produit connu par ses seuls prix (à afficher accompagné, jamais nu).",
+    )
     pct_change: float = Field(description="Variation en %. +10.5 = +10.5%.")
     price_eur_current: float | None
     price_eur_previous: float | None

@@ -120,3 +120,57 @@ def generate_ticket_upload_url(
         expires_at=expiration,
         content_type=content_type,
     )
+
+
+@dataclass
+class TicketReadURL:
+    read_url: str
+    expires_at: datetime.datetime
+
+
+def _object_name_from_gcs_path(gcs_path: str) -> str:
+    """Extrait le nom d'objet (chemin relatif au bucket) d'un `gs://bucket/obj`."""
+    settings = get_settings()
+    prefix = f"gs://{settings.prt_gcs_bucket_bronze}/"
+    if not gcs_path.startswith(prefix):
+        raise ValueError(f"gcs_path outside bronze bucket: {gcs_path!r}")
+    return gcs_path[len(prefix) :]
+
+
+def generate_ticket_read_url(*, gcs_path: str) -> TicketReadURL:
+    """Génère une Signed URL V4 GET pour afficher l'image d'un ticket.
+
+    Même mécanisme d'impersonation IAM `signBlob` que l'upload (org policy
+    interdit les clés JSON). L'appelant doit avoir vérifié que le ticket
+    appartient bien à l'utilisateur avant d'exposer l'URL.
+    """
+    settings = get_settings()
+    if not settings.prt_gcs_bucket_bronze:
+        raise RuntimeError("PRT_GCS_BUCKET_BRONZE not configured.")
+
+    credentials, _project = adc_default()
+    credentials.refresh(GoogleAuthRequest())
+    sa_email = getattr(credentials, "service_account_email", None)
+    if not sa_email:
+        raise RuntimeError(
+            "ADC credentials do not expose service_account_email. "
+            "Run with a service account (Cloud Run) or impersonate one locally."
+        )
+
+    object_name = _object_name_from_gcs_path(gcs_path)
+    bucket = _storage_client().bucket(settings.prt_gcs_bucket_bronze)
+    blob = bucket.blob(object_name)
+
+    ttl_min = settings.prt_signed_url_ttl_min
+    expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=ttl_min)
+
+    read_url = blob.generate_signed_url(
+        version="v4",
+        expiration=datetime.timedelta(minutes=ttl_min),
+        method="GET",
+        service_account_email=sa_email,
+        access_token=credentials.token,
+    )
+
+    logger.info("signed_read_url_generated", object_name=object_name, ttl_min=ttl_min)
+    return TicketReadURL(read_url=read_url, expires_at=expiration)

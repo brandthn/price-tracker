@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getTicket,
@@ -24,19 +24,31 @@ const POLL_MAX_ATTEMPTS = 60; // 5 min max
 export function UploadForm() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const dragRef = useRef<HTMLLabelElement>(null);
+
+  // Aperçu local (objet URL) — révoqué à chaque changement / démontage.
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const handleFile = (f: File | null) => {
     setError(null);
     if (!f) return setFile(null);
     if (!["image/jpeg", "image/png"].includes(f.type)) {
-      setError(`Format non supporté (${f.type}). JPEG ou PNG uniquement.`);
+      setError(`Format non pris en charge (${f.type}). Utilisez un JPEG ou un PNG.`);
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      setError(`Image trop grosse (${(f.size / 1024 / 1024).toFixed(1)} MB > 10 MB).`);
+      setError(`Image trop lourde (${(f.size / 1024 / 1024).toFixed(1)} Mo, maximum 10 Mo).`);
       return;
     }
     setFile(f);
@@ -55,7 +67,7 @@ export function UploadForm() {
       await uploadToSignedURL(signed.upload_url, file, contentType);
 
       setStage("polling");
-      toast.success("Ticket reçu — analyse en cours…");
+      toast.success("Ticket reçu, analyse en cours.");
 
       // Polling jusqu'à status !== pending|processing
       let attempts = 0;
@@ -70,9 +82,11 @@ export function UploadForm() {
           ) {
             setStage(t.status === "ocr_failed" ? "failed" : "done");
             if (t.status === "ocr_failed") {
-              toast.error("L'analyse a échoué — réessaie avec une autre photo.");
+              toast.error("La lecture a échoué. Reprenez la photo, bien à plat et nette.");
+              setError(
+                "La lecture a échoué. Reprenez la photo, bien à plat, nette et bien éclairée.",
+              );
             } else {
-              toast.success("Ticket analysé !");
               router.push(`/tickets/${signed.ticket_id}`);
             }
             return;
@@ -80,23 +94,23 @@ export function UploadForm() {
           if (attempts >= POLL_MAX_ATTEMPTS) {
             setStage("failed");
             setError(
-              "L'analyse prend plus de temps que prévu. Tu peux retrouver ton ticket dans la liste « Mes tickets »."
+              "L'analyse prend plus de temps que prévu. Vous retrouverez ce ticket dans « Mes tickets ».",
             );
             return;
           }
           setTimeout(tick, POLL_INTERVAL_MS);
         } catch {
           setStage("failed");
-          setError("Une erreur est survenue pendant l'analyse. Réessaie dans un instant.");
+          setError("Une erreur est survenue pendant l'analyse. Réessayez dans un instant.");
         }
       };
       setTimeout(tick, POLL_INTERVAL_MS);
     } catch (err) {
       setStage("failed");
       if (err instanceof ApiError) {
-        setError(`Erreur ${err.status} — ${err.detail ?? "réessaie dans un instant."}`);
+        setError(`Erreur ${err.status} — ${err.detail ?? "réessayez dans un instant."}`);
       } else {
-        setError("Impossible de joindre le serveur. Vérifie ta connexion.");
+        setError("Impossible de joindre le serveur. Vérifiez votre connexion.");
       }
     }
   }, [file, router]);
@@ -118,37 +132,44 @@ export function UploadForm() {
         onDrop={(e) => {
           e.preventDefault();
           dragRef.current?.classList.remove("border-primary", "bg-primary/5");
-          handleFile(e.dataTransfer.files[0] ?? null);
+          if (!disabled) handleFile(e.dataTransfer.files[0] ?? null);
         }}
-        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-stroke px-6 py-10 text-center transition-colors hover:border-primary dark:border-dark-3"
+        className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-stroke px-6 py-8 text-center transition-colors hover:border-primary dark:border-dark-3 ${
+          disabled ? "pointer-events-none opacity-60" : ""
+        }`}
       >
         <input
           id="ticket-file"
           type="file"
           accept="image/jpeg,image/png"
+          capture="environment"
           className="sr-only"
           disabled={disabled}
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
-        {file ? (
+        {previewUrl ? (
           <>
-            <span className="text-base font-medium text-dark dark:text-white">
-              {file.name}
+            {/* Aperçu local avant envoi — pas besoin de next/image (blob URL). */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt="Aperçu du ticket"
+              className="max-h-72 w-auto rounded-md border border-stroke object-contain dark:border-dark-3"
+            />
+            <span className="text-sm font-medium text-dark dark:text-white">
+              {file?.name}
             </span>
             <span className="text-xs text-dark-6">
-              {(file.size / 1024).toFixed(0)} KB · {file.type}
-            </span>
-            <span className="mt-2 text-xs text-primary">
-              Cliquer pour changer d&apos;image
+              {file ? (file.size / 1024).toFixed(0) : "0"} Ko · appuyez pour changer de photo
             </span>
           </>
         ) : (
           <>
             <span className="text-base font-medium text-dark dark:text-white">
-              Cliquer ou glisser une image ici
+              Prendre en photo ou choisir un fichier
             </span>
             <span className="text-xs text-dark-6">
-              JPEG ou PNG, max 10 MB
+              JPEG ou PNG, 10 Mo maximum. Cadrez le ticket entier, bien à plat.
             </span>
           </>
         )}
@@ -156,7 +177,7 @@ export function UploadForm() {
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-light bg-red-light-5 p-3 text-sm text-red dark:border-red-dark dark:bg-red/10">
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -172,7 +193,7 @@ export function UploadForm() {
 
         {stage === "polling" && (
           <p className="text-xs text-dark-6">
-            Cela prend généralement quelques secondes.
+            La lecture prend généralement quelques secondes.
           </p>
         )}
       </div>
@@ -185,15 +206,15 @@ export function UploadForm() {
 function labelForStage(stage: Stage): string {
   switch (stage) {
     case "idle":
-      return "Envoyer mon ticket";
+      return "Envoyer le ticket";
     case "signing":
       return "Préparation…";
     case "uploading":
-      return "Envoi de l'image…";
+      return "Envoi de la photo…";
     case "polling":
-      return "Analyse en cours…";
+      return "Lecture du ticket…";
     case "done":
-      return "Terminé ✓";
+      return "Terminé";
     case "failed":
       return "Réessayer";
   }
@@ -201,9 +222,9 @@ function labelForStage(stage: Stage): string {
 
 const STEPS: { key: Stage; label: string }[] = [
   { key: "signing", label: "Préparation" },
-  { key: "uploading", label: "Envoi de l'image" },
-  { key: "polling", label: "Analyse de ton ticket" },
-  { key: "done", label: "Prêt à valider" },
+  { key: "uploading", label: "Envoi de la photo" },
+  { key: "polling", label: "Lecture du ticket" },
+  { key: "done", label: "Prêt à vérifier" },
 ];
 
 function Steps({ stage }: { stage: Stage }) {

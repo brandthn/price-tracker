@@ -26,8 +26,12 @@ export default async function ProductsPage({
     <>
       <div className="mb-6">
         <h1 className="text-heading-4 font-bold text-dark dark:text-white">
-          Catalogue produits
+          Produits &amp; prix
         </h1>
+        <p className="mt-1 text-sm text-dark-5 dark:text-dark-6">
+          Cherchez un produit pour voir son prix, son évolution et où il est
+          le moins cher.
+        </p>
       </div>
 
       <div className="rounded-[10px] bg-white p-6 shadow-1 dark:bg-gray-dark">
@@ -35,7 +39,7 @@ export default async function ProductsPage({
 
         {!query && (
           <p className="mt-6 text-sm text-dark-6">
-            Tape au moins 2 caractères pour lancer une recherche (ex:{" "}
+            Cherchez par nom, marque ou code-barres (ex :{" "}
             <Link href="/products?q=coca" className="text-primary hover:underline">
               coca
             </Link>
@@ -65,7 +69,7 @@ export default async function ProductsPage({
 
             {result.items.length === 0 ? (
               <p className="text-sm text-dark-6">
-                Aucun produit ne correspond à ta recherche.
+                Aucun produit ne correspond à votre recherche.
               </p>
             ) : (
               <ul className="divide-y divide-stroke dark:divide-dark-3">

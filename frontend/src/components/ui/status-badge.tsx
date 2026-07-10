@@ -3,17 +3,20 @@ import { cn } from "@/lib/utils";
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-yellow-light/30 text-orange-light-1",
   processing: "bg-blue-light/30 text-primary",
-  ocr_done: "bg-blue-light-2/30 text-primary",
+  ocr_processing: "bg-blue-light/30 text-primary",
+  ocr_done: "bg-green-light-7 text-green",
   ocr_failed: "bg-red-light-6 text-red",
   validated: "bg-green-light-7 text-green",
 };
 
+// Plus d'étape « à valider » côté user : un ticket analysé est pris en compte.
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente",
-  processing: "Traitement",
-  ocr_done: "OCR terminé",
+  processing: "Analyse…",
+  ocr_processing: "Analyse…",
+  ocr_done: "Pris en compte",
   ocr_failed: "Échec OCR",
-  validated: "Validé",
+  validated: "Pris en compte",
 };
 
 export function StatusBadge({ status }: { status: string }) {

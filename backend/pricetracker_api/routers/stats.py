@@ -50,12 +50,19 @@ async def get_brand_stats(brand: str) -> BrandStatsOut:
             status.HTTP_404_NOT_FOUND, detail=f"Brand {brand!r} not in catalog."
         )
 
-    # 2) Médiane variation — depuis Gold rankings_produits.
+    # 2) Médiane variation — Gold `rankings_produits` n'a pas de colonne
+    # brand (schéma réel : reference_week, product_code, prev/curr_median,
+    # pct_change RATIO) → join catalogue par EAN + conversion en %.
+    rankings_fq = bq.qualified(settings.prt_bq_dataset_gold, "rankings_produits")
+    catalogue_fq = bq.qualified(
+        settings.prt_bq_dataset_silver, settings.prt_bq_table_catalogue
+    )
     gold_sql = f"""
     SELECT
-      APPROX_QUANTILES(pct_change, 100)[OFFSET(50)] AS median_pct_change
-    FROM {bq.qualified(settings.prt_bq_dataset_gold, 'rankings_produits')}
-    WHERE LOWER(brand) = LOWER(@brand)
+      APPROX_QUANTILES(r.pct_change * 100, 100)[OFFSET(50)] AS median_pct_change
+    FROM {rankings_fq} r
+    JOIN {catalogue_fq} c ON c.ean = r.product_code
+    WHERE LOWER(c.brand) = LOWER(@brand)
     """
     gold_rows = await asyncio.to_thread(
         bq.query_dicts_safe,
@@ -67,12 +74,18 @@ async def get_brand_stats(brand: str) -> BrandStatsOut:
 
     # 3) Top hausses pour cette marque.
     top_sql = f"""
-    SELECT ean, produit_nom, brand, pct_change, price_eur_current,
-           price_eur_previous, sample_size
-    FROM {bq.qualified(settings.prt_bq_dataset_gold, 'rankings_produits')}
-    WHERE LOWER(brand) = LOWER(@brand)
-      AND category = 'top_increases'
-    ORDER BY pct_change DESC
+    SELECT
+      r.product_code AS ean,
+      c.name AS produit_nom,
+      c.brand,
+      r.pct_change * 100 AS pct_change,
+      r.curr_median AS price_eur_current,
+      r.prev_median AS price_eur_previous
+    FROM {rankings_fq} r
+    JOIN {catalogue_fq} c ON c.ean = r.product_code
+    WHERE LOWER(c.brand) = LOWER(@brand)
+      AND r.pct_change > 0
+    ORDER BY r.pct_change DESC
     LIMIT 5
     """
     top_rows = await asyncio.to_thread(

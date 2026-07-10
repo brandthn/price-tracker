@@ -30,6 +30,9 @@ locals {
     # N'autorise PAS la création/modification de bindings IAM.
     "roles/iam.serviceAccountUser",
 
+    # Compute Engine — administrer les instances
+    "roles/compute.instanceAdmin",
+
     # Secret Manager — lire valeurs + ajouter versions (rotations)
     "roles/secretmanager.secretAccessor",
     "roles/secretmanager.viewer",
@@ -40,6 +43,18 @@ locals {
 
     # Firebase — Auth + FCM en mode développeur
     "roles/firebase.developAdmin",
+
+    # Pub/Sub — créer/supprimer topics & subscriptions, publier/consommer
+    "roles/pubsub.admin",
+
+    # Cloud Build — déclencher `gcloud builds submit` pour builder des images
+    "roles/cloudbuild.builds.editor",
+
+    # Cloud Scheduler — déclencher manuellement les workers (`gcloud scheduler jobs run`)
+    "roles/cloudscheduler.admin",
+
+    # Service Usage — consommer les APIs activées du projet (quota project).
+    "roles/serviceusage.serviceUsageConsumer",
 
     # Monitoring + Logs
     "roles/monitoring.editor",

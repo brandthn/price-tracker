@@ -48,27 +48,44 @@ variable "worker_ingestion_image_tag" {
 variable "worker_off_image_tag" {
   description = "Tag de l'image worker-off en AR. Doit exister dans le repo prt-prod-docker."
   type        = string
-  default     = "13d832b"
+  default     = "43d4669"
 }
 
 variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
-  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
-  default = "63c5d4a"
+  default = "4f8ae38"
+}
+
+variable "backend_auth_enabled" {
+  description = <<-EOT
+    Active la vérification réelle des JWT Firebase côté backend (PRT_ENV=prod +
+    PRT_AUTH_DISABLE=0). `false` = mode démo (bypass, tous les appels mappés sur
+    un user fake — pas de per-user).
+
+    ⚠️ Passer à `true` UNIQUEMENT après avoir déployé le frontend avec sa config
+    Firebase (NEXT_PUBLIC_FIREBASE_*) : sinon le front démo envoie un Bearer
+    invalide → 401. Voir docs/phase-11-auth-handoff.md.
+  EOT
+  type        = bool
+  default     = true
 }
 
 variable "worker_ocr_image_tag" {
   description = "Tag de l'image worker-ocr en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr/cloudbuild.yaml)."
   type        = string
-  default     = "63c5d4a"
+  default     = "90598e4"
+}
+
+variable "worker_ocr_llm_image_tag" {
+  description = "Tag de l'image worker-ocr-llm (OCR tier-2) en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-llm/cloudbuild.yaml)."
+  type        = string
+  default = "08c2365"
 }
 
 variable "worker_indices_image_tag" {
   description = "Tag de l'image worker-indices en AR. Bumper après chaque build (gcloud builds submit . --config=workers/indices/cloudbuild.yaml)."
   type        = string
-  # Placeholder skeleton — Cloud Run garde l'image `us-docker.pkg.dev/cloudrun/container/hello`
-  # tant que ce default n'est pas remplacé par un SHA réel pushé en AR.
   default = "3576a7f"
 }
 
@@ -81,8 +98,7 @@ variable "worker_alertes_image_tag" {
 variable "frontend_image_tag" {
   description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
   type        = string
-  # Placeholder skeleton — le 1er apply après le 1er build remplace par le SHA réel.
-  default = "b518872"
+  default     = "bb0d230"
 }
 
 variable "frontend_cors_origins" {

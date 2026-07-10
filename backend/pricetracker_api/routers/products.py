@@ -1,6 +1,11 @@
-"""Router products — détail + recherche (BQ catalogue) + substituts (pgvector).
+"""Router products — détail + recherche + substituts sur Cloud SQL `products`,
+prix sur BQ Silver `open_prices_clean`.
 
-Important : le catalogue est partiel (worker OFF rate-limité à 15 rpm).
+Source de vérité du catalogue : Cloud SQL `products` (~14k EANs, 12k enrichis
+via OFF bulk + worker quotidien) — beaucoup plus complet que le miroir BQ
+`catalogue_produits`, qui ne sert plus ici qu'aux joins d'affichage des
+requêtes analytiques (observatoire/stats).
+
 On distingue 3 états par EAN :
   1. EAN absent de la table : renvoie 404.
   2. EAN présent avec `off_found=false` : renvoie 200 avec champs OFF NULL.
@@ -23,7 +28,15 @@ from .. import bq
 from ..config import get_settings
 from ..db import get_session
 from ..logging import get_logger
-from ..schemas.products import ProductOut, ProductSearchResult, SubstituteOut
+from ..models.products import Product
+from ..schemas.products import (
+    PricePoint,
+    ProductOut,
+    ProductPricesOut,
+    ProductSearchResult,
+    StorePrice,
+    SubstituteOut,
+)
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/products", tags=["products"])
@@ -56,53 +69,169 @@ def _row_to_product(row: dict) -> ProductOut:
 async def search_products(
     q: str = Query(min_length=2, max_length=100),
     limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
 ) -> ProductSearchResult:
-    """Recherche full-text simple sur name + brand. Tolère les EAN avec NULL
-    name/brand : ces lignes sont juste exclues du LIKE et donc des résultats.
+    """Recherche par nom, marque ou début d'EAN sur Cloud SQL `products`.
+
+    Filtre `off_found = TRUE` : les EAN non enrichis ont name/brand NULL,
+    inutilisables en résultat de recherche. L'ILIKE échappe %/_ pour que la
+    saisie utilisateur soit traitée littéralement.
     """
-    settings = get_settings()
-    sql = f"""
-    SELECT ean, name, brand, category_l1, category_l2, category_l3,
-           nutriscore, nova, ecoscore, image_url, off_found, source
-    FROM {bq.qualified(settings.prt_bq_dataset_silver, settings.prt_bq_table_catalogue)}
-    WHERE off_found = TRUE
-      AND (
-        LOWER(name) LIKE CONCAT('%', LOWER(@q), '%')
-        OR LOWER(brand) LIKE CONCAT('%', LOWER(@q), '%')
-      )
-    ORDER BY name
-    LIMIT @limit
-    """
-    rows = await asyncio.to_thread(
-        bq.query_dicts,
-        sql,
-        params=[
-            bigquery.ScalarQueryParameter("q", "STRING", q),
-            bigquery.ScalarQueryParameter("limit", "INT64", limit),
-        ],
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    sql = text(
+        """
+        SELECT ean, name, brand, category_l1, category_l2, category_l3,
+               nutriscore, nova, ecoscore, image_url, off_found, source
+        FROM products
+        WHERE off_found = TRUE
+          AND (
+            name ILIKE :pattern
+            OR brand ILIKE :pattern
+            OR ean LIKE :ean_prefix
+          )
+        ORDER BY name
+        LIMIT :limit
+        """
     )
-    items = [_row_to_product(r) for r in rows]
+    result = await session.execute(
+        sql,
+        {"pattern": f"%{escaped}%", "ean_prefix": f"{escaped}%", "limit": limit},
+    )
+    rows = result.mappings().all()
+    items = [_row_to_product(dict(r)) for r in rows]
     return ProductSearchResult(items=items, total=len(items))
 
 
 @router.get("/{ean}", response_model=ProductOut)
-async def get_product(ean: str) -> ProductOut:
+async def get_product(
+    ean: str,
+    session: AsyncSession = Depends(get_session),
+) -> ProductOut:
+    row = await session.get(Product, ean)
+    if row is not None:
+        return ProductOut(
+            ean=row.ean,
+            name=row.name,
+            brand=row.brand,
+            category_l1=row.category_l1,
+            category_l2=row.category_l2,
+            category_l3=row.category_l3,
+            nutriscore=row.nutriscore,
+            nova=row.nova,
+            ecoscore=row.ecoscore,
+            image_url=row.image_url,
+            off_found=bool(row.off_found),
+            catalog=True,
+            source=row.source,
+        )
+
+    # Hors catalogue : un EAN peut n'exister que par ses relevés Silver (codes
+    # magasin d'Open Prices, produits jamais enrichis). Plutôt qu'un 404 qui
+    # casse le clic depuis l'observatoire, on renvoie une fiche « prix seulement »
+    # (200, catalog=false) dès qu'au moins un prix existe. 404 seulement si
+    # l'EAN n'est nulle part.
     settings = get_settings()
-    sql = f"""
-    SELECT ean, name, brand, category_l1, category_l2, category_l3,
-           nutriscore, nova, ecoscore, image_url, off_found, source
-    FROM {bq.qualified(settings.prt_bq_dataset_silver, settings.prt_bq_table_catalogue)}
-    WHERE ean = @ean
-    LIMIT 1
-    """
-    rows = await asyncio.to_thread(
-        bq.query_dicts,
-        sql,
+    src = bq.qualified(settings.prt_bq_dataset_silver, "open_prices_clean")
+    exists = await asyncio.to_thread(
+        bq.query_dicts_safe,
+        f"SELECT 1 AS ok FROM {src} WHERE product_code = @ean LIMIT 1",
         params=[bigquery.ScalarQueryParameter("ean", "STRING", ean)],
+        context=f"product_price_only_probe_{ean}",
     )
-    if not rows:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"EAN {ean!r} not in catalog.")
-    return _row_to_product(rows[0])
+    if exists:
+        return ProductOut(ean=ean, off_found=False, catalog=False)
+    raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"EAN {ean!r} not in catalog.")
+
+
+@router.get("/{ean}/prices", response_model=ProductPricesOut)
+async def get_product_prices(ean: str) -> ProductPricesOut:
+    """Historique de prix + comparateur enseignes pour un EAN.
+
+    Source : Silver `open_prices_clean` (relevés Open Prices géolocalisés).
+    - `series` : médiane hebdo tous points de vente confondus (toute la
+      profondeur disponible — la fenêtre Open Prices est encore courte).
+    - `by_store` : médiane par enseigne sur les 8 dernières semaines DE CE
+      PRODUIT (ancrées sur son MAX(week), pas CURRENT_DATE : robuste aux
+      retards d'ingestion), triée du moins cher au plus cher.
+
+    Un EAN jamais relevé renvoie un payload vide (200) : le produit peut
+    exister au catalogue sans avoir de prix publics — état à afficher
+    honnêtement côté frontend.
+    """
+    settings = get_settings()
+    src = bq.qualified(settings.prt_bq_dataset_silver, "open_prices_clean")
+    ean_param = [bigquery.ScalarQueryParameter("ean", "STRING", ean)]
+
+    series_sql = f"""
+    SELECT
+      week_start_date AS week,
+      APPROX_QUANTILES(price_eur, 100)[OFFSET(50)] AS median_price_eur,
+      COUNT(*) AS observations
+    FROM {src}
+    WHERE product_code = @ean
+      AND (iqr_outlier IS NULL OR iqr_outlier = FALSE)
+      AND week_start_date IS NOT NULL
+    GROUP BY week_start_date
+    ORDER BY week_start_date
+    """
+    stores_sql = f"""
+    WITH anchor AS (
+      SELECT MAX(week_start_date) AS maxw FROM {src} WHERE product_code = @ean
+    )
+    SELECT
+      store_brand_normalized AS enseigne,
+      APPROX_QUANTILES(price_eur, 100)[OFFSET(50)] AS median_price_eur,
+      COUNT(*) AS observations,
+      MAX(week_start_date) AS last_seen_week
+    FROM {src}, anchor
+    WHERE product_code = @ean
+      AND (iqr_outlier IS NULL OR iqr_outlier = FALSE)
+      AND store_brand_normalized IS NOT NULL
+      AND week_start_date > DATE_SUB(anchor.maxw, INTERVAL 8 WEEK)
+    GROUP BY store_brand_normalized
+    ORDER BY median_price_eur ASC
+    """
+    series_rows, store_rows = await asyncio.gather(
+        asyncio.to_thread(
+            bq.query_dicts_safe, series_sql, params=ean_param, context=f"product_prices_{ean}"
+        ),
+        asyncio.to_thread(
+            bq.query_dicts_safe, stores_sql, params=ean_param, context=f"product_stores_{ean}"
+        ),
+    )
+
+    series = [
+        PricePoint(
+            week=r["week"],
+            median_price_eur=float(r["median_price_eur"]),
+            observations=int(r["observations"]),
+        )
+        for r in series_rows
+        if r.get("median_price_eur") is not None
+    ]
+    by_store = [
+        StorePrice(
+            enseigne=r["enseigne"],
+            median_price_eur=float(r["median_price_eur"]),
+            observations=int(r["observations"]),
+            last_seen_week=r.get("last_seen_week"),
+        )
+        for r in store_rows
+        if r.get("median_price_eur") is not None
+    ]
+
+    latest = series[-1].median_price_eur if series else None
+    pct = None
+    if len(series) >= 2 and series[0].median_price_eur > 0:
+        pct = (series[-1].median_price_eur / series[0].median_price_eur - 1) * 100
+
+    return ProductPricesOut(
+        ean=ean,
+        series=series,
+        by_store=by_store,
+        latest_median_eur=latest,
+        pct_change_window=pct,
+    )
 
 
 @router.get("/{ean}/substitutes", response_model=list[SubstituteOut])
