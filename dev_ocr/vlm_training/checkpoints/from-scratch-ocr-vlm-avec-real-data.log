@@ -1,0 +1,90 @@
+7.3s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+7.3s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+7.3s 3 0.00s - to python to disable frozen modules.
+7.3s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+8.0s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+8.0s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+8.0s 7 0.00s - to python to disable frozen modules.
+8.0s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+14.3s 9 Tesla T4
+14.5s 10 Checkpoints -> dataset: giorgiopasini/receipt-ocr-vlm-checkpoints | every epoch: True
+19.4s 11 Train package: /kaggle/working/repo/dev_ocr/vlm_training
+42.9s 12 Install OK
+42.9s 13 Checkpoints -> /kaggle/working/ocr_ckpts
+48.0s 14 Restored 4 file(s): ['ocr_vlm_epoch038_loss0.2369.pt', 'ocr_vlm_epoch039_loss0.2314.pt', 'ocr_vlm_epoch040_loss0.2265.pt', 'tokenizer.json']
+48.4s 15 REAL_DATA_DIR -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-real-data-1640
+48.4s 16 >> /usr/bin/python3 -u scripts/train_ocr_vlm.py --target schema --checkpoint-dir /kaggle/working/ocr_ckpts --n 4000 --languages fr,en,es,de,it --epochs 50 --batch-size 24 --lr 0.0003 --embed-dim 256 --enc-depth 4 --dec-depth 4 --heads 8 --max-len 768 --num-workers 2 --log-every 200 --eval-every 1 --keep-last 3 --distort-intensity light --distort --real --real-repeat 4 --real-data-dir /kaggle/input/datasets/giorgiopasini/receipt-vlm-real-data-1640
+50.5s 17 [16:02:35 +    2s gap   2s] target schema | langs ['fr', 'en', 'es', 'de', 'it'] | n/epoch 4000 | vocab 190 | device cuda
+55.6s 18 [16:02:40 +    7s gap   5s]   [real] wildreceipt: 804 train receipts
+56.1s 19 [16:02:40 +    7s gap   0s]   [real] expressexpense_srd: 71 train receipts
+56.1s 20 [16:02:40 +    7s gap   0s] mixing 3500 real (x4) + 4000 synthetic
+62.1s 21 [16:02:46 +   13s gap   6s] Resumed from ocr_vlm_epoch040_loss0.2265.pt (continue at epoch 41)
+62.1s 22 [16:02:46 +   13s gap   0s] OcrVLM 8.73M params | 384 visual tokens | 313 batches/epoch
+156.8s 23 [16:04:21 +  108s gap  95s]   epoch 41 batch 200/313 loss 1.0142 (2.1 it/s)
+219.2s 24 [16:05:24 +  170s gap  62s] epoch 41/50 | train 0.9139 | 146s | F1 0.153 prod_rec 0.620 anls 0.895 valid 1.00
+219.4s 25 [16:05:24 +  170s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch041_loss0.9139.pt (105 MB)
+221.2s 26 [dataset] version: ocr_vlm_epoch041_loss0.9139.pt
+228.2s 27 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+310.8s 28 [16:06:55 +  262s gap  91s]   epoch 42 batch 200/313 loss 0.8896 (2.2 it/s)
+372.4s 29 [16:07:57 +  323s gap  62s] epoch 42/50 | train 0.7703 | 142s | F1 0.120 prod_rec 0.558 anls 0.878 valid 1.00
+372.5s 30 [16:07:57 +  324s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch042_loss0.7703.pt (105 MB)
+373.2s 31 [dataset] version: ocr_vlm_epoch042_loss0.7703.pt
+379.8s 32 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+463.6s 33 [16:09:28 +  415s gap  91s]   epoch 43 batch 200/313 loss 0.9158 (2.2 it/s)
+524.6s 34 [16:10:29 +  476s gap  61s] epoch 43/50 | train 0.7005 | 142s | F1 0.154 prod_rec 0.628 anls 0.912 valid 1.00
+524.8s 35 [16:10:29 +  476s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch043_loss0.7005.pt (105 MB)
+525.4s 36 [dataset] version: ocr_vlm_epoch043_loss0.7005.pt
+531.6s 37 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+616.5s 38 [16:12:01 +  568s gap  92s]   epoch 44 batch 200/313 loss 0.7197 (2.2 it/s)
+676.5s 39 [16:13:01 +  628s gap  60s] epoch 44/50 | train 0.6302 | 141s | F1 0.125 prod_rec 0.612 anls 0.885 valid 1.00
+676.7s 40 [16:13:01 +  628s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch044_loss0.6302.pt (105 MB)
+677.6s 41 [dataset] version: ocr_vlm_epoch044_loss0.6302.pt
+683.6s 42 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+768.8s 43 [16:14:33 +  720s gap  92s]   epoch 45 batch 200/313 loss 0.4905 (2.2 it/s)
+828.4s 44 [16:15:33 +  779s gap  60s] epoch 45/50 | train 0.5695 | 142s | F1 0.148 prod_rec 0.651 anls 0.909 valid 1.00
+828.6s 45 [16:15:33 +  780s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch045_loss0.5695.pt (105 MB)
+829.5s 46 [dataset] version: ocr_vlm_epoch045_loss0.5695.pt
+835.4s 47 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+919.1s 48 [16:17:03 +  870s gap  90s]   epoch 46 batch 200/313 loss 0.5806 (2.2 it/s)
+978.1s 49 [16:18:02 +  929s gap  59s] epoch 46/50 | train 0.5143 | 140s | F1 0.127 prod_rec 0.519 anls 0.872 valid 1.00
+978.3s 50 [16:18:03 +  929s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch046_loss0.5143.pt (105 MB)
+979.1s 51 [dataset] version: ocr_vlm_epoch046_loss0.5143.pt
+985.6s 52 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1069.0s 53 [16:19:33 + 1020s gap  91s]   epoch 47 batch 200/313 loss 0.4365 (2.2 it/s)
+1129.4s 54 [16:20:34 + 1080s gap  60s] epoch 47/50 | train 0.4681 | 141s | F1 0.154 prod_rec 0.729 anls 0.927 valid 1.00
+1129.6s 55 [16:20:34 + 1081s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch047_loss0.4681.pt (105 MB)
+1130.3s 56 [dataset] version: ocr_vlm_epoch047_loss0.4681.pt
+1136.9s 57 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1221.0s 58 [16:22:05 + 1172s gap  91s]   epoch 48 batch 200/313 loss 0.3300 (2.2 it/s)
+1281.6s 59 [16:23:06 + 1233s gap  61s] epoch 48/50 | train 0.4268 | 142s | F1 0.131 prod_rec 0.636 anls 0.890 valid 1.00
+1281.7s 60 [16:23:06 + 1233s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch048_loss0.4268.pt (105 MB)
+1282.4s 61 [dataset] version: ocr_vlm_epoch048_loss0.4268.pt
+1289.3s 62 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1372.6s 63 [16:24:37 + 1324s gap  91s]   epoch 49 batch 200/313 loss 0.5055 (2.2 it/s)
+1433.0s 64 [16:25:37 + 1384s gap  60s] epoch 49/50 | train 0.3931 | 140s | F1 0.153 prod_rec 0.667 anls 0.923 valid 1.00
+1433.1s 65 [16:25:38 + 1384s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch049_loss0.3931.pt (105 MB)
+1433.9s 66 [dataset] version: ocr_vlm_epoch049_loss0.3931.pt
+1440.6s 67 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1522.2s 68 [16:27:07 + 1473s gap  89s]   epoch 50 batch 200/313 loss 0.3537 (2.2 it/s)
+1582.7s 69 [16:28:07 + 1534s gap  61s] epoch 50/50 | train 0.3619 | 139s | F1 0.166 prod_rec 0.760 anls 0.940 valid 1.00
+1582.9s 70 [16:28:07 + 1534s gap   0s] Checkpoint saved: /kaggle/working/ocr_ckpts/ocr_vlm_epoch050_loss0.3619.pt (105 MB)
+1583.5s 71 [dataset] version: ocr_vlm_epoch050_loss0.3619.pt
+1589.7s 72 [dataset] -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1589.7s 73 [16:28:14 + 1541s gap   7s] Training done
+1589.7s 74 Training done
+1589.8s 75 Files in /kaggle/working/ocr_ckpts :
+1589.8s 76 dataset-metadata.json                         0.0 MB
+1589.8s 77 ocr_vlm_epoch048_loss0.4268.pt              104.9 MB
+1589.8s 78 ocr_vlm_epoch049_loss0.3931.pt              104.9 MB
+1589.8s 79 ocr_vlm_epoch050_loss0.3619.pt              104.9 MB
+1589.8s 80 tokenizer.json                                0.0 MB
+1589.8s 81 
+1589.8s 82 Durable copy -> https://www.kaggle.com/datasets/giorgiopasini/receipt-ocr-vlm-checkpoints
+1592.9s 83 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+1592.9s 84 cells[i][c] = re.sub('\\\\\|', '|', cell)
+1593.0s 85 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+1593.0s 86 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+1593.7s 87 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+1594.0s 88 [NbConvertApp] Writing 32879 bytes to __notebook__.ipynb
+1596.4s 89 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+1597.2s 90 [NbConvertApp] Writing 333534 bytes to __results__.html

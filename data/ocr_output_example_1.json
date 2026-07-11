@@ -1,0 +1,25 @@
+{
+  "ticket": {
+    "supermarché": "Carrefour",
+    "adresse": "2 Rue du Départ, 75014 Paris",
+    "ville": "Paris",
+    "date": "2026-05-10"
+  },
+  "produits": [
+    { "libellé": "Tomate Cerise Grappe Carrefour Bio 250g", "prix_unitaire": 2.56 },
+    { "libellé": "Lait Demi-Écrémé Lactel UHT 1L", "prix_unitaire": 1.30 },
+    { "libellé": "Beurre Doux Elle & Vire 250g", "prix_unitaire": 2.15 },
+    { "libellé": "Yaourt Nature Danone x8 960g", "prix_unitaire": 3.49 },
+    { "libellé": "Pâtes Penne Rigate Barilla 500g", "prix_unitaire": 1.89 },
+    { "libellé": "Sauce Tomate Basilic Mutti 400g", "prix_unitaire": 2.20 },
+    { "libellé": "Filet de Saumon Atlantique Carrefour 300g", "prix_unitaire": 6.95 },
+    { "libellé": "Poulet Entier Fermier Label Rouge 1.4kg", "prix_unitaire": 9.80 },
+    { "libellé": "Pain de Mie Harry's American Sandwich x12 550g", "prix_unitaire": 2.75 },
+    { "libellé": "Jus d'Orange Tropicana Pure Premium 1L", "prix_unitaire": 3.60 },
+    { "libellé": "Coca-Cola Original 1.5L", "prix_unitaire": 2.05 },
+    { "libellé": "Camembert de Normandie Président 250g", "prix_unitaire": 3.15 },
+    { "libellé": "Oeufs Frais Plein Air Carrefour x6", "prix_unitaire": 2.89 },
+    { "libellé": "Farine de Blé T45 Francine 1kg", "prix_unitaire": 1.45 },
+    { "libellé": "Huile d'Olive Vierge Extra Puget 75cl", "prix_unitaire": 7.20 }
+  ]
+}

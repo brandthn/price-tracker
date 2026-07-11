@@ -1,0 +1,30 @@
+{
+  "ticket": {
+    "supermarché": "Intermarché",
+    "adresse": "18 Boulevard Voltaire, 75011 Paris",
+    "ville": "Paris",
+    "date": "2026-05-10"
+  },
+  "produits": [
+    { "libellé": "Lait Entier Frais Candia 1L", "prix_unitaire": 1.45 },
+    { "libellé": "Baguette Tradition Intermarché 250g", "prix_unitaire": 1.20 },
+    { "libellé": "Steak Haché Pur Boeuf 15% MG Charal x4 480g", "prix_unitaire": 7.50 },
+    { "libellé": "Riz Basmati Uncle Ben's 1kg", "prix_unitaire": 3.25 },
+    { "libellé": "Crème Fraîche Épaisse Elle & Vire 30cl", "prix_unitaire": 1.85 },
+    { "libellé": "Spaghetti N°5 Barilla 500g", "prix_unitaire": 1.75 },
+    { "libellé": "Thon Albacore à l'Huile d'Olive Saupiquet 160g", "prix_unitaire": 2.90 },
+    { "libellé": "Ketchup Heinz Original 570g", "prix_unitaire": 3.10 },
+    { "libellé": "Compote Pomme Nature Materne Pocket x4 360g", "prix_unitaire": 2.65 },
+    { "libellé": "Chocolat Noir 70% Lindt Excellence 100g", "prix_unitaire": 2.40 },
+    { "libellé": "Café Moulu Arabica L'Or Classique 250g", "prix_unitaire": 4.20 },
+    { "libellé": "Soupe Velouté de Tomates Knorr 1L", "prix_unitaire": 2.35 },
+    { "libellé": "Poisson Pané Findus Croustillant x6 360g", "prix_unitaire": 4.95 },
+    { "libellé": "Mozzarella di Buffala Galbani 125g", "prix_unitaire": 2.80 },
+    { "libellé": "Chips Nature Lay's Classic 145g", "prix_unitaire": 2.55 },
+    { "libellé": "Dentifrice Colgate Total Original 75ml", "prix_unitaire": 3.45 },
+    { "libellé": "Lessive Liquide Ariel Original 1.98L 33 Lavages", "prix_unitaire": 9.90 },
+    { "libellé": "Pommes Golden Délicious Intermarché 1.5kg", "prix_unitaire": 3.00 },
+    { "libellé": "Carottes Entières Intermarché Bio 1kg", "prix_unitaire": 1.99 },
+    { "libellé": "Biscuits Petit Beurre LU 200g", "prix_unitaire": 1.70 }
+  ]
+}

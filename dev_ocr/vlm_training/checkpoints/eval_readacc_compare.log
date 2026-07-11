@@ -1,0 +1,5 @@
+=== EPOCH 040 ===
+model 8.73M params | vocab 190 | max_len 768 | device cuda
+checkpoint ocr_vlm_epoch040_loss0.2265.pt | tokenizer tokenizer_20260607_0900.json
+[wildreceipt] 424 receipts...
+    24/424

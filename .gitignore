@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OS
 .DS_Store
 Thumbs.db
@@ -61,3 +62,7 @@ gcp-key*.json
 vertex-sa.json
 *-sa.json
 vertex-*.json
+=======
+images_tickets_caisse
+
+src/receipt_ocr/__pycache__

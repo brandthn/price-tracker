@@ -6,7 +6,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+<<<<<<< HEAD
+# Phase 8 — EAN matching not yet implemented: ean/match_* are always unset below.
+=======
 # Phase 8 — EAN matching not yet implemented: ean/match_* are always unset.
+>>>>>>> origin
 
 
 def _parse_ticket_date(raw: str) -> date | None:
@@ -26,11 +30,15 @@ def map_ticket_fields(
     duration_ms: int,
     confidence: float,
 ) -> dict[str, Any]:
+<<<<<<< HEAD
+    """Return columns for ``UPDATE tickets`` on OCR success."""
+=======
     """Return columns for ``UPDATE tickets`` on OCR success.
 
     Keys use the Python-layer names (ticket_date, total_amount) — pg.py maps
     these to the actual DB column names (date_ticket, total_eur).
     """
+>>>>>>> origin
     ticket = ocr_result.get("ticket") or {}
     produits = ticket.get("produits") or []
 
@@ -44,11 +52,21 @@ def map_ticket_fields(
 
     total_amount = sum(line_totals, Decimal("0")) if line_totals else None
 
+<<<<<<< HEAD
+    # TODO: derive real confidence from OCR/VLM when exposed by receipt_ocr
+    ocr_confidence = confidence
+
+=======
+>>>>>>> origin
     return {
         "enseigne": (ticket.get("chaine_supermarche") or "").strip() or None,
         "ticket_date": _parse_ticket_date(ticket.get("date") or ""),
         "total_amount": float(total_amount) if total_amount is not None else None,
+<<<<<<< HEAD
+        "ocr_confidence": ocr_confidence,
+=======
         "ocr_confidence": confidence,
+>>>>>>> origin
         "ocr_engine": engine,
         "ocr_duration_ms": duration_ms,
     }

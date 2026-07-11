@@ -1,0 +1,3 @@
+Config: phase 1, lr 0.0003, epochs 5, sources ['cord', 'sroie', 'synthetic']
+Samples: 5545 train / 314 val
+Phase 1: 6,828,096 trainable params (patterns: projector)

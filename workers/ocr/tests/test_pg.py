@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+"""Integration tests for Cloud SQL helpers (testcontainers)."""
+=======
 """Integration tests for Cloud SQL helpers (testcontainers).
 
 DDL = miroir du schéma prod après migration 0002 :
@@ -5,6 +8,7 @@ DDL = miroir du schéma prod après migration 0002 :
   - prix_extraits : id UUID DEFAULT gen_random_uuid() + UNIQUE(ticket_id, line_index)
                    + colonnes unit_price, line_total, match_method
 """
+>>>>>>> origin
 
 from __future__ import annotations
 
@@ -17,13 +21,53 @@ from pricetracker_ocr import pg
 from pricetracker_ocr.config import Settings
 
 DDL = """
+<<<<<<< HEAD
+DO $$ BEGIN
+    CREATE TYPE ticket_status AS ENUM (
+      'pending', 'uploaded', 'ocr_processing', 'ocr_done', 'ocr_failed', 'validated'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+=======
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+>>>>>>> origin
 
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS tickets (
+<<<<<<< HEAD
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES users(id),
+  gcs_object_path text NOT NULL UNIQUE,
+  status ticket_status NOT NULL DEFAULT 'pending',
+  enseigne text,
+  ticket_date date,
+  total_amount numeric(10,2),
+  ocr_confidence real,
+  ocr_engine text,
+  ocr_duration_ms integer,
+  error_message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS prix_extraits (
+  ticket_id uuid NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  line_index smallint NOT NULL,
+  raw_text text NOT NULL,
+  quantity numeric(8,3),
+  unit_price numeric(10,2),
+  line_total numeric(10,2),
+  ean text,
+  match_method text,
+  match_confidence real,
+  needs_validation boolean NOT NULL DEFAULT true,
+  validated_by_user boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (ticket_id, line_index)
+=======
   id              uuid PRIMARY KEY,
   user_id         uuid NOT NULL REFERENCES users(id),
   gcs_path        text NOT NULL UNIQUE,
@@ -54,6 +98,7 @@ CREATE TABLE IF NOT EXISTS prix_extraits (
   validated_by_user boolean NOT NULL DEFAULT false,
   PRIMARY KEY (id),
   UNIQUE (ticket_id, line_index)
+>>>>>>> origin
 );
 """
 
@@ -87,8 +132,13 @@ async def _seed_ticket(pool, ticket_id: str, status: str = "pending") -> None:
         await conn.execute("INSERT INTO users (id) VALUES ($1::uuid)", user_id)
         await conn.execute(
             """
+<<<<<<< HEAD
+            INSERT INTO tickets (id, user_id, gcs_object_path, status)
+            VALUES ($1::uuid, $2::uuid, $3, $4::ticket_status)
+=======
             INSERT INTO tickets (id, user_id, gcs_path, status)
             VALUES ($1::uuid, $2::uuid, $3, $4)
+>>>>>>> origin
             """,
             ticket_id,
             user_id,
@@ -156,8 +206,16 @@ async def test_set_ticket_failed(pool):
     await pg.set_ticket_failed(pool, ticket_id, "corrupt image")
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
+<<<<<<< HEAD
+            "SELECT status, error_message FROM tickets WHERE id = $1::uuid",
+            ticket_id,
+        )
+    assert row["status"] == "ocr_failed"
+    assert row["error_message"] == "corrupt image"
+=======
             "SELECT status, ocr_error FROM tickets WHERE id = $1::uuid",
             ticket_id,
         )
     assert row["status"] == "ocr_failed"
     assert row["ocr_error"] == "corrupt image"
+>>>>>>> origin

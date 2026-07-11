@@ -1,0 +1,38 @@
+# Build config Cloud Build pour worker-ocr-ppocrv4 (backend PP-OCRv4 mobile).
+# Soumettre depuis la RACINE du monorepo (libs/ est dans le contexte) :
+#   gcloud builds submit . --config=workers/ocr-ppocrv4/cloudbuild.yaml \
+#     --substitutions=_SHORT_SHA=$(git rev-parse --short HEAD) \
+#     --project=price-tracker-prod-01
+#
+# Puis bumper worker_ocr_ppocrv4_image_tag dans
+# infra/envs/prod/variables_ocr_backends.tf et `terraform apply`.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-f'
+      - 'workers/ocr-ppocrv4/Dockerfile'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-ppocrv4:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-ppocrv4:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-ppocrv4:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # Image lourde (paddlepaddle + modèles baked) : machine de build plus large.
+  machineType: E2_HIGHCPU_8
+
+substitutions:
+  _SHORT_SHA: 'latest'

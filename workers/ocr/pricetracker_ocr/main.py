@@ -115,6 +115,10 @@ async def push(
         )
         duration_ms = int((time.monotonic() - t_start) * 1000)
 
+<<<<<<< HEAD
+        # TODO: derive real confidence when receipt_ocr exposes it
+=======
+>>>>>>> origin
         ticket_fields = mapper.map_ticket_fields(
             ocr_result,
             ticket_id,

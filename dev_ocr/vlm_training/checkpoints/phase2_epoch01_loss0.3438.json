@@ -1,0 +1,13 @@
+{
+  "phase": 2,
+  "epoch": 1,
+  "val_loss": 0.34380099521233487,
+  "field_f1": 0.038135593220338986,
+  "field_precision": 0.0297029702970297,
+  "field_recall": 0.05325443786982249,
+  "anls": 0.6368874964407412,
+  "price_mae": 0.6815,
+  "product_recall": 0.16393442622950818,
+  "date_accuracy": 0.0,
+  "n_samples": 16.0
+}

@@ -1,0 +1,62 @@
+model 8.73M params | vocab 190 | max_len 768 | device cuda
+checkpoint ocr_vlm_epoch050_loss0.3619.pt | tokenizer tokenizer_20260607_0900.json
+[wildreceipt] 424 receipts...
+    24/424    48/424    72/424    96/424    120/424    144/424    168/424    192/424    216/424    240/424    264/424    288/424    312/424    336/424    360/424    384/424    408/424    424/424                                        [wildreceipt] done in 1393s
+
+--- wildreceipt: 3 qualitative examples ---
+  GOLD store='Jungle Jamboree' date='' items=6
+  PRED store='Papparis' date='' items=8
+       gold[0]='JalpartFishTikka'@475.0 | pred[0]='ChowatterMas(Sw/Striemp'@18.0
+
+  GOLD store='CVS/pharmacy' date='' items=1
+  PRED store='GO BA JANDINEPONE' date='20140610 12:29' items=6
+       gold[0]='FGSPIDERMANSG'@8.99 | pred[0]='CAMBO'@8.0
+
+  GOLD store="TRADERJOE'S" date='' items=7
+  PRED store='WAL[UNK]MART' date='20160620 10:30' items=8
+       gold[0]='SVHYDRANGEA3STEMS'@5.99 | pred[0]='BANANAS'@0.59
+
+[trainingdatapro] 9 receipts...
+    9/9                                        [trainingdatapro] done in 24s
+
+--- trainingdatapro: 3 qualitative examples ---
+  GOLD store="TRADER JOE'S" date='' items=18
+  PRED store='RESTAURANT' date='20150106 11:36' items=26
+       gold[0]='MINI-PEARL TOMATOES..'@2.49 | pred[0]='REACSSINDWH'@1.0
+
+  GOLD store='WHOLE FOODS MARKET' date='' items=9
+  PRED store='' date='20140920 00:00' items=4
+       gold[0]='*WT PLUMS BLACK CV'@2.15 | pred[0]='SWEET&SOURSANCE'@8.75
+
+  GOLD store='Walmart' date='20170811 19:22' items=1
+  PRED store='ATLACATUPIGITE' date='' items=1
+       gold[0]='GIFT CARD'@50.0 | pred[0]='LDIGHTSIPSICIALLPES'@2.99
+
+[synthetic] 128 held-out receipts...
+    24/128    48/128    72/128    96/128    120/128    128/128                                        
+--- synthetic: 3 qualitative examples ---
+  GOLD store='Lidl' date='20260325 14:09' items=6
+  PRED store='Lidl' date='20260410 10:40' items=6
+       gold[0]='LIQUIDE VAISSELLE 500ML'@1.87 | pred[0]='BAGUETTE TRADITION'@1.27
+
+  GOLD store="Sainsbury's Local" date='20260411 15:02' items=5
+  PRED store='Carrefour Express' date='20250804 10:40' items=5
+       gold[0]='GREEK YOGURT 32OZ'@3.98 | pred[0]='ZUMO NARANJA 1L'@2.17
+
+  GOLD store='Carrefour Express' date='20260201 18:22' items=8
+  PRED store='dm-drogerie markt' date='20260323 13:29' items=8
+       gold[0]='LECHE ENTERA 1L'@1.05 | pred[0]='CROISSANTS X4'@2.1
+
+
+Metric              REAL-all      wildreceipt   trainingdatapro  synthetic   
+-----------------------------------------------------------------------------
+Field F1            0.000         0.000         0.000            0.068       
+Field precision     0.000         0.000         0.000            0.067       
+Field recall        0.000         0.000         0.000            0.069       
+Product recall      0.002         0.002         0.000            0.336       
+ANLS                0.183         0.184         0.135            0.763       
+Price MAE           32.740        32.740        0.000            0.220       
+Date exact match    0.000         0.000         0.000            0.000       
+n                   433           424           9                128         
+
+Results written to checkpoints/eval_epoch050.json

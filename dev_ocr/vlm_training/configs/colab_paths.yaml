@@ -1,0 +1,23 @@
+# Colab overlay — merged after base.yaml by phase*_colab.yaml via train.py.
+# Paths assume Drive folder: /content/drive/MyDrive/receipt_vlm/
+# (created by notebooks/train_receipt_vlm_colab.ipynb)
+
+checkpoint_dir: /content/drive/MyDrive/receipt_vlm/checkpoints
+batch_size: 8
+num_workers: 2
+log_every: 50
+
+model:
+  gradient_checkpointing: true
+
+data:
+  synthetic_on_the_fly: true
+  synthetic_diverse: true
+  synthetic_distort: true
+  synthetic_distort_intensity: medium
+  synthetic_count: 3000
+  cord_limit: 800
+  synthetic_val_fraction: 0.05
+  real_images_dir: /content/drive/MyDrive/receipt_vlm/images_tickets_caisse
+  real_labels_dir: /content/drive/MyDrive/receipt_vlm/real_labels
+  sroie_dir: null

@@ -1,0 +1,62 @@
+model 8.73M params | vocab 190 | max_len 768 | device cuda
+checkpoint ocr_vlm_epoch040_loss0.2265.pt | tokenizer tokenizer_20260607_0900.json
+[cord_v2] 100 receipts...
+    24/100    48/100    72/100    96/100    100/100                                        [cord_v2] done in 32s
+
+--- cord_v2: 2 qualitative examples ---
+  GOLD store='' date='' items=1
+  PRED store='Aldi' date='20251111 11:11' items=3
+       gold[0]='-TICKET CP'@60000.0 | pred[0]='BANANES VRAC'@2.08
+
+  GOLD store='' date='' items=3
+  PRED store='Aldi' date='' items=4
+       gold[0]='J.STB PROMO'@17500.0 | pred[0]='HAND SOAP 12OZ'@3.12
+
+[wildreceipt] 424 receipts...
+    24/424    48/424    72/424    96/424    120/424    144/424    168/424    192/424    216/424    240/424    264/424    288/424    312/424    336/424    360/424    384/424    408/424    424/424                                        [wildreceipt] done in 981s
+
+--- wildreceipt: 2 qualitative examples ---
+  GOLD store='Jungle Jamboree' date='' items=6
+  PRED store='Carrefour Express' date='20250911 11:56' items=8
+       gold[0]='JalpartFishTikka'@475.0 | pred[0]='PLATANOS'@1.48
+
+  GOLD store='CVS/pharmacy' date='' items=1
+  PRED store='Lidl' date='20250916 10:24' items=11
+       gold[0]='FGSPIDERMANSG'@8.99 | pred[0]='CAFFE MACINATO 250G'@3.31
+
+[trainingdatapro] 9 receipts...
+    9/9                                        [trainingdatapro] done in 25s
+
+--- trainingdatapro: 2 qualitative examples ---
+  GOLD store="TRADER JOE'S" date='' items=18
+  PRED store='Lidl' date='20250916 16:21' items=18
+       gold[0]='MINI-PEARL TOMATOES..'@2.49 | pred[0]='BRIOCHE TRANCHEE 500G'@2.03
+
+  GOLD store='WHOLE FOODS MARKET' date='' items=9
+  PRED store='Conad' date='20260121 11:21' items=9
+       gold[0]='*WT PLUMS BLACK CV'@2.15 | pred[0]='BANANE'@1.84
+
+[synthetic] 128 held-out receipts...
+    24/128    48/128    72/128    96/128    120/128    128/128                                        
+--- synthetic: 2 qualitative examples ---
+  GOLD store='Lidl' date='20260325 14:31' items=6
+  PRED store='Lidl' date='20250915 16:21' items=6
+       gold[0]='LIQUIDE VAISSELLE 500ML'@1.87 | pred[0]='BISCUITS PETIT DEJ 400G'@2.27
+
+  GOLD store="Sainsbury's Local" date='20260411 15:24' items=5
+  PRED store='Whole Foods Market' date='20251211 11:05' items=6
+       gold[0]='GREEK YOGURT 32OZ'@3.98 | pred[0]='GREEK YOGURT 32OZ'@4.15
+
+
+Metric              REAL-all      cord_v2       wildreceipt   trainingdatapro  synthetic   
+-------------------------------------------------------------------------------------------
+Field F1            0.000         0.000         0.000         0.000            0.078       
+Field precision     0.000         0.000         0.000         0.000            0.077       
+Field recall        0.000         0.000         0.000         0.000            0.079       
+Product recall      0.001         0.000         0.001         0.000            0.357       
+ANLS                0.170         0.000         0.170         0.185            0.787       
+Price MAE           0.210         0.000         0.210         0.000            0.247       
+Date exact match    0.000         0.000         0.000         0.000            0.000       
+n                   533           100           424           9                128         
+
+Results written to checkpoints/eval_epoch040.json

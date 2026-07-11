@@ -1,0 +1,7 @@
+# Phase 3 — JSON alignment: clean structured output at low LR.
+phase: 3
+lr: 5.0e-5
+epochs: 5
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 32

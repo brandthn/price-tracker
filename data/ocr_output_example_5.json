@@ -1,0 +1,19 @@
+{
+  "ticket": {
+    "supermarché": "Auchan",
+    "adresse": "49 Avenue du Général de Gaulle, 69800 Saint-Priest",
+    "ville": "Lyon",
+    "date": "2026-05-10"
+  },
+  "produits": [
+    { "libellé": "Rosette de Lyon Auchan Tradition 150g", "prix_unitaire": 3.20 },
+    { "libellé": "Fromage Blanc Battu 0% Danone 500g", "prix_unitaire": 1.95 },
+    { "libellé": "Pain de Campagne Tradition Auchan 400g", "prix_unitaire": 1.60 },
+    { "libellé": "Pâté de Campagne Bordeau Chesnel 180g", "prix_unitaire": 2.10 },
+    { "libellé": "Eau Minérale Naturelle Évian 6x1.5L", "prix_unitaire": 5.40 },
+    { "libellé": "Filet de Cabillaud MSC Auchan Surgelé 400g", "prix_unitaire": 5.95 },
+    { "libellé": "Moutarde de Dijon Original Amora 435g", "prix_unitaire": 2.75 },
+    { "libellé": "Crème Brûlée La Laitière x2 200g", "prix_unitaire": 2.90 },
+    { "libellé": "Cervelas Lyonnais Auchan 300g", "prix_unitaire": 3.40 }
+  ]
+}

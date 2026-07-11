@@ -1,8 +1,14 @@
+<<<<<<< HEAD
+# Build config Cloud Build for worker-ocr.
+# Submit from monorepo root:
+#   gcloud builds submit . --config=workers/ocr/cloudbuild.yaml
+=======
 # Build config Cloud Build pour worker-ocr.
 # Soumettre depuis la RACINE du monorepo (dev_ocr/ est dans le contexte) :
 #   gcloud builds submit . --config=workers/ocr/cloudbuild.yaml \
 #     --substitutions=_SHORT_SHA=$(git rev-parse --short HEAD) \
 #     --project=price-tracker-prod-01
+>>>>>>> origin
 
 steps:
   - id: build

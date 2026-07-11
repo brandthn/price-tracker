@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+"""Cloud SQL access for tickets and prix_extraits."""
+=======
 """Cloud SQL access for tickets and prix_extraits.
 
 Noms de colonnes utilisés = schéma prod (migration 0001 + 0002) :
@@ -5,6 +8,7 @@ Noms de colonnes utilisés = schéma prod (migration 0001 + 0002) :
   prix_extraits : unit_price, line_total, match_method
   + contrainte UNIQUE(ticket_id, line_index) + DEFAULT gen_random_uuid() sur id
 """
+>>>>>>> origin
 
 from __future__ import annotations
 
@@ -31,7 +35,11 @@ async def create_pool(settings: Settings) -> asyncpg.Pool:
 
 
 async def set_ticket_processing(pool: asyncpg.Pool, ticket_id: str) -> bool:
+<<<<<<< HEAD
+    """Set status to ``ocr_processing`` if still pending/uploaded."""
+=======
     """Set status to 'ocr_processing' si encore pending/uploaded. Retourne True si claimé."""
+>>>>>>> origin
     result = await pool.execute(
         """
         UPDATE tickets
@@ -44,6 +52,19 @@ async def set_ticket_processing(pool: asyncpg.Pool, ticket_id: str) -> bool:
 
 
 async def set_ticket_done(pool: asyncpg.Pool, ticket_id: str, fields: dict[str, Any]) -> None:
+<<<<<<< HEAD
+    await pool.execute(
+        """
+        UPDATE tickets
+        SET status = 'ocr_done',
+            enseigne = $2,
+            ticket_date = $3,
+            total_amount = $4,
+            ocr_confidence = $5,
+            ocr_engine = $6,
+            ocr_duration_ms = $7,
+            updated_at = now()
+=======
     """Mise à jour tickets au succès OCR. Les clés de `fields` sont les noms
     Python du mapper (ticket_date, total_amount) ; on les écrit dans les
     colonnes DB réelles (date_ticket, total_eur, ocr_engine, ocr_duration_ms).
@@ -59,6 +80,7 @@ async def set_ticket_done(pool: asyncpg.Pool, ticket_id: str, fields: dict[str, 
             ocr_engine     = $6,
             ocr_duration_ms = $7,
             updated_at     = now()
+>>>>>>> origin
         WHERE id = $1::uuid
         """,
         ticket_id,
@@ -77,8 +99,13 @@ async def set_ticket_failed(
     await pool.execute(
         """
         UPDATE tickets
+<<<<<<< HEAD
+        SET status = 'ocr_failed',
+            error_message = $2,
+=======
         SET status    = 'ocr_failed',
             ocr_error = $2,
+>>>>>>> origin
             updated_at = now()
         WHERE id = $1::uuid
         """,
@@ -98,12 +125,21 @@ VALUES (
 )
 ON CONFLICT (ticket_id, line_index)
 DO UPDATE SET
+<<<<<<< HEAD
+    raw_text = EXCLUDED.raw_text,
+    quantity = EXCLUDED.quantity,
+    unit_price = EXCLUDED.unit_price,
+    line_total = EXCLUDED.line_total,
+    ean = EXCLUDED.ean,
+    match_method = EXCLUDED.match_method,
+=======
     raw_text         = EXCLUDED.raw_text,
     quantity         = EXCLUDED.quantity,
     unit_price       = EXCLUDED.unit_price,
     line_total       = EXCLUDED.line_total,
     ean              = EXCLUDED.ean,
     match_method     = EXCLUDED.match_method,
+>>>>>>> origin
     match_confidence = EXCLUDED.match_confidence,
     needs_validation = EXCLUDED.needs_validation
 """
