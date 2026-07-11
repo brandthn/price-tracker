@@ -8,8 +8,9 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Labels moteur écrits par les workers dans `tickets.ocr_engine` (= la var
-# PRT_OCR_ENGINE_LABEL côté Cloud Run). Servent à router l'escalade sur 👎 :
-# scratch → moondream → ocr-llm (gemini = terminal).
+# PRT_OCR_ENGINE_LABEL côté Cloud Run). Ils identifient quel OCR a traité le
+# ticket en dernier, ce qui permet de router le 👎 vers le tier suivant
+# (cf. Settings.ocr_escalation_by_engine). ocr-llm écrit "gemini".
 OCR_ENGINE_SCRATCH = "ocr-vlm-scratch"
 OCR_ENGINE_MOONDREAM = "moondream-0.5b"
 
@@ -96,8 +97,9 @@ class Settings(BaseSettings):
     def ocr_escalation_by_engine(self) -> dict[str, str]:
         """`ocr_engine` du dernier OCR → chemin du topic du tier suivant.
 
-        Un engine absent (ex. `gemini`, ou un ticket traité par un worker hors
-        pipeline) est terminal : plus d'escalade possible.
+        Seuls scratch et moondream ont un tier au-dessus d'eux. ocr-llm est le
+        dernier maillon : son label ("gemini") n'est pas une clé ici, donc
+        `.get()` renvoie None et l'escalade s'arrête (idem tout engine inconnu).
         """
         return {
             OCR_ENGINE_SCRATCH: self._topic_path(self.prt_ocr_moondream_topic),
