@@ -40,5 +40,36 @@ module "pubsub" {
       message_retention_duration = "604800s"
       subscribers                = [local.worker_sa]
     }
+
+    # Backends OCR « un backend = un worker » : un topic (+ DLQ) par moteur.
+    # Le backend publie {ticket_id} sur le topic du tier voulu (scratch → moondream
+    # → ocr-retry), une push subscription relaie vers le worker (cf. subscriptions.tf).
+    "ocr-paddle" = {
+      message_retention_duration = "604800s"
+      publishers                 = [local.backend_sa]
+      subscribers                = [local.worker_sa]
+    }
+    "ocr-paddle-dlq" = {
+      message_retention_duration = "604800s"
+      subscribers                = [local.worker_sa]
+    }
+    "ocr-vlm-moondream" = {
+      message_retention_duration = "604800s"
+      publishers                 = [local.backend_sa]
+      subscribers                = [local.worker_sa]
+    }
+    "ocr-vlm-moondream-dlq" = {
+      message_retention_duration = "604800s"
+      subscribers                = [local.worker_sa]
+    }
+    "ocr-vlm-scratch" = {
+      message_retention_duration = "604800s"
+      publishers                 = [local.backend_sa]
+      subscribers                = [local.worker_sa]
+    }
+    "ocr-vlm-scratch-dlq" = {
+      message_retention_duration = "604800s"
+      subscribers                = [local.worker_sa]
+    }
   }
 }

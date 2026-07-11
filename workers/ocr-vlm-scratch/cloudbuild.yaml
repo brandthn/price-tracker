@@ -1,0 +1,47 @@
+# Build config Cloud Build pour worker-ocr-vlm-scratch (backend OCR-VLM from-scratch).
+# Soumettre depuis la RACINE du monorepo (libs/ + dev_ocr/vlm_training/receipt_vlm
+# sont dans le contexte) :
+#   gcloud builds submit . --config=workers/ocr-vlm-scratch/cloudbuild.yaml \
+#     --substitutions=_SHORT_SHA=$(git rev-parse --short HEAD) \
+#     --project=price-tracker-prod-01
+#
+# Prérequis (une fois) : checkpoint + tokenizer sur GCS. epoch050 = meilleur
+# checkpoint réel (Stage B, cf. checkpoints/eval_epoch0*.json) :
+#   gsutil cp dev_ocr/vlm_training/checkpoints/ocr_vlm_epoch050_loss0.3619.pt \
+#             dev_ocr/vlm_training/checkpoints/tokenizer_20260607_0900.json \
+#             gs://price-tracker-prod-01-models/vlm/ocr-vlm-scratch/v1/
+#
+# Puis bumper worker_ocr_vlm_scratch_image_tag dans
+# infra/envs/prod/variables_ocr_backends.tf et `terraform apply`.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-f'
+      - 'workers/ocr-vlm-scratch/Dockerfile'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-scratch:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-scratch:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-scratch:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # Image lourde (torch CPU) : machine de build plus large.
+  machineType: E2_HIGHCPU_8
+
+timeout: 3600s
+
+substitutions:
+  _SHORT_SHA: 'latest'

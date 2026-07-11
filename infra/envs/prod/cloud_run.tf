@@ -233,6 +233,158 @@ module "run_worker_ocr_llm" {
   labels = merge(var.labels, { component = "worker-ocr-llm" })
 }
 
+# --- Backend OCR PaddleOCR ------------------------------------------------
+# cpu 2 / memory 4Gi : inférence CPU locale (paddlepaddle + modèles fr bakés
+# dans l'image, pas de bootstrap GCS). >2Gi impose >=2 vCPU.
+module "run_worker_ocr_paddle" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-worker-ocr-paddle"
+  image                 = var.worker_ocr_paddle_image_tag == "skeleton" ? local.cloud_run_skeleton_image : "${module.artifact_registry.docker_registry_url}/worker-ocr-paddle:${var.worker_ocr_paddle_image_tag}"
+  service_account_email = module.iam.emails["worker"]
+
+  min_instances   = 0
+  max_instances   = 3
+  cpu             = "2"
+  memory          = "4Gi"
+  timeout_seconds = 540
+
+  vpc_subnet = local.cloud_run_subnet
+  vpc_egress = "PRIVATE_RANGES_ONLY"
+  ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+
+    PRT_OCR_ENGINE_LABEL       = "paddleocr"
+    RECEIPT_OCR_MAX_IMAGE_SIDE = "1280"
+    RECEIPT_OCR_CPU_THREADS    = "2"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-paddle" })
+}
+
+# --- Backend OCR VLM Moondream 0.5B (poids locaux) ------------------------
+# cpu 2 / memory 2Gi : poids int8 ~600Mo en /tmp (tmpfs = RAM) + runtime,
+# téléchargés du bucket models au cold start (worker-sa a déjà objectViewer).
+module "run_worker_ocr_vlm_moondream" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-worker-ocr-vlm-moondream"
+  image                 = var.worker_ocr_vlm_moondream_image_tag == "skeleton" ? local.cloud_run_skeleton_image : "${module.artifact_registry.docker_registry_url}/worker-ocr-vlm-moondream:${var.worker_ocr_vlm_moondream_image_tag}"
+  service_account_email = module.iam.emails["worker"]
+
+  min_instances   = 0
+  max_instances   = 3
+  cpu             = "2"
+  memory          = "2Gi"
+  timeout_seconds = 540
+
+  vpc_subnet = local.cloud_run_subnet
+  vpc_egress = "PRIVATE_RANGES_ONLY"
+  ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+
+    PRT_OCR_ENGINE_LABEL = "moondream-0.5b"
+    PRT_MODEL_GCS_URI    = "gs://${module.bucket_models.name}/${var.ocr_vlm_moondream_model_gcs_uri}"
+    PRT_MODEL_LOCAL_DIR  = "/tmp/models"
+
+    RECEIPT_VLM_MODE        = "transcribe"
+    RECEIPT_VLM_MAX_RETRIES = "2"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-vlm-moondream" })
+}
+
+# --- Backend OCR-VLM from-scratch (poids + tokenizer locaux) --------------
+# cpu 2 / memory 4Gi : modèle maison compact, décodage glouton CPU jusqu'à 640
+# tokens. max_instances=2 (coût + évalué seulement sur Kaggle). Deux artefacts :
+# checkpoint .pt + tokenizer .json, tous deux depuis le bucket models.
+module "run_worker_ocr_vlm_scratch" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-worker-ocr-vlm-scratch"
+  image                 = var.worker_ocr_vlm_scratch_image_tag == "skeleton" ? local.cloud_run_skeleton_image : "${module.artifact_registry.docker_registry_url}/worker-ocr-vlm-scratch:${var.worker_ocr_vlm_scratch_image_tag}"
+  service_account_email = module.iam.emails["worker"]
+
+  min_instances   = 0
+  max_instances   = 2
+  cpu             = "2"
+  memory          = "4Gi"
+  timeout_seconds = 540
+
+  vpc_subnet = local.cloud_run_subnet
+  vpc_egress = "PRIVATE_RANGES_ONLY"
+  ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = var.region
+
+    PRT_OCR_ENGINE_LABEL  = "ocr-vlm-scratch"
+    PRT_MODEL_GCS_URI     = "gs://${module.bucket_models.name}/${var.ocr_vlm_scratch_model_gcs_uri}"
+    PRT_TOKENIZER_GCS_URI = "gs://${module.bucket_models.name}/${var.ocr_vlm_scratch_tokenizer_gcs_uri}"
+    PRT_MODEL_LOCAL_DIR   = "/tmp/models"
+
+    PRT_PG_HOST      = module.cloud_sql_main.private_ip_address
+    PRT_PG_PORT      = "5432"
+    PRT_PG_DB        = module.cloud_sql_main.db_name
+    PRT_PG_USER      = module.cloud_sql_main.db_user
+    PRT_PG_POOL_SIZE = "4"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_PG_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-vlm-scratch" })
+}
+
 # --- Worker Ingestion (Phase 6.1) ----------------------------------------
 # Cron quotidien (03h UTC) — pull du snapshot Open Prices HuggingFace,
 # upload Bronze parquet, MERGE BQ `silver.open_prices_clean`.
@@ -539,14 +691,17 @@ module "run_worker_alertes" {
   labels = merge(var.labels, { component = "worker-alertes" })
 }
 
-# --- IAM : worker-sa peut invoquer les 5 services workers ----------------
+# --- IAM : worker-sa peut invoquer les services workers ------------------
 # Requis pour : Cloud Scheduler → worker-{ingestion,off,indices,alertes}
-# et Pub/Sub push → worker-ocr. La SA worker-sa porte l'identité OIDC dans
-# les deux cas.
+# et Pub/Sub push → worker-ocr, worker-ocr-llm et les backends OCR. La SA
+# worker-sa porte l'identité OIDC dans tous les cas.
 locals {
   worker_run_services = toset([
     module.run_worker_ocr.name,
     module.run_worker_ocr_llm.name,
+    module.run_worker_ocr_paddle.name,
+    module.run_worker_ocr_vlm_moondream.name,
+    module.run_worker_ocr_vlm_scratch.name,
     module.run_worker_ingestion.name,
     module.run_worker_off.name,
     module.run_worker_indices.name,
