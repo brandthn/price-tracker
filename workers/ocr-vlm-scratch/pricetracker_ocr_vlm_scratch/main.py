@@ -159,6 +159,8 @@ async def push(
         logger.warning(
             "ocr_failed", ticket_id=ticket_id, error=str(fatal_err), retryable=False
         )
+        # Tier-1 : signaler l'échec au front upload (statut ocr_failed).
+        await pg.mark_failed(pool, ticket_id, str(fatal_err))
         return Response(status_code=204)
 
     except Exception as transient_err:

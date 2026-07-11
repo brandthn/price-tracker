@@ -79,7 +79,8 @@ async def persist_result(
       1. DELETE des anciennes lignes (clean slate : une nouvelle passe peut en
          renvoyer un nombre différent).
       2. INSERT des nouvelles lignes.
-      3. UPDATE tickets : champs + ocr_model + bump `ocr_attempts` (EN DERNIER).
+      3. UPDATE tickets : statut `ocr_done` + champs + ocr_model + bump
+         `ocr_attempts` (EN DERNIER).
 
     Pourquoi atomique + bump en dernier :
     - Le frontend poll `ocr_attempts > baseline` pour détecter la fin de
@@ -88,7 +89,9 @@ async def persist_result(
     - En cas d'échec d'une étape, la transaction rollback : le résultat
       précédent reste INTACT.
 
-    Le statut n'est pas touché.
+    Le statut passe à `ocr_done` : le worker tier-1 (scratch, déclenché par la
+    notification GCS) en dépend pour débloquer le front `/tickets/upload`. En
+    re-OCR (tiers 2-3) le ticket est déjà `ocr_done` → no-op côté statut.
     """
     insert_records = [
         (
@@ -117,7 +120,8 @@ async def persist_result(
             await conn.execute(
                 """
                 UPDATE tickets
-                SET enseigne        = $2,
+                SET status          = 'ocr_done',
+                    enseigne        = $2,
                     date_ticket     = $3,
                     total_eur       = $4,
                     ocr_confidence  = $5,
@@ -137,3 +141,23 @@ async def persist_result(
                 fields.get("ocr_duration_ms"),
                 model,
             )
+
+
+async def mark_failed(pool: asyncpg.Pool, ticket_id: str, error: str) -> None:
+    """Passe le ticket en `ocr_failed` (échec déterministe du tier-1).
+
+    À n'appeler QUE par le worker tier-1 (scratch) : sur un ticket frais, ça
+    débloque le front `/tickets/upload` avec l'état d'échec. Les workers de
+    re-OCR (tiers 2-3) ne l'appellent pas — un échec y laisse le `ocr_done`
+    précédent (et ses lignes) intact.
+    """
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            UPDATE tickets
+            SET status = 'ocr_failed', ocr_error = $2, updated_at = now()
+            WHERE id = $1::uuid
+            """,
+            ticket_id,
+            error[:500],
+        )
