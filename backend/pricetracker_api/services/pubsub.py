@@ -1,11 +1,11 @@
-"""Publisher Pub/Sub pour déclencher le re-OCR tier-2 (boucle de feedback).
+"""Publisher Pub/Sub pour l'escalade OCR sur 👎 (boucle de feedback).
 
-Quand un utilisateur met un 👎 sur l'output OCR, le backend publie le
-`ticket_id` sur le topic `ocr-retry`. Une push subscription relaie le message
-vers le worker OCR (`POST /retry`), qui ré-analyse l'image avec un second LLM.
+Quand un utilisateur met un 👎, le backend publie le `ticket_id` sur le topic
+du **tier suivant** (scratch → moondream → ocr-llm). Une push subscription
+relaie le message vers le worker cible, qui ré-analyse l'image.
 
 Auth : ADC via la SA Cloud Run `prt-prod-backend-sa` (pas de clé JSON). La SA
-doit avoir `roles/pubsub.publisher` sur le topic (cf. infra/envs/prod).
+doit avoir `roles/pubsub.publisher` sur chaque topic (cf. infra/envs/prod).
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from ..config import get_settings
 from ..logging import get_logger
 
 logger = get_logger(__name__)
@@ -33,21 +32,19 @@ def reset_for_tests() -> None:
     _publisher.cache_clear()
 
 
-def publish_ocr_retry(ticket_id: str) -> str:
-    """Publie `{"ticket_id": ...}` sur le topic de re-OCR. Retourne le message id.
+def publish_to_topic(topic_path: str, ticket_id: str) -> str:
+    """Publie `{"ticket_id": ...}` sur `topic_path`. Retourne le message id.
 
     Le payload est encodé en JSON UTF-8 dans `data` (le worker le décode via
     `parse_retry_envelope`). Bloquant le temps du `result()` pour propager une
     éventuelle erreur de publication à l'appelant.
     """
-    settings = get_settings()
-    topic_path = settings.ocr_retry_topic_path
     data = json.dumps({"ticket_id": ticket_id}).encode("utf-8")
 
     future = _publisher().publish(topic_path, data=data)
     message_id = future.result()
     logger.info(
-        "ocr_retry_published",
+        "ocr_escalation_published",
         ticket_id=ticket_id,
         topic=topic_path,
         message_id=message_id,

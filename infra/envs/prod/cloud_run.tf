@@ -283,8 +283,10 @@ module "run_worker_ocr_paddle" {
 }
 
 # --- Backend OCR VLM Moondream 0.5B (poids locaux) ------------------------
-# cpu 2 / memory 2Gi : poids int8 ~600Mo en /tmp (tmpfs = RAM) + runtime,
-# téléchargés du bucket models au cold start (worker-sa a déjà objectViewer).
+# cpu 2 / memory 4Gi : le .mf int8 fait 673Mo, téléchargé dans /tmp (tmpfs =
+# RAM, tenu en permanence) PUIS chargé dans le runtime moondream (~1Go) +
+# overhead Python. 2Gi a OOM au 1er apply (révision -00001 killed). 4Gi donne
+# la marge ; worker-sa a déjà objectViewer sur le bucket models.
 module "run_worker_ocr_vlm_moondream" {
   source = "../../modules/cloud_run"
 
@@ -297,7 +299,7 @@ module "run_worker_ocr_vlm_moondream" {
   min_instances   = 0
   max_instances   = 3
   cpu             = "2"
-  memory          = "2Gi"
+  memory          = "4Gi"
   timeout_seconds = 540
 
   vpc_subnet = local.cloud_run_subnet

@@ -15,7 +15,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def _make_ticket(user_id: uuid.UUID, *, attempts: int = 1, last_feedback=None):
+def _make_ticket(
+    user_id: uuid.UUID, *, attempts: int = 1, last_feedback=None, ocr_engine: str = "ocr-vlm-scratch"
+):
     now = datetime.datetime.now(datetime.UTC)
     return SimpleNamespace(
         id=uuid.uuid4(),
@@ -25,8 +27,8 @@ def _make_ticket(user_id: uuid.UUID, *, attempts: int = 1, last_feedback=None):
         date_ticket=None,
         total_eur=None,
         ocr_confidence=1.0,
-        ocr_engine="groq",
-        ocr_model="meta-llama/llama-4-scout-17b-16e-instruct",
+        ocr_engine=ocr_engine,  # tier-1 par défaut → escalade vers moondream
+        ocr_model=None,
         ocr_duration_ms=1200,
         ocr_error=None,
         ocr_attempts=attempts,
@@ -87,14 +89,14 @@ def make_client(monkeypatch: pytest.MonkeyPatch):
 
         published: list[str] = []
 
-        def _fake_publish(ticket_id: str) -> str:
+        def _fake_publish(topic_path: str, ticket_id: str) -> str:
             published.append(ticket_id)
             return "msg-id-123"
 
         monkeypatch.setattr(
             tickets_router, "get_or_create_user", _fake_get_or_create_user
         )
-        monkeypatch.setattr(pubsub, "publish_ocr_retry", _fake_publish)
+        monkeypatch.setattr(pubsub, "publish_to_topic", _fake_publish)
 
         session = _FakeSession(ticket)
         main_mod.app.dependency_overrides[get_session] = lambda: session
@@ -136,7 +138,20 @@ def test_feedback_down_triggers_retry(make_client) -> None:
 
 def test_feedback_down_at_cap_does_not_retry(make_client) -> None:
     user_id = uuid.uuid4()
-    ticket = _make_ticket(user_id, attempts=2)  # plafond par défaut = 2
+    ticket = _make_ticket(user_id, attempts=5)  # plafond anti-boucle par défaut = 5
+    client, _session, published = make_client(ticket)
+
+    r = client.post(f"/tickets/{ticket.id}/feedback", json={"rating": "down"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["retry_triggered"] is False
+    assert published == []
+
+
+def test_feedback_down_terminal_engine_does_not_retry(make_client) -> None:
+    # `gemini` (ocr-llm, tier-3) est terminal : un 👎 n'escalade plus.
+    user_id = uuid.uuid4()
+    ticket = _make_ticket(user_id, attempts=1, ocr_engine="gemini")
     client, _session, published = make_client(ticket)
 
     r = client.post(f"/tickets/{ticket.id}/feedback", json={"rating": "down"})

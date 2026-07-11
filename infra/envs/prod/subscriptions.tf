@@ -1,15 +1,15 @@
 # Pub/Sub subscriptions — Phase 5.
 #
 # Deux subscriptions :
-#   1. Push   : `ticket-uploaded` → `prt-prod-worker-ocr` (déclenche le pipeline OCR)
+#   1. Push   : `ticket-uploaded` → tier-1 `prt-prod-worker-ocr-vlm-scratch` (déclenche le pipeline OCR)
 #   2. Pull   : `ticket-uploaded-dlq` (inspection / replay manuel des messages empoisonnés)
 #
 # Le DLQ wiring vit côté subscription principale (`dead_letter_policy`), pas côté topic.
 
-# --- 1) Push subscription : ticket-uploaded → worker-ocr -------------------
+# --- 1) Push subscription : ticket-uploaded → tier-1 worker-ocr-vlm-scratch -
 #
 # OIDC auth : Cloud Run vérifie le token signé par Google contre :
-#   - aud  == URL exacte du service `prt-prod-worker-ocr` (audience)
+#   - aud  == URL exacte du service `prt-prod-worker-ocr-vlm-scratch` (audience)
 #   - iss  == worker-sa (qui a `roles/run.invoker` via cloud_run.tf)
 #
 # DLQ : après 5 échecs (5xx ou non-ack dans ack_deadline), Pub/Sub bascule le
@@ -29,13 +29,12 @@ resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
   enable_message_ordering    = false
 
   push_config {
-    # Convention : le worker OCR expose son handler sur /push (cf. plan-01
-    # Phase 8). En Phase 5 l'image hello répond 200 sur n'importe quel path.
-    push_endpoint = "${module.run_worker_ocr.uri}/push"
+    # Tier-1 du pipeline OCR = backend OCR-VLM from-scratch. Le worker expose /push.
+    push_endpoint = "${module.run_worker_ocr_vlm_scratch.uri}/push"
 
     oidc_token {
       service_account_email = module.iam.emails["worker"]
-      audience              = module.run_worker_ocr.uri
+      audience              = module.run_worker_ocr_vlm_scratch.uri
     }
 
     attributes = {
@@ -53,7 +52,7 @@ resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
     max_delivery_attempts = 5
   }
 
-  labels = merge(var.labels, { component = "worker-ocr" })
+  labels = merge(var.labels, { component = "ocr-tier1-dispatch" })
 
   # Ordre : la sub principale ne peut pas être créée tant que :
   #   - le service agent Pub/Sub n'a pas TokenCreator sur worker-sa

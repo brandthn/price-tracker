@@ -54,7 +54,7 @@ variable "worker_off_image_tag" {
 variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
-  default = "4f8ae38"
+  default     = "4f8ae38"
 }
 
 variable "backend_auth_enabled" {
@@ -63,7 +63,7 @@ variable "backend_auth_enabled" {
     PRT_AUTH_DISABLE=0). `false` = mode démo (bypass, tous les appels mappés sur
     un user fake — pas de per-user).
 
-    ⚠️ Passer à `true` UNIQUEMENT après avoir déployé le frontend avec sa config
+    !! Passer à `true` UNIQUEMENT après avoir déployé le frontend avec sa config
     Firebase (NEXT_PUBLIC_FIREBASE_*) : sinon le front démo envoie un Bearer
     invalide → 401. Voir docs/phase-11-auth-handoff.md.
   EOT
@@ -86,19 +86,19 @@ variable "worker_ocr_llm_image_tag" {
 variable "worker_ocr_paddle_image_tag" {
   description = "Tag de l'image worker-ocr-paddle en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-paddle/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
   type        = string
-  default     = "skeleton"
+  default     = "1672d2d"
 }
 
 variable "worker_ocr_vlm_moondream_image_tag" {
   description = "Tag de l'image worker-ocr-vlm-moondream en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-vlm-moondream/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
   type        = string
-  default     = "skeleton"
+  default     = "1672d2d"
 }
 
 variable "worker_ocr_vlm_scratch_image_tag" {
   description = "Tag de l'image worker-ocr-vlm-scratch en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-vlm-scratch/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
   type        = string
-  default     = "skeleton"
+  default     = "1672d2d"
 }
 
 variable "ocr_vlm_moondream_model_gcs_uri" {

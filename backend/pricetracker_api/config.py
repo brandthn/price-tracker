@@ -7,6 +7,12 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Labels moteur écrits par les workers dans `tickets.ocr_engine` (= la var
+# PRT_OCR_ENGINE_LABEL côté Cloud Run). Servent à router l'escalade sur 👎 :
+# scratch → moondream → ocr-llm (gemini = terminal).
+OCR_ENGINE_SCRATCH = "ocr-vlm-scratch"
+OCR_ENGINE_MOONDREAM = "moondream-0.5b"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -55,28 +61,48 @@ class Settings(BaseSettings):
         description="DEV ONLY : bypass Firebase Auth, retourne un user fake.",
     )
 
-    # --- Feedback loop / re-OCR ------------------------------------------
+    # --- Feedback loop / escalade re-OCR ---------------------------------
+    # Escalade sur 👎 : tier-1 scratch → tier-2 moondream → tier-3 ocr-llm.
+    # Le tier-1 est dispatché par la notification GCS (topic `ticket-uploaded`),
+    # pas par le backend ; le backend ne pilote que l'escalade.
+    prt_ocr_moondream_topic: str = Field(
+        default="ocr-vlm-moondream",
+        description="Topic Pub/Sub du backend OCR tier-2 (moondream).",
+    )
     prt_ocr_retry_topic: str = Field(
         default="ocr-retry",
-        description="Nom (ou chemin complet) du topic Pub/Sub déclenchant le re-OCR tier-2.",
+        description="Topic Pub/Sub du re-OCR tier-3 (ocr-llm / gemini).",
     )
     prt_max_ocr_attempts: int = Field(
-        default=2,
-        description="Garde-fou anti-boucle : un 👎 ne relance un re-OCR que si "
-        "ocr_attempts < cette valeur (tier-1=1, tier-2=2).",
+        default=5,
+        description="Plafond anti-boucle (nb de passes OCR). L'escalade réelle est "
+        "bornée par la ladder par engine (2 escalades max) ; ceci n'est qu'un garde-fou.",
     )
 
-    @property
-    def ocr_retry_topic_path(self) -> str:
-        """Chemin complet `projects/<proj>/topics/<topic>` attendu par PublisherClient.
+    def _topic_path(self, topic: str) -> str:
+        """`projects/<proj>/topics/<topic>` attendu par PublisherClient.
 
-        Accepte soit un nom court (`ocr-retry`) — préfixé avec le projet — soit
-        un chemin déjà complet.
+        Accepte un nom court (préfixé avec le projet) ou un chemin déjà complet.
         """
-        topic = self.prt_ocr_retry_topic
         if topic.startswith("projects/"):
             return topic
         return f"projects/{self.google_cloud_project}/topics/{topic}"
+
+    @property
+    def ocr_retry_topic_path(self) -> str:
+        return self._topic_path(self.prt_ocr_retry_topic)
+
+    @property
+    def ocr_escalation_by_engine(self) -> dict[str, str]:
+        """`ocr_engine` du dernier OCR → chemin du topic du tier suivant.
+
+        Un engine absent (ex. `gemini`, ou un ticket traité par un worker hors
+        pipeline) est terminal : plus d'escalade possible.
+        """
+        return {
+            OCR_ENGINE_SCRATCH: self._topic_path(self.prt_ocr_moondream_topic),
+            OCR_ENGINE_MOONDREAM: self.ocr_retry_topic_path,
+        }
 
     @property
     def cors_origins_list(self) -> list[str]:
