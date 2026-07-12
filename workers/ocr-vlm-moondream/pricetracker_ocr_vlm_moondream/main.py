@@ -150,6 +150,10 @@ async def push(
         logger.warning(
             "ocr_failed", ticket_id=ticket_id, error=str(fatal_err), retryable=False
         )
+        # Résultat de ce tier = aucun libellé reconnu → on persiste le résultat
+        # VIDE du modèle (engine=moondream, 0 ligne, ocr_done, attempts+1). Le
+        # ticket affiche « Aucun libellé » ; le 👎 suivant escalade vers ocr-llm.
+        await pg.persist_result(pool, ticket_id, {"ocr_engine": model}, model, [])
         return Response(status_code=204)
 
     except Exception as transient_err:

@@ -95,10 +95,13 @@ module "run_backend" {
     PRT_PG_USER      = module.cloud_sql_main.db_user
     PRT_PG_POOL_SIZE = "4"
 
-    # Boucle de feedback : un 👎 publie sur ce topic pour déclencher le re-OCR
-    # tier-2. Plafond d'essais = garde-fou anti-boucle (tier-1=1, tier-2=2).
-    PRT_OCR_RETRY_TOPIC  = module.pubsub.topics["ocr-retry"].name
-    PRT_MAX_OCR_ATTEMPTS = "2"
+    # Escalade sur 👎 : scratch (tier-1) → moondream (tier-2) → ocr-llm (tier-3).
+    # Le backend route par `ocr_engine` (cf. ocr_escalation_by_engine) ; le
+    # plafond n'est qu'un garde-fou anti-boucle. scratch bump `ocr_attempts` à 2
+    # dès le tier-1, donc il faut >= 4 pour laisser passer les 2 escalades.
+    PRT_OCR_MOONDREAM_TOPIC = module.pubsub.topics["ocr-vlm-moondream"].name
+    PRT_OCR_RETRY_TOPIC     = module.pubsub.topics["ocr-retry"].name
+    PRT_MAX_OCR_ATTEMPTS    = "5"
   }
 
   secret_env = {
