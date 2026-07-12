@@ -1871,7 +1871,7 @@ elsewhere means overriding those variables too.
 
 | # | Local file | → GCS object path | Size | Worker |
 |---|---|---|---|---|
-| 1 | `data/models/moondream-0_5b-int8.mf` ⚠️ **must be generated first** | `vlm/moondream/v1/moondream-0_5b-int8.mf` | ~600 MB | `ocr-vlm-moondream` |
+| 1 | `data/models/moondream-0_5b-int8.mf` ⚠️ **must be generated first** | `vlm/moondream/v1/moondream-0_5b-int8.mf` | 693 MB | `ocr-vlm-moondream` |
 | 2 | `vlm_training/checkpoints/receipt_vlm_500m_merged.pt` | `vlm/receipt-vlm/v1/receipt_vlm_500m_merged.pt` | 1.82 GB | `ocr-vlm-receipt` |
 | 3 | `vlm_training/checkpoints/ocr_vlm_epoch050_loss0.3619.pt` | `vlm/ocr-vlm-scratch/v1/ocr_vlm_epoch050_loss0.3619.pt` | 105 MB | `ocr-vlm-scratch` |
 | 4 | `vlm_training/checkpoints/tokenizer_20260607_0900.json` | `vlm/ocr-vlm-scratch/v1/tokenizer_20260607_0900.json` | 993 B | `ocr-vlm-scratch` |
@@ -1888,10 +1888,11 @@ produced before any upload:
 
 ```bash
 cd dev_ocr
-python scripts/download_moondream_weights.py     # 593 MB .mf.gz from HF → decompressed into data/models/
+python scripts/download_moondream_weights.py     # 593 MB .mf.gz from HF → 693 MB .mf in data/models/
 ```
 
-Upload the **decompressed `.mf`**, not the `.mf.gz`: `MoondreamProvider` passes the path straight to
+The script deletes the `.mf.gz` after decompressing, and `data/models/` is gitignored. Upload the
+**decompressed `.mf`**, not the archive: `MoondreamProvider` passes the path straight to
 `md.vl(model=...)`. The pinned source is `vikhyatk/moondream2` at revision `9dddae84…` (see the
 script) — the same weights the local benchmarks in Entries 11–13 were run against.
 
