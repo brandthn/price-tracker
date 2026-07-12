@@ -27,7 +27,7 @@ def _make_ticket(
         date_ticket=None,
         total_eur=None,
         ocr_confidence=1.0,
-        ocr_engine=ocr_engine,  # tier-1 par défaut → escalade vers moondream
+        ocr_engine=ocr_engine,  # tier-1 par défaut → escalade vers ocr-llm
         ocr_model=None,
         ocr_duration_ms=1200,
         ocr_error=None,
@@ -138,7 +138,7 @@ def test_feedback_down_triggers_retry(make_client) -> None:
 
 def test_feedback_down_at_cap_does_not_retry(make_client) -> None:
     user_id = uuid.uuid4()
-    ticket = _make_ticket(user_id, attempts=5)  # plafond anti-boucle par défaut = 5
+    ticket = _make_ticket(user_id, attempts=4)  # plafond = 4 (scratch + 2 passes ocr-llm)
     client, _session, published = make_client(ticket)
 
     r = client.post(f"/tickets/{ticket.id}/feedback", json={"rating": "down"})
@@ -148,10 +148,24 @@ def test_feedback_down_at_cap_does_not_retry(make_client) -> None:
     assert published == []
 
 
-def test_feedback_down_terminal_engine_does_not_retry(make_client) -> None:
-    # `gemini` (ocr-llm, tier-3) est terminal : un 👎 n'escalade plus.
+def test_feedback_down_gemini_mid_chain_retries(make_client) -> None:
+    # Chaîne scratch → ocr-llm → ocr-llm : le 1er `gemini` (attempts=3) n'est PAS
+    # terminal, il re-boucle vers ocr-llm pour la 2e passe corrective.
     user_id = uuid.uuid4()
-    ticket = _make_ticket(user_id, attempts=1, ocr_engine="gemini")
+    ticket = _make_ticket(user_id, attempts=3, ocr_engine="gemini")
+    client, _session, published = make_client(ticket)
+
+    r = client.post(f"/tickets/{ticket.id}/feedback", json={"rating": "down"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["retry_triggered"] is True
+    assert published == [str(ticket.id)]
+
+
+def test_feedback_down_gemini_at_cap_does_not_retry(make_client) -> None:
+    # Après la 2e passe ocr-llm (attempts=4), le plafond stoppe la chaîne.
+    user_id = uuid.uuid4()
+    ticket = _make_ticket(user_id, attempts=4, ocr_engine="gemini")
     client, _session, published = make_client(ticket)
 
     r = client.post(f"/tickets/{ticket.id}/feedback", json={"rating": "down"})

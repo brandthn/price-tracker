@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # (cf. Settings.ocr_escalation_by_engine). ocr-llm écrit "gemini".
 OCR_ENGINE_SCRATCH = "ocr-vlm-scratch"
 OCR_ENGINE_MOONDREAM = "moondream-0.5b"
+OCR_ENGINE_GEMINI = "gemini"
 
 
 class Settings(BaseSettings):
@@ -63,21 +64,24 @@ class Settings(BaseSettings):
     )
 
     # --- Feedback loop / escalade re-OCR ---------------------------------
-    # Escalade sur 👎 : tier-1 scratch → tier-2 moondream → tier-3 ocr-llm.
+    # Escalade sur 👎 : tier-1 scratch → ocr-llm (pass 1) → ocr-llm (pass 2).
     # Le tier-1 est dispatché par la notification GCS (topic `ticket-uploaded`),
     # pas par le backend ; le backend ne pilote que l'escalade.
     prt_ocr_moondream_topic: str = Field(
         default="ocr-vlm-moondream",
-        description="Topic Pub/Sub du backend OCR tier-2 (moondream).",
+        description="Topic Pub/Sub moondream — worker déployé mais HORS chaîne "
+        "(remplacé par ocr-llm). Conservé pour un éventuel ré-enrôlement.",
     )
     prt_ocr_retry_topic: str = Field(
         default="ocr-retry",
-        description="Topic Pub/Sub du re-OCR tier-3 (ocr-llm / gemini).",
+        description="Topic Pub/Sub du re-OCR ocr-llm (gemini, prompt correctif).",
     )
     prt_max_ocr_attempts: int = Field(
-        default=5,
-        description="Plafond anti-boucle (nb de passes OCR). L'escalade réelle est "
-        "bornée par la ladder par engine (2 escalades max) ; ceci n'est qu'un garde-fou.",
+        default=4,
+        description="Borne de la chaîne : scratch + 2 passes ocr-llm correctives. "
+        "Les 2 passes ocr-llm partageant le label `gemini`, la terminaison se fait "
+        "ici (le compteur = n° de passe), pas par la ladder engine. Reste aussi un "
+        "garde-fou anti-boucle. Doit rester aligné sur l'env PRT_MAX_OCR_ATTEMPTS.",
     )
 
     def _topic_path(self, topic: str) -> str:
@@ -97,13 +101,15 @@ class Settings(BaseSettings):
     def ocr_escalation_by_engine(self) -> dict[str, str]:
         """`ocr_engine` du dernier OCR → chemin du topic du tier suivant.
 
-        Seuls scratch et moondream ont un tier au-dessus d'eux. ocr-llm est le
-        dernier maillon : son label ("gemini") n'est pas une clé ici, donc
-        `.get()` renvoie None et l'escalade s'arrête (idem tout engine inconnu).
+        Chaîne : scratch → ocr-llm (pass 1) → ocr-llm (pass 2 correctif). Les deux
+        passes ocr-llm partagent le label `gemini` et re-bouclent donc sur le même
+        topic `ocr-retry` ; la terminaison n'est PAS portée par cette map mais par
+        `prt_max_ocr_attempts` (cf. submit_feedback). Tout engine absent de la map
+        (ex. moondream, hors chaîne) n'escalade pas.
         """
         return {
-            OCR_ENGINE_SCRATCH: self._topic_path(self.prt_ocr_moondream_topic),
-            OCR_ENGINE_MOONDREAM: self.ocr_retry_topic_path,
+            OCR_ENGINE_SCRATCH: self.ocr_retry_topic_path,
+            OCR_ENGINE_GEMINI: self.ocr_retry_topic_path,
         }
 
     @property

@@ -342,10 +342,10 @@ async def submit_feedback(
     ticket.last_feedback = body.rating
 
     settings = get_settings()
-    # Escalade routée par le moteur du dernier OCR : scratch → moondream →
-    # ocr-llm. Un engine terminal (`gemini`) ou hors pipeline n'a pas de tier
-    # suivant → pas d'escalade. `prt_max_ocr_attempts` reste un garde-fou
-    # anti-boucle secondaire.
+    # Escalade routée par le moteur du dernier OCR : scratch → ocr-llm (pass 1)
+    # → ocr-llm (pass 2 correctif). Les deux passes ocr-llm partagent le label
+    # `gemini` et re-bouclent sur le même topic ; c'est `prt_max_ocr_attempts`
+    # (=4 : scratch + 2 passes) qui borne la chaîne. Un engine hors map n'escalade pas.
     next_topic: str | None = None
     if body.rating == "down" and ticket.ocr_attempts < settings.prt_max_ocr_attempts:
         next_topic = settings.ocr_escalation_by_engine.get(ticket.ocr_engine or "")
