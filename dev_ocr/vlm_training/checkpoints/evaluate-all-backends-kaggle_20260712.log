@@ -1,0 +1,82 @@
+7.6s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+7.6s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+7.6s 3 0.00s - to python to disable frozen modules.
+7.6s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+8.3s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+8.3s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+8.3s 7 0.00s - to python to disable frozen modules.
+8.3s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+9.4s 9 BACKENDS = ['hybrid']
+14.7s 10 CUDA: True Tesla T4
+16.2s 11 Train package: /kaggle/working/repo/dev_ocr/vlm_training
+18.7s 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.0/44.0 kB 2.2 MB/s eta 0:00:00
+18.9s 13 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.0/44.0 kB 2.2 MB/s eta 0:00:00
+19.9s 14 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.0/12.0 MB 104.4 MB/s eta 0:00:00
+19.9s 15 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 566.4/566.4 kB 34.8 MB/s eta 0:00:00
+20.1s 16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.0/12.0 MB 104.4 MB/s eta 0:00:00
+20.1s 17 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 566.4/566.4 kB 34.8 MB/s eta 0:00:00
+54.9s 18 transformers 4.57.6 | huggingface_hub 0.36.2 | tokenizers 0.22.2
+54.9s 19 Install OK for: ['hybrid']
+55.2s 20 Groq key: loaded
+55.2s 21 FR_IMAGES  -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-french-eval/images_tickets_caisse
+55.2s 22 FR_LABELS  -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-french-eval/real_labels
+55.2s 23 HYBRID     -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-hybrid-ckpt/receipt_vlm_500m_merged.pt
+55.2s 24 OCRVLM     -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-eval-ckpts/ocr_vlm_epoch050_loss0.3619.pt
+55.2s 25 OCRVLM_TOK -> /kaggle/input/datasets/giorgiopasini/receipt-vlm-eval-ckpts/tokenizer.json
+55.2s 26 MOONDREAM  -> None
+55.2s 27 
+55.2s 28 ################  hybrid  ################
+57.2s 29 Common test set: 18 French receipts | device cuda
+57.2s 30 
+57.2s 31 === hybrid ===
+57.4s 32 Common test set: 18 French receipts | device cuda
+57.4s 33 
+57.4s 34 === hybrid ===
+433.4s 35 [hybrid] done in 376s
+433.4s 36 
+433.4s 37 Metric              hybrid
+433.4s 38 --------------------------------
+433.4s 39 Read acc (1-CER)    0.064
+433.4s 40 Valid (non-empty)   1.000
+433.4s 41 Product recall      0.000
+433.4s 42 Field F1            0.000
+433.4s 43 ANLS                0.258
+433.4s 44 Price MAE           0.000
+433.4s 45 Date exact match    0.000
+433.4s 46 n                   18
+433.4s 47 
+433.4s 48 Results written to /kaggle/working/cmp_hybrid.json
+433.6s 49 [hybrid] done in 376s
+433.6s 50 
+433.6s 51 Metric              hybrid
+433.6s 52 --------------------------------
+433.6s 53 Read acc (1-CER)    0.064
+433.6s 54 Valid (non-empty)   1.000
+433.6s 55 Product recall      0.000
+433.6s 56 Field F1            0.000
+433.6s 57 ANLS                0.258
+433.6s 58 Price MAE           0.000
+433.6s 59 Date exact match    0.000
+433.6s 60 n                   18
+433.6s 61 
+433.6s 62 Results written to /kaggle/working/cmp_hybrid.json
+437.5s 63 
+437.5s 64 collected: ['/kaggle/working/cmp_hybrid.json']
+437.5s 65 Metric              hybrid
+437.5s 66 ----------------------------------
+437.5s 67 Read acc (1-CER)    0.064
+437.5s 68 Valid (non-empty)   1.000
+437.5s 69 Product recall      0.000
+437.5s 70 Field F1            0.000
+437.5s 71 ANLS                0.258
+437.5s 72 Price MAE           0.000
+437.5s 73 Date exact match    0.000
+437.5s 74 n                   18
+440.5s 75 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+440.5s 76 cells[i][c] = re.sub('\\\\\|', '|', cell)
+440.6s 77 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+440.6s 78 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+441.3s 79 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+441.6s 80 [NbConvertApp] Writing 18616 bytes to __notebook__.ipynb
+443.9s 81 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+444.6s 82 [NbConvertApp] Writing 313986 bytes to __results__.html

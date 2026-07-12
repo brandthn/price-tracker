@@ -80,10 +80,14 @@ l'image par attention croisée) → SmolLM2-360M **gelé** + une **LoRA impléme
 bibliothèque → un **décodeur sous contrainte grammaticale** qui *garantit* un JSON valide par
 construction. Surface entraînable : **10,8 M sur 457 M, soit 2,4 %** — tout l'intérêt de l'approche.
 
-**Verdict honnête : ce modèle n'a jamais été évalué contre ses propres critères.** L'export de 1,82 Go
-provient d'un point de contrôle intermédiaire (la phase finale n'a jamais tourné), et il a **planté au
-banc d'essai**. Il n'a **aucune colonne** dans le tableau de la section 3.5. Un modèle complet, testé,
-déployable — mais sans mesure. C'est une dette, pas un résultat.
+**Verdict : mesuré, et décevant.** Ce modèle **lit moins bien que notre modèle *from scratch*, 52 fois
+plus petit** — précision de lecture **0,064 contre 0,113** (tableau 3.5). Deux enseignements. D'abord,
+**le pré-entraîné ne compense pas un entraînement inachevé** : l'export de 1,82 Go provient d'un point
+de contrôle intermédiaire, la phase finale d'alignement JSON n'ayant jamais tourné. Ensuite, son ANLS
+est *meilleur* (0,258 vs 0,166) alors que sa lecture est *pire* : il produit des tickets **bien
+formés mais au contenu plus faux** — le décodeur sous contrainte garantit la structure, pas la
+vérité. C'est précisément ce contraste qui a justifié de bifurquer vers une architecture plus petite,
+entraînée entièrement par nous.
 
 ### b) Modèle *from scratch*, 8,73 M paramètres (52× plus petit)
 
@@ -96,30 +100,39 @@ valide 1,00. Sur du synthétique, il lit.
 
 **Temps 2 — le gouffre.** Confronté à 533 tickets réels, il s'effondre : ANLS **0,170**, rappel
 **0,001**. Mais le mode de défaillance est instructif : **le modèle n'est pas cassé**. Il produit des
-tickets *valides et cohérents*… entièrement inventés depuis les enseignes synthétiques mémorisées.
+tickets *valides et cohérents*… entièrement inventés depuis le catalogue synthétique qu'il a mémorisé.
+Sur des tickets américains, il répond avec des enseignes et des produits **italiens** :
 
 ```
-Vérité : 'TRADERJOE'S'   →  Prédiction : 'Eurospin'
-Vérité : 'CVS/pharmacy'  →  Prédiction : 'Lidl'
+Ticket 'CVS/pharmacy'  →  enseigne prédite 'Lidl'      , 1er article 'CAFFE MACINATO 250G'
+Ticket "TRADERJOE'S"   →  enseigne prédite 'Eurospin'  , 1er article 'POMODORI 500G'
 ```
 
 Il **génère depuis son a priori sans regarder les pixels** : c'est le fossé *sim-to-real*. Diagnostic
 sans appel — **ajouter des epochs synthétiques ne servirait à rien**, cela ne ferait qu'affûter l'a
 priori. Le modèle doit *voir* du réel.
 
-**Temps 3 — le mélange, et une métrique à inventer.** Réentraînement en mélangeant **3 500 tickets
-réels à 4 000 synthétiques**. Le comportement change :
+**Temps 3 — le mélange.** Réentraînement en mélangeant **3 500 tickets réels à 4 000 synthétiques**.
+Le changement ne se lit pas dans l'exactitude — les prédictions restent fausses — mais dans **la
+nature même des erreurs** :
 
 ```
-epoch 40 : 'TRADERJOE'S' → 'Eurospin'                                    (hallucination)
-epoch 50 : 'TRADERJOE'S' → 'WAL[UNK]MART' , 1er article 'BANANAS' @0.59   (il lit)
+epoch 40 :  'Lidl'  ·  'CAFFE MACINATO 250G'  ·  'POMODORI 500G'      (propre, valide, synthétique)
+epoch 50 :  'GO BA JANDINEPONE'  ·  'ChowatterMas(Sw/Striemp'  ·  'CAMBO'   (abîmé, non-synthétique)
 ```
 
-Mais **nos métriques ne le voyaient pas** : ANLS et F1 restaient à zéro, car elles pénalisent une
-lecture *presque* juste autant qu'une hallucination. Nous avons donc **conçu une métrique adaptée** —
-la précision de lecture (`1 − CER`) sur le texte concaténé normalisé, qui mesure la lecture
-indépendamment de la structure. Elle, elle voit le progrès : **0,033 → 0,122 (×3,7)**. *La direction
-est prouvée ; la magnitude reste faible.*
+C'est **le signal décisif**. Un modèle qui hallucine produit du texte *impeccable et faux* — il récite
+un catalogue. Un modèle qui **lit mal** produit du texte *cassé* : `GO BA JANDINEPONE` n'appartient à
+aucun catalogue, c'est une tentative ratée de déchiffrer des pixels. Le vocabulaire bascule d'ailleurs
+du domaine synthétique européen vers l'anglais des tickets réels (`BANANAS`, `WAL[UNK]MART` — le
+`[UNK]` étant notre tokenizer caractère butant sur un glyphe hors de ses 190 symboles). **Le passage
+du « récité propre » au « lu abîmé » est un progrès**, même si le résultat reste inexploitable.
+
+Mais **nos métriques ne le voyaient pas** : ANLS et F1 comparent champ par champ en correspondance
+exacte, et pénalisent une lecture *presque* juste autant qu'une hallucination. Nous avons donc **conçu
+une métrique adaptée** — la précision de lecture (`1 − CER`) sur le texte concaténé normalisé, qui
+mesure la lecture **indépendamment de la structure**. Elle, elle voit le progrès : **0,033 → 0,122
+(×3,7)**. *La direction est prouvée ; la magnitude reste faible.*
 
 Ce parcours s'est payé en incidents — poste figé, disque plein, points de contrôle perdus sur disques
 éphémères — qui ont conduit à déporter définitivement l'entraînement et l'évaluation sur GPU distant
@@ -130,14 +143,14 @@ Ce parcours s'est payé en incidents — poste figé, disque plein, points de co
 Tous les moteurs, évalués **sur les mêmes 18 photos réelles**, avec les mêmes métriques —
 l'aboutissement du choix d'architecture de la section 3.2.
 
-| Métrique | paddle | ppocrv4 | groq | **ocrvlm** *(le nôtre)* |
-|---|---|---|---|---|
-| Précision de lecture (1−CER) | 0,111 | 0,074 | **0,790** | **0,113** |
-| Sortie valide | 0,833 | 0,722 | **1,000** | **1,000** |
-| Rappel produits | 0,106 | 0,071 | **0,682** | 0,000 |
-| Field F1 | 0,109 | 0,025 | **0,746** | 0,000 |
-| ANLS | 0,186 | 0,147 | **0,986** | 0,166 |
-| Date (exacte) | 0,000 | 0,000 | **0,944** | 0,000 |
+| Métrique | paddle | ppocrv4 | groq | *hybride* **(457 M)** | **ocrvlm** *(le nôtre, 8,7 M)* |
+|---|---|---|---|---|---|
+| Précision de lecture (1−CER) | 0,111 | 0,074 | **0,790** | 0,064 | **0,113** |
+| Sortie valide | 0,833 | 0,722 | **1,000** | **1,000** | **1,000** |
+| Rappel produits | 0,106 | 0,071 | **0,682** | 0,000 | 0,000 |
+| Field F1 | 0,109 | 0,025 | **0,746** | 0,000 | 0,000 |
+| ANLS | 0,186 | 0,147 | **0,986** | 0,258 | 0,166 |
+| Date (exacte) | 0,000 | 0,000 | **0,944** | 0,000 | 0,000 |
 
 **1. Groq écrase tout** (ANLS 0,986, date lue dans 94 % des cas). Un VLM *frontier* hébergé reste hors
 de portée de ce que nous pouvons entraîner localement : c'est la raison, factuelle, pour laquelle il
@@ -148,9 +161,15 @@ pure** (0,113 vs 0,111), **dépasse PP-OCRv4**, et est le **seul moteur local à
 exploitables** (PaddleOCR : 83 %). Face à des moteurs OCR industriels, c'est le résultat que nous
 défendons.
 
-**3. Mais il obtient 0,000 en rappel produits et en Field F1** : il **lit des caractères, il n'extrait
-pas encore des champs**. Son erreur de prix de 0,000 n'est pas une victoire — il n'a jamais apparié un
-produit permettant de comparer un prix. Et **aucun moteur local ne lit une date**.
+**3. Le plus gros modèle n'est pas le meilleur.** Le hybride, **52× plus lourd** et bâti sur deux
+réseaux pré-entraînés, **lit deux fois moins bien** que notre modèle *from scratch* (0,064 vs 0,113).
+Son ANLS supérieur (0,258) ne le sauve pas : il signale des tickets **bien structurés au contenu
+faux**. La taille et le pré-entraînement ne remplacent pas un entraînement mené à son terme.
+
+**4. Aucun modèle local n'extrait de champs** : 0,000 en rappel produits et en Field F1 pour les
+trois. Ils **lisent des caractères, ils ne remplissent pas encore un schéma**. L'erreur de prix de
+0,000 n'est d'ailleurs pas une victoire — aucun produit n'a été apparié, donc aucun prix comparé. Et
+**aucun ne lit une date**.
 
 ## 3.6 Mise en production et limites
 
