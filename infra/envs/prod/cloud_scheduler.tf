@@ -49,6 +49,13 @@ module "cloud_scheduler_jobs" {
       oidc_service_account_email = module.iam.emails["worker"]
       description                = "Phase 9.2 V1 simulation — agrégation BQ Gold → rapport JSON sur GCS bronze/alerts/."
     }
+    "${var.name_prefix}-trigger-catalogue" = {
+      schedule                   = "0 3 * * 0"   # Dimanche 03h UTC
+      target_url                 = module.run_worker_catalogue.uri
+      target_path                = "/run"
+      oidc_service_account_email = module.iam.emails["worker"]
+      description                = "Hebdomadaire — matching tickets Open Prices via Gemini vision → catalogue EAN Cloud SQL."
+    }
   }
 
   # Sans ce depends_on Terraform peut créer un job avant que le service agent

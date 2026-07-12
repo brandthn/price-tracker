@@ -473,6 +473,71 @@ module "run_worker_alertes" {
   labels = merge(var.labels, { component = "worker-alertes" })
 }
 
+# --- Worker Catalogue (Phase X) ------------------------------------------
+# Cron hebdomadaire (dimanche 03h UTC) — matching des tickets Open Prices
+# via Gemini 2.5 Flash vision → catalogue EAN ↔ libellés ↔ prix dans
+# Cloud SQL (tables catalogue_*).
+#
+# Tailles :
+# - memory 2Gi : vertexai SDK + pandas + psycopg2 ; le traitement image
+#   + appel Gemini est I/O-bound mais pandas charge le parquet en mémoire.
+# - cpu 2 : accélère le parsing pyarrow du parquet (~160k lignes).
+# - timeout 21600s : 3863 tickets × ~5s/ticket ≈ 5h. Largement dans la
+#   limite Cloud Run gen2 (6h max).
+#
+# vpc_egress = PRIVATE_RANGES_ONLY : Cloud SQL via VPC (private IP),
+# Open Food Facts + Vertex AI via internet direct.
+module "run_worker_catalogue" {
+  source = "../../modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "${var.name_prefix}-worker-catalogue"
+  image                 = "${module.artifact_registry.docker_registry_url}/catalogue:latest"
+  service_account_email = module.iam.emails["worker"]
+
+  min_instances   = 0
+  max_instances   = 1
+  cpu             = "2"
+  memory          = "2Gi"
+  timeout_seconds = 21600
+
+  vpc_subnet = local.cloud_run_subnet
+  vpc_egress = "PRIVATE_RANGES_ONLY"
+  ingress    = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  env = {
+    GOOGLE_CLOUD_PROJECT = var.project_id
+    PRT_GCP_REGION       = "us-central1"  # Gemini 2.5 Flash dispo en us-central1
+
+    PRT_BRONZE_BUCKET = module.bucket_bronze.name
+
+    PRT_DB_HOST = "/cloudsql/${module.cloud_sql_main.connection_name}"
+    PRT_DB_USER = module.cloud_sql_main.db_user
+    PRT_DB_NAME = module.cloud_sql_main.db_name
+
+    PRT_VERTEX_MODEL       = "gemini-2.5-flash"
+    PRT_LLM_MAX_TOKENS     = "8192"
+    PRT_LLM_TEMPERATURE    = "0.0"
+    PRT_LLM_DELAY_SECONDS  = "0.5"
+
+    PRT_CONFIDENCE_THRESHOLD = "0.7"
+    PRT_FILTER_COUNTRY_CODES = "FR,GP,GF,MQ,RE,YT,PM,MF,BL,WF,NC,PF"
+    PRT_FILTER_PROOF_TYPE    = "RECEIPT"
+
+    PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS = module.iam.emails["worker"]
+  }
+
+  secret_env = {
+    PRT_DB_PASSWORD = {
+      secret  = module.secrets.secret_ids["${var.name_prefix}-cloudsql-password"]
+      version = "latest"
+    }
+  }
+
+  labels = merge(var.labels, { component = "worker-catalogue" })
+}
+
 # --- IAM : worker-sa peut invoquer les 5 services workers ----------------
 # Requis pour : Cloud Scheduler → worker-{ingestion,off,indices,alertes}
 # et Pub/Sub push → worker-ocr. La SA worker-sa porte l'identité OIDC dans
@@ -484,6 +549,7 @@ locals {
     module.run_worker_off.name,
     module.run_worker_indices.name,
     module.run_worker_alertes.name,
+    module.run_worker_catalogue.name,
   ])
 }
 

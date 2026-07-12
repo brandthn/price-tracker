@@ -23,3 +23,4 @@ from .products import Product  # noqa: E402, F401
 from .tickets import Ticket  # noqa: E402, F401
 from .user_basket_history import UserBasketHistory  # noqa: E402, F401
 from .users import User  # noqa: E402, F401
+from .recommendations import ProductSubstitution  # noqa: F401

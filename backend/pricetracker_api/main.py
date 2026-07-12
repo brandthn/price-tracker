@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .db import dispose_engine, init_engine
 from .logging import configure_logging, get_logger
-from .routers import indices, observatoire, products, stats, tickets, users
+from .routers import indices, observatoire, products, recommendations, stats, tickets, users
 
 
 def _build_app() -> FastAPI:
@@ -85,6 +85,7 @@ def _build_app() -> FastAPI:
     app.include_router(indices.router)
     app.include_router(observatoire.router)
     app.include_router(products.router)
+    app.include_router(recommendations.router)
     app.include_router(stats.router)
     app.include_router(users.router)
 
