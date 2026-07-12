@@ -92,7 +92,7 @@ variable "worker_ocr_paddle_image_tag" {
 variable "worker_ocr_vlm_moondream_image_tag" {
   description = "Tag de l'image worker-ocr-vlm-moondream en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-vlm-moondream/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
   type        = string
-  default     = "1672d2d"
+  default     = "ebc73d0"
 }
 
 variable "worker_ocr_vlm_scratch_image_tag" {
