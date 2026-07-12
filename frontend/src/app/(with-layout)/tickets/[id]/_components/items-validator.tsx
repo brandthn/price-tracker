@@ -83,6 +83,10 @@ export function ItemsValidator({
         toast.success(
           `${changed.length} correction${changed.length > 1 ? "s" : ""} enregistrée${changed.length > 1 ? "s" : ""}.`,
         );
+        // Le remount ne se déclenche plus sur une sauvegarde (key = ocr_attempts,
+        // inchangé ici) : on efface les drapeaux dirty localement pour repasser
+        // le bouton à « Aucune correction ».
+        setDrafts((prev) => prev.map((d) => ({ ...d, dirty: false })));
         router.refresh();
       } catch (err) {
         toast.error(`Impossible d'enregistrer : ${(err as Error).message}`);

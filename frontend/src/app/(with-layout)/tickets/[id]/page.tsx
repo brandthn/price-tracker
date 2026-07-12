@@ -54,7 +54,11 @@ export default async function TicketDetailPage({
         {/* Colonne droite : lecture à vérifier, dépliée. */}
         <div className="space-y-6 lg:col-span-2">
           {hasOcrResult && (
+            // key sur ocr_attempts : chaque passe OCR remonte le composant, qui
+            // repart de props frais (feedback, baseline de poll) — sinon l'état
+            // rémanent désynchronise les boutons et fausse le « maximum atteint ».
             <OcrFeedback
+              key={ticket.ocr_attempts}
               ticketId={ticket.id}
               initialFeedback={ticket.last_feedback}
               initialAttempts={ticket.ocr_attempts}
@@ -62,7 +66,7 @@ export default async function TicketDetailPage({
           )}
 
           <ItemsValidator
-            key={ticket.updated_at}
+            key={ticket.ocr_attempts}
             ticketId={ticket.id}
             initialItems={ticket.items}
             ticketStatus={ticket.status}
