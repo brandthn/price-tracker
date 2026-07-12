@@ -1,15 +1,15 @@
 # Pub/Sub subscriptions — Phase 5.
 #
 # Deux subscriptions :
-#   1. Push   : `ticket-uploaded` → `prt-prod-worker-ocr` (déclenche le pipeline OCR)
+#   1. Push   : `ticket-uploaded` → tier-1 `prt-prod-worker-ocr-vlm-scratch` (déclenche le pipeline OCR)
 #   2. Pull   : `ticket-uploaded-dlq` (inspection / replay manuel des messages empoisonnés)
 #
 # Le DLQ wiring vit côté subscription principale (`dead_letter_policy`), pas côté topic.
 
-# --- 1) Push subscription : ticket-uploaded → worker-ocr -------------------
+# --- 1) Push subscription : ticket-uploaded → tier-1 worker-ocr-vlm-scratch -
 #
 # OIDC auth : Cloud Run vérifie le token signé par Google contre :
-#   - aud  == URL exacte du service `prt-prod-worker-ocr` (audience)
+#   - aud  == URL exacte du service `prt-prod-worker-ocr-vlm-scratch` (audience)
 #   - iss  == worker-sa (qui a `roles/run.invoker` via cloud_run.tf)
 #
 # DLQ : après 5 échecs (5xx ou non-ack dans ack_deadline), Pub/Sub bascule le
@@ -29,13 +29,12 @@ resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
   enable_message_ordering    = false
 
   push_config {
-    # Convention : le worker OCR expose son handler sur /push (cf. plan-01
-    # Phase 8). En Phase 5 l'image hello répond 200 sur n'importe quel path.
-    push_endpoint = "${module.run_worker_ocr.uri}/push"
+    # Tier-1 du pipeline OCR = backend OCR-VLM from-scratch. Le worker expose /push.
+    push_endpoint = "${module.run_worker_ocr_vlm_scratch.uri}/push"
 
     oidc_token {
       service_account_email = module.iam.emails["worker"]
-      audience              = module.run_worker_ocr.uri
+      audience              = module.run_worker_ocr_vlm_scratch.uri
     }
 
     attributes = {
@@ -53,7 +52,7 @@ resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
     max_delivery_attempts = 5
   }
 
-  labels = merge(var.labels, { component = "worker-ocr" })
+  labels = merge(var.labels, { component = "ocr-tier1-dispatch" })
 
   # Ordre : la sub principale ne peut pas être créée tant que :
   #   - le service agent Pub/Sub n'a pas TokenCreator sur worker-sa
@@ -178,4 +177,218 @@ resource "google_pubsub_subscription" "ocr_retry_dlq_inspection" {
   enable_message_ordering    = false
 
   labels = merge(var.labels, { component = "worker-ocr-retry-dlq" })
+}
+
+# --- 4) Backends OCR « un backend = un worker » ----------------------------
+#
+# Un backend = un topic → une push subscription vers son worker /push, même
+# schéma OIDC/DLQ que la sub OCR principale. Le pipeline (scratch → moondream →
+# ocr-retry) est piloté par le backend en publiant {ticket_id} sur le topic du
+# tier voulu ; les workers ne s'appellent pas entre eux.
+
+# 4a) Backend PaddleOCR
+resource "google_pubsub_subscription" "ocr_paddle_worker_push" {
+  project = var.project_id
+  name    = "ocr-paddle-push"
+  topic   = module.pubsub.topics["ocr-paddle"].name
+
+  ack_deadline_seconds       = 600
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  push_config {
+    push_endpoint = "${module.run_worker_ocr_paddle.uri}/push"
+
+    oidc_token {
+      service_account_email = module.iam.emails["worker"]
+      audience              = module.run_worker_ocr_paddle.uri
+    }
+
+    attributes = {
+      x-goog-version = "v1"
+    }
+  }
+
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+
+  dead_letter_policy {
+    dead_letter_topic     = module.pubsub.topics["ocr-paddle-dlq"].id
+    max_delivery_attempts = 5
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-paddle" })
+
+  depends_on = [
+    google_service_account_iam_member.pubsub_token_creator_on_worker,
+    google_cloud_run_v2_service_iam_member.worker_sa_invoker,
+  ]
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_agent_paddle_dlq_forwarder" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.ocr_paddle_worker_push.name
+  role         = "roles/pubsub.subscriber"
+  member       = local.pubsub_agent_member
+}
+
+resource "google_pubsub_topic_iam_member" "pubsub_agent_paddle_dlq_publisher" {
+  project = var.project_id
+  topic   = module.pubsub.topics["ocr-paddle-dlq"].name
+  role    = "roles/pubsub.publisher"
+  member  = local.pubsub_agent_member
+}
+
+resource "google_pubsub_subscription" "ocr_paddle_dlq_inspection" {
+  project = var.project_id
+  name    = "ocr-paddle-dlq-inspection"
+  topic   = module.pubsub.topics["ocr-paddle-dlq"].name
+
+  ack_deadline_seconds       = 60
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  labels = merge(var.labels, { component = "worker-ocr-paddle-dlq" })
+}
+
+# 4b) Backend VLM Moondream
+resource "google_pubsub_subscription" "ocr_vlm_moondream_worker_push" {
+  project = var.project_id
+  name    = "ocr-vlm-moondream-push"
+  topic   = module.pubsub.topics["ocr-vlm-moondream"].name
+
+  ack_deadline_seconds       = 600
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  push_config {
+    push_endpoint = "${module.run_worker_ocr_vlm_moondream.uri}/push"
+
+    oidc_token {
+      service_account_email = module.iam.emails["worker"]
+      audience              = module.run_worker_ocr_vlm_moondream.uri
+    }
+
+    attributes = {
+      x-goog-version = "v1"
+    }
+  }
+
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+
+  dead_letter_policy {
+    dead_letter_topic     = module.pubsub.topics["ocr-vlm-moondream-dlq"].id
+    max_delivery_attempts = 5
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-vlm-moondream" })
+
+  depends_on = [
+    google_service_account_iam_member.pubsub_token_creator_on_worker,
+    google_cloud_run_v2_service_iam_member.worker_sa_invoker,
+  ]
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_agent_moondream_dlq_forwarder" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.ocr_vlm_moondream_worker_push.name
+  role         = "roles/pubsub.subscriber"
+  member       = local.pubsub_agent_member
+}
+
+resource "google_pubsub_topic_iam_member" "pubsub_agent_moondream_dlq_publisher" {
+  project = var.project_id
+  topic   = module.pubsub.topics["ocr-vlm-moondream-dlq"].name
+  role    = "roles/pubsub.publisher"
+  member  = local.pubsub_agent_member
+}
+
+resource "google_pubsub_subscription" "ocr_vlm_moondream_dlq_inspection" {
+  project = var.project_id
+  name    = "ocr-vlm-moondream-dlq-inspection"
+  topic   = module.pubsub.topics["ocr-vlm-moondream-dlq"].name
+
+  ack_deadline_seconds       = 60
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  labels = merge(var.labels, { component = "worker-ocr-vlm-moondream-dlq" })
+}
+
+# 4c) Backend OCR-VLM from-scratch
+resource "google_pubsub_subscription" "ocr_vlm_scratch_worker_push" {
+  project = var.project_id
+  name    = "ocr-vlm-scratch-push"
+  topic   = module.pubsub.topics["ocr-vlm-scratch"].name
+
+  ack_deadline_seconds       = 600
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  push_config {
+    push_endpoint = "${module.run_worker_ocr_vlm_scratch.uri}/push"
+
+    oidc_token {
+      service_account_email = module.iam.emails["worker"]
+      audience              = module.run_worker_ocr_vlm_scratch.uri
+    }
+
+    attributes = {
+      x-goog-version = "v1"
+    }
+  }
+
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+
+  dead_letter_policy {
+    dead_letter_topic     = module.pubsub.topics["ocr-vlm-scratch-dlq"].id
+    max_delivery_attempts = 5
+  }
+
+  labels = merge(var.labels, { component = "worker-ocr-vlm-scratch" })
+
+  depends_on = [
+    google_service_account_iam_member.pubsub_token_creator_on_worker,
+    google_cloud_run_v2_service_iam_member.worker_sa_invoker,
+  ]
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_agent_scratch_dlq_forwarder" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.ocr_vlm_scratch_worker_push.name
+  role         = "roles/pubsub.subscriber"
+  member       = local.pubsub_agent_member
+}
+
+resource "google_pubsub_topic_iam_member" "pubsub_agent_scratch_dlq_publisher" {
+  project = var.project_id
+  topic   = module.pubsub.topics["ocr-vlm-scratch-dlq"].name
+  role    = "roles/pubsub.publisher"
+  member  = local.pubsub_agent_member
+}
+
+resource "google_pubsub_subscription" "ocr_vlm_scratch_dlq_inspection" {
+  project = var.project_id
+  name    = "ocr-vlm-scratch-dlq-inspection"
+  topic   = module.pubsub.topics["ocr-vlm-scratch-dlq"].name
+
+  ack_deadline_seconds       = 60
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  enable_message_ordering    = false
+
+  labels = merge(var.labels, { component = "worker-ocr-vlm-scratch-dlq" })
 }

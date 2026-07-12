@@ -1,0 +1,40 @@
+# Build config Cloud Build pour worker-ocr-vlm-moondream (backend VLM Moondream 0.5B).
+# Soumettre depuis la RACINE du monorepo (libs/ est dans le contexte) :
+#   gcloud builds submit . --config=workers/ocr-vlm-moondream/cloudbuild.yaml \
+#     --substitutions=_SHORT_SHA=$(git rev-parse --short HEAD) \
+#     --project=price-tracker-prod-01
+#
+# Prérequis (une fois) : poids sur GCS
+#   gsutil cp dev_ocr/data/models/moondream-0_5b-int8.mf \
+#     gs://price-tracker-prod-01-models/vlm/moondream/v1/
+#
+# Puis bumper worker_ocr_vlm_moondream_image_tag dans
+# infra/envs/prod/variables_ocr_backends.tf et `terraform apply`.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-f'
+      - 'workers/ocr-vlm-moondream/Dockerfile'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-moondream:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-moondream:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-moondream:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _SHORT_SHA: 'latest'

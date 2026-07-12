@@ -54,18 +54,21 @@ export default async function TicketDetailPage({
         {/* Colonne droite : lecture à vérifier, dépliée. */}
         <div className="space-y-6 lg:col-span-2">
           {hasOcrResult && (
+            // Identité stable (pas de `key` dynamique) : le composant reste monté
+            // entre deux passes et re-synchronise son état depuis les props à
+            // chaque `router.refresh()`. Un `key` dérivé de la donnée empilait des
+            // instances dans l'arbre RSC au lieu de les remplacer.
             <OcrFeedback
               ticketId={ticket.id}
               initialFeedback={ticket.last_feedback}
-              initialAttempts={ticket.ocr_attempts}
             />
           )}
 
           <ItemsValidator
-            key={ticket.updated_at}
             ticketId={ticket.id}
             initialItems={ticket.items}
             ticketStatus={ticket.status}
+            ocrAttempts={ticket.ocr_attempts}
           />
         </div>
       </div>

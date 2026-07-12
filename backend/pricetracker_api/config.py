@@ -7,6 +7,14 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Labels moteur écrits par les workers dans `tickets.ocr_engine` (= la var
+# PRT_OCR_ENGINE_LABEL côté Cloud Run). Ils identifient quel OCR a traité le
+# ticket en dernier, ce qui permet de router le 👎 vers le tier suivant
+# (cf. Settings.ocr_escalation_by_engine). ocr-llm écrit "gemini".
+OCR_ENGINE_SCRATCH = "ocr-vlm-scratch"
+OCR_ENGINE_MOONDREAM = "moondream-0.5b"
+OCR_ENGINE_GEMINI = "gemini"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -55,28 +63,54 @@ class Settings(BaseSettings):
         description="DEV ONLY : bypass Firebase Auth, retourne un user fake.",
     )
 
-    # --- Feedback loop / re-OCR ------------------------------------------
+    # --- Feedback loop / escalade re-OCR ---------------------------------
+    # Escalade sur 👎 : tier-1 scratch → ocr-llm (pass 1) → ocr-llm (pass 2).
+    # Le tier-1 est dispatché par la notification GCS (topic `ticket-uploaded`),
+    # pas par le backend ; le backend ne pilote que l'escalade.
+    prt_ocr_moondream_topic: str = Field(
+        default="ocr-vlm-moondream",
+        description="Topic Pub/Sub moondream — worker déployé mais HORS chaîne "
+        "(remplacé par ocr-llm). Conservé pour un éventuel ré-enrôlement.",
+    )
     prt_ocr_retry_topic: str = Field(
         default="ocr-retry",
-        description="Nom (ou chemin complet) du topic Pub/Sub déclenchant le re-OCR tier-2.",
+        description="Topic Pub/Sub du re-OCR ocr-llm (gemini, prompt correctif).",
     )
     prt_max_ocr_attempts: int = Field(
-        default=2,
-        description="Garde-fou anti-boucle : un 👎 ne relance un re-OCR que si "
-        "ocr_attempts < cette valeur (tier-1=1, tier-2=2).",
+        default=4,
+        description="Borne de la chaîne : scratch + 2 passes ocr-llm correctives. "
+        "Les 2 passes ocr-llm partageant le label `gemini`, la terminaison se fait "
+        "ici (le compteur = n° de passe), pas par la ladder engine. Reste aussi un "
+        "garde-fou anti-boucle. Doit rester aligné sur l'env PRT_MAX_OCR_ATTEMPTS.",
     )
 
-    @property
-    def ocr_retry_topic_path(self) -> str:
-        """Chemin complet `projects/<proj>/topics/<topic>` attendu par PublisherClient.
+    def _topic_path(self, topic: str) -> str:
+        """`projects/<proj>/topics/<topic>` attendu par PublisherClient.
 
-        Accepte soit un nom court (`ocr-retry`) — préfixé avec le projet — soit
-        un chemin déjà complet.
+        Accepte un nom court (préfixé avec le projet) ou un chemin déjà complet.
         """
-        topic = self.prt_ocr_retry_topic
         if topic.startswith("projects/"):
             return topic
         return f"projects/{self.google_cloud_project}/topics/{topic}"
+
+    @property
+    def ocr_retry_topic_path(self) -> str:
+        return self._topic_path(self.prt_ocr_retry_topic)
+
+    @property
+    def ocr_escalation_by_engine(self) -> dict[str, str]:
+        """`ocr_engine` du dernier OCR → chemin du topic du tier suivant.
+
+        Chaîne : scratch → ocr-llm (pass 1) → ocr-llm (pass 2 correctif). Les deux
+        passes ocr-llm partagent le label `gemini` et re-bouclent donc sur le même
+        topic `ocr-retry` ; la terminaison n'est PAS portée par cette map mais par
+        `prt_max_ocr_attempts` (cf. submit_feedback). Tout engine absent de la map
+        (ex. moondream, hors chaîne) n'escalade pas.
+        """
+        return {
+            OCR_ENGINE_SCRATCH: self.ocr_retry_topic_path,
+            OCR_ENGINE_GEMINI: self.ocr_retry_topic_path,
+        }
 
     @property
     def cors_origins_list(self) -> list[str]:

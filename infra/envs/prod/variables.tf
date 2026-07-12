@@ -54,7 +54,7 @@ variable "worker_off_image_tag" {
 variable "backend_image_tag" {
   description = "Tag de l'image backend FastAPI en AR. Doit exister dans le repo prt-prod-docker. Mis à jour à chaque déploiement Phase 7+."
   type        = string
-  default = "4f8ae38"
+  default     = "f34364d"
 }
 
 variable "backend_auth_enabled" {
@@ -63,7 +63,7 @@ variable "backend_auth_enabled" {
     PRT_AUTH_DISABLE=0). `false` = mode démo (bypass, tous les appels mappés sur
     un user fake — pas de per-user).
 
-    ⚠️ Passer à `true` UNIQUEMENT après avoir déployé le frontend avec sa config
+    !! Passer à `true` UNIQUEMENT après avoir déployé le frontend avec sa config
     Firebase (NEXT_PUBLIC_FIREBASE_*) : sinon le front démo envoie un Bearer
     invalide → 401. Voir docs/phase-11-auth-handoff.md.
   EOT
@@ -83,6 +83,42 @@ variable "worker_ocr_llm_image_tag" {
   default = "08c2365"
 }
 
+variable "worker_ocr_paddle_image_tag" {
+  description = "Tag de l'image worker-ocr-paddle en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-paddle/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
+  type        = string
+  default     = "1672d2d"
+}
+
+variable "worker_ocr_vlm_moondream_image_tag" {
+  description = "Tag de l'image worker-ocr-vlm-moondream en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-vlm-moondream/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
+  type        = string
+  default     = "ebc73d0"
+}
+
+variable "worker_ocr_vlm_scratch_image_tag" {
+  description = "Tag de l'image worker-ocr-vlm-scratch en AR. Bumper après chaque build (gcloud builds submit . --config=workers/ocr-vlm-scratch/cloudbuild.yaml). 'skeleton' = image hello (pré-build)."
+  type        = string
+  default     = "10d90ed"
+}
+
+variable "ocr_vlm_moondream_model_gcs_uri" {
+  description = "Objet GCS (relatif au bucket models) des poids Moondream 0.5B int8 (.mf), téléchargés au cold start."
+  type        = string
+  default     = "vlm/moondream/v1/moondream-0_5b-int8.mf"
+}
+
+variable "ocr_vlm_scratch_model_gcs_uri" {
+  description = "Objet GCS (relatif au bucket models) du checkpoint OCR-VLM from-scratch (.pt). Défaut = epoch050 (meilleur ANLS/product_recall réel)."
+  type        = string
+  default     = "vlm/ocr-vlm-scratch/v1/ocr_vlm_epoch050_loss0.3619.pt"
+}
+
+variable "ocr_vlm_scratch_tokenizer_gcs_uri" {
+  description = "Objet GCS (relatif au bucket models) du tokenizer caractère du modèle from-scratch (.json)."
+  type        = string
+  default     = "vlm/ocr-vlm-scratch/v1/tokenizer_20260607_0900.json"
+}
+
 variable "worker_indices_image_tag" {
   description = "Tag de l'image worker-indices en AR. Bumper après chaque build (gcloud builds submit . --config=workers/indices/cloudbuild.yaml)."
   type        = string
@@ -98,7 +134,7 @@ variable "worker_alertes_image_tag" {
 variable "frontend_image_tag" {
   description = "Tag de l'image frontend Next.js en AR. Bumper après chaque build (gcloud builds submit . --config=frontend/cloudbuild.yaml)."
   type        = string
-  default     = "bb0d230"
+  default     = "b9fa0f3"
 }
 
 variable "frontend_cors_origins" {

@@ -1,22 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getTicket, submitFeedback } from "@/lib/api/tickets";
 import type { FeedbackRating } from "@/lib/api/types";
 
 const POLL_INTERVAL_MS = 3000;
-const POLL_MAX_ATTEMPTS = 20; // ~60s max d'attente du re-OCR tier-2
+const POLL_MAX_ATTEMPTS = 20; // ~60s max d'attente du re-OCR
 
 export function OcrFeedback({
   ticketId,
   initialFeedback,
-  initialAttempts,
 }: {
   ticketId: string;
   initialFeedback: FeedbackRating | null;
-  initialAttempts: number;
 }) {
   const router = useRouter();
   const [feedback, setFeedback] = useState<FeedbackRating | null>(
@@ -24,6 +22,12 @@ export function OcrFeedback({
   );
   const [busy, setBusy] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
+
+  // Composant monté en continu entre deux passes : on re-cale l'état des boutons
+  // sur la vérité serveur à chaque refresh (sinon le surlignage reste figé).
+  useEffect(() => {
+    setFeedback(initialFeedback);
+  }, [initialFeedback]);
 
   const send = async (rating: FeedbackRating) => {
     if (busy || reanalyzing) return;
@@ -34,7 +38,10 @@ export function OcrFeedback({
       const res = await submitFeedback(ticketId, rating);
       if (res.retry_triggered) {
         toast.info("Merci ! Une nouvelle analyse plus poussée est lancée…");
-        await pollUntilReanalyzed(ticketId, initialAttempts, setReanalyzing);
+        // Baseline autoritative = nb de passes AVANT le re-OCR, renvoyé par la
+        // réponse elle-même. On ne dépend pas d'un prop qui pourrait être périmé
+        // entre deux 👎 (source du faux « maximum atteint »).
+        await pollUntilReanalyzed(ticketId, res.ticket.ocr_attempts, setReanalyzing);
         router.refresh();
       } else if (rating === "up") {
         toast.success("Merci pour votre retour 👍");

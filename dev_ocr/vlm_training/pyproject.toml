@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "receipt_vlm"
+version = "0.1.0"
+description = "Training package for the hybrid CLIP+SmolLM French receipt VLM (academic deliverable)."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Price Tracker" }]
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+include = ["receipt_vlm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../src"]
+addopts = "-ra"
+markers = [
+    "slow: tests that download pretrained weights (CLIP / SmolLM2).",
+]

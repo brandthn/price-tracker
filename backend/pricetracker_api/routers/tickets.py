@@ -342,23 +342,33 @@ async def submit_feedback(
     ticket.last_feedback = body.rating
 
     settings = get_settings()
-    retry_triggered = False
+    # Escalade routée par le moteur du dernier OCR : scratch → ocr-llm (pass 1)
+    # → ocr-llm (pass 2 correctif). Les deux passes ocr-llm partagent le label
+    # `gemini` et re-bouclent sur le même topic ; c'est `prt_max_ocr_attempts`
+    # (=4 : scratch + 2 passes) qui borne la chaîne. Un engine hors map n'escalade pas.
+    next_topic: str | None = None
     if body.rating == "down" and ticket.ocr_attempts < settings.prt_max_ocr_attempts:
-        retry_triggered = True
+        next_topic = settings.ocr_escalation_by_engine.get(ticket.ocr_engine or "")
+    retry_triggered = next_topic is not None
 
     await session.commit()
     await session.refresh(ticket)
 
     # Publication APRÈS commit : on ne relance un re-OCR que si l'avis est bien
     # persisté. Échec de publication → 502 explicite (le feedback reste sauvé).
-    if retry_triggered:
+    if next_topic is not None:
         try:
-            await asyncio.to_thread(pubsub.publish_ocr_retry, str(ticket.id))
+            await asyncio.to_thread(pubsub.publish_to_topic, next_topic, str(ticket.id))
         except Exception as exc:
-            logger.error("ocr_retry_publish_failed", ticket_id=str(ticket.id), error=str(exc))
+            logger.error(
+                "ocr_escalation_publish_failed",
+                ticket_id=str(ticket.id),
+                topic=next_topic,
+                error=str(exc),
+            )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Feedback enregistré mais le re-OCR n'a pas pu être déclenché.",
+                detail="Feedback enregistré mais l'escalade OCR n'a pas pu être déclenchée.",
             ) from exc
 
     detail = await _load_ticket_detail(session, ticket)
@@ -367,6 +377,8 @@ async def submit_feedback(
         ticket_id=str(ticket.id),
         rating=body.rating,
         ocr_attempt=ticket.ocr_attempts,
+        from_engine=ticket.ocr_engine,
+        escalated_to=next_topic,
         retry_triggered=retry_triggered,
     )
     return FeedbackResponse(ticket=detail, retry_triggered=retry_triggered)

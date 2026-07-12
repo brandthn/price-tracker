@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { patchTicketItems } from "@/lib/api/tickets";
@@ -19,16 +19,27 @@ export function ItemsValidator({
   ticketId,
   initialItems,
   ticketStatus,
+  ocrAttempts,
 }: {
   ticketId: string;
   initialItems: PrixExtrait[];
   ticketStatus: string;
+  ocrAttempts: number;
 }) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     initialItems.map(toDraft),
   );
   const [isPending, startTransition] = useTransition();
+
+  // Une nouvelle passe OCR (ocr_attempts change) réécrit les lignes serveur : on
+  // reconstruit les brouillons. Les refresh sans nouvelle passe (ex. sauvegarde
+  // de corrections) ne déclenchent pas ce resync et préservent la saisie en cours.
+  useEffect(() => {
+    setDrafts(initialItems.map(toDraft));
+    // initialItems volontairement hors deps : on ne resync que sur une passe OCR.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ocrAttempts]);
 
   const dirtyCount = useMemo(
     () => drafts.filter((d) => d.dirty).length,
@@ -83,6 +94,10 @@ export function ItemsValidator({
         toast.success(
           `${changed.length} correction${changed.length > 1 ? "s" : ""} enregistrée${changed.length > 1 ? "s" : ""}.`,
         );
+        // Une sauvegarde ne change pas ocr_attempts → le resync des brouillons ne
+        // se déclenche pas : on efface les drapeaux dirty localement pour repasser
+        // le bouton à « Aucune correction ».
+        setDrafts((prev) => prev.map((d) => ({ ...d, dirty: false })));
         router.refresh();
       } catch (err) {
         toast.error(`Impossible d'enregistrer : ${(err as Error).message}`);
