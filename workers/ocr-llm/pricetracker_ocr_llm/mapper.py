@@ -33,8 +33,6 @@ def _line_total(item: dict) -> Decimal:
 
 def map_ticket_fields(
     ocr_result: dict,
-    ticket_id: str,
-    gcs_path: str,
     engine: str,
     duration_ms: int,
     confidence: float,

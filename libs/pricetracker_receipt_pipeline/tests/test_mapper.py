@@ -20,7 +20,7 @@ TICKET = {
 
 
 def test_map_ticket_fields():
-    fields = mapper.map_ticket_fields(TICKET, "tid", "obj.jpg", "paddleocr", 1234, 1.0)
+    fields = mapper.map_ticket_fields(TICKET, "paddleocr", 1234, 1.0)
 
     assert fields["enseigne"] == "CARREFOUR"
     assert fields["ticket_date"] == date(2024, 3, 15)
@@ -32,7 +32,7 @@ def test_map_ticket_fields():
 def test_map_ticket_fields_without_products_or_date():
     fields = mapper.map_ticket_fields(
         {"ticket": {"date": "", "chaine_supermarche": "", "produits": []}},
-        "tid", "obj.jpg", "paddleocr", 1, 1.0,
+        "paddleocr", 1, 1.0,
     )
     assert fields["enseigne"] is None
     assert fields["ticket_date"] is None

@@ -179,7 +179,7 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
         )
 
     chain = _as_str(ticket_raw.get(TicketField.CHAINE.value, ""))
-    if chain and not _looks_like_store_name(chain):
+    if chain and not looks_like_store_name(chain):
         raise ReceiptParseError(f"VLM JSON: invalid chaine_supermarche {chain!r}.")
     address = _as_str(ticket_raw.get(TicketField.ADRESSE.value, ""))
     products_raw = ticket_raw.get(TicketField.PRODUITS.value, [])
@@ -192,10 +192,10 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
     for index, item in enumerate(products_raw):
         if not isinstance(item, dict):
             continue
-        name = _normalize_product_name(_as_str(item.get(ProductField.NOM.value, "")))
+        name = _WHITESPACE.sub(" ", _as_str(item.get(ProductField.NOM.value, "")).strip())
         if not name:
             continue
-        price = _round_price(_as_price(item.get(ProductField.PRIX.value)))
+        price = round(_as_price(item.get(ProductField.PRIX.value)), 2)
         units = _as_units(item.get(ProductField.UNITES.value))
         products.append(
             {
@@ -217,29 +217,16 @@ def normalize_vlm_ticket(payload: dict[str, Any]) -> dict:
     }
 
 
-def _normalize_product_name(name: str) -> str:
-    """Collapse whitespace for stable duplicate detection."""
-    return _WHITESPACE.sub(" ", name.strip())
-
-
-def _round_price(value: float) -> float:
-    return round(value, 2)
-
-
-def _product_dedup_key(product: dict[str, Any]) -> tuple[str, float, int]:
-    return (
-        product[ProductField.NOM.value],
-        product[ProductField.PRIX.value],
-        product[ProductField.UNITES.value],
-    )
-
-
 def _dedupe_vlm_products(products: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove exact duplicate line items (common VLM hallucination)."""
+    """Les VLM répètent régulièrement deux fois la même ligne."""
     seen: set[tuple[str, float, int]] = set()
     deduped: list[dict[str, Any]] = []
     for product in products:
-        key = _product_dedup_key(product)
+        key = (
+            product[ProductField.NOM.value],
+            product[ProductField.PRIX.value],
+            product[ProductField.UNITES.value],
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -308,7 +295,7 @@ _VLM_DATE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 
 
 def _coerce_vlm_date(value: str) -> str:
-    """Normalize common receipt date strings to ``yyyyMMdd HH:mm``."""
+    """Ramène les dates de ticket au format yyyyMMdd HH:mm."""
     stripped = value.strip()
     if not stripped or _looks_like_output_date(stripped):
         return stripped
@@ -326,7 +313,31 @@ def _looks_like_output_date(value: str) -> bool:
     return bool(re.fullmatch(r"\d{8}\s+\d{2}:\d{2}", value.strip()))
 
 
-def _looks_like_store_name(value: str) -> bool:
-    from receipt_ocr.vlm_validate import looks_like_store_name
+# Les VLM bavardent : ils commentent l'image au lieu de la lire. Ces marqueurs
+# servent à la fois à valider une transcription et à refuser une fausse enseigne.
+_CHAT_MARKERS = (
+    "note:",
+    "the image shows",
+    "i think",
+    "newspaper",
+    "this image",
+    " cette image",
+    "je pense",
+)
+_STORE_BAD_CHARS = re.compile(r"[(){}]|^(?:here|note|the image)", re.IGNORECASE)
 
-    return looks_like_store_name(value)
+
+def looks_like_store_name(value: str) -> bool:
+    """Refuse les noms d'enseigne qui sont en fait du blabla du modèle."""
+    stripped = value.strip()
+    if not stripped:
+        return True
+    if len(stripped) > 80:
+        return False
+    lowered = stripped.lower()
+    for marker in _CHAT_MARKERS:
+        if marker in lowered:
+            return False
+    if _STORE_BAD_CHARS.search(stripped):
+        return False
+    return True

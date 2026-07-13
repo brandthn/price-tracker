@@ -47,8 +47,6 @@ class CharTokenizer:
         self.unk_id = self.stoi[UNK]
         self._markers = sorted(FIELD_TOKENS, key=len, reverse=True)  # longest-match first
 
-    # ------------------------------------------------------------------
-
     @property
     def vocab_size(self) -> int:
         return len(self.itos)
@@ -78,8 +76,6 @@ class CharTokenizer:
             out.append(self.itos[i] if 0 <= i < len(self.itos) else "")
         return "".join(out)
 
-    # ------------------------------------------------------------------
-
     @classmethod
     def from_corpus(cls, texts: Iterable[str], extra: str = "") -> "CharTokenizer":
         """Build from the characters actually present in ``texts`` (+ optional extras)."""
@@ -107,8 +103,6 @@ class CharTokenizer:
     @classmethod
     def default(cls) -> "CharTokenizer":
         return cls(_DEFAULT_CHARS)
-
-    # ------------------------------------------------------------------
 
     def save(self, path: str | Path) -> None:
         chars = self.itos[len(_SPECIALS) + len(FIELD_TOKENS):]

@@ -193,7 +193,6 @@ def generate_ticket(seed: Optional[int] = None, locale: Optional[str] = None) ->
     )
 
 
-# --- Font pool: drop .ttf/.otf into receipt_vlm/data/fonts/ (or point --fonts-dir at
 # one) to massively widen glyph/typeface diversity — the biggest OCR-diversity lever.
 # Empty pool => fall back to the system fonts below (original behaviour preserved).
 _FONT_DIR = Path(__file__).resolve().parent / "fonts"

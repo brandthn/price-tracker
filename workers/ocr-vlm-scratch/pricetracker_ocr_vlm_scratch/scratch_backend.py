@@ -78,7 +78,7 @@ class OcrVlmScratchBackend(OcrBackend):
             self._model = OcrVLM.from_checkpoint(
                 str(self._checkpoint), tokenizer, device=self._device
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise OcrBackendError(
                 f"Failed to load the from-scratch OCR-VLM checkpoint "
                 f"{self._checkpoint}: {exc}"
@@ -100,7 +100,7 @@ class OcrVlmScratchBackend(OcrBackend):
 
             generate_kwargs = {"max_len": self._max_len} if self._max_len else {}
             tickets = self._model.generate(batch, **generate_kwargs)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise OcrBackendError(
                 f"From-scratch OCR-VLM inference failed on {image_path!r}: {exc}"
             ) from exc

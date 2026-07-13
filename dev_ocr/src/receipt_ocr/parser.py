@@ -1,8 +1,8 @@
-"""Parsing logic — converts raw OCR text into the structured receipt dict.
+"""Texte OCR brut -> dict structuré.
 
-The parser is deliberately backend-agnostic: it takes a plain string and
-returns the dict described in ``project_guidelines.md``. All heuristics
-specific to French *tickets de caisse* live here.
+Agnostique du backend : on prend une string, on rend le dict. Toutes les
+heuristiques propres aux tickets de caisse français vivent ici (et elles
+sont sales, parce que les tickets le sont).
 """
 
 from __future__ import annotations
@@ -25,12 +25,10 @@ from receipt_ocr.vlm_parse import try_parse_vlm_json
 logger = logging.getLogger(__name__)
 
 
-# --- Regex helpers ---------------------------------------------------------
-
+# Un nombre à deux décimales, virgule ou point : 12,34 / 12.34
 _PRICE = r"\d{1,4}[.,]\d{2}"
-"""A number with two decimals, comma or dot separator (`12,34` or `12.34`)."""
 
-# Common French date formats found on receipts.
+# Les formats de date qu'on croise vraiment sur les tickets.
 _DATE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(r"(\d{2})[/\-.](\d{2})[/\-.](\d{4})\s+(\d{1,2})[:hH](\d{2})"),
@@ -44,19 +42,19 @@ _DATE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         re.compile(r"(\d{4})[/\-.](\d{2})[/\-.](\d{2})\s+(\d{1,2})[:hH](\d{2})"),
         "{0}{1}{2} {3:0>2}:{4}",
     ),
-    # Date-only fallback (no time on the line) — assume 00:00
+    # Date sans heure sur la ligne : on met 00:00
     (
         re.compile(r"(\d{2})[/\-.](\d{2})[/\-.](\d{4})\b"),
         "{2}{1}{0} 00:00",
     ),
 )
 
-# Quantity-style lines: "3 x 1,29", "2 X 0.99", "3x1,29"
+# Lignes quantité : "3 x 1,29", "2 X 0.99", "3x1,29"
 _QUANTITY_LINE = re.compile(
     rf"^\s*(?P<qty>\d{{1,3}})\s*[xX×]\s*(?P<unit_price>{_PRICE})\s*$"
 )
 
-# Weight-style lines: "0,452 kg x 5,98 €/kg" or "0.452kg X 5,98€/kg"
+# Lignes au poids : "0,452 kg x 5,98 €/kg", "0.452kg X 5,98€/kg"
 _WEIGHT_LINE = re.compile(
     rf"(?P<weight>\d+[.,]\d+)\s*kg\s*[xX×]?\s*(?P<unit_price>{_PRICE})\s*(?:€/?kg)?",
     re.IGNORECASE,
@@ -67,8 +65,7 @@ _PRICE_PER_KG_LINE = re.compile(
     re.IGNORECASE,
 )
 
-# A typical product line ends with a price, possibly followed by € and a TVA letter.
-# Examples:
+# Une ligne produit finit par un prix, parfois suivi du € et d'une lettre TVA :
 #   "PAIN COMPLET           1,20 €"
 #   "COCA COLA 1.5L          2,49"
 #   "BANANES               2,15 A"
@@ -76,10 +73,10 @@ _PRODUCT_LINE = re.compile(
     rf"^(?P<name>.+?)\s+(?P<price>{_PRICE})\s*(?:€|EUR)?\s*[A-Z0-9]?\s*$"
 )
 
-# Multi-line layouts (common on real photos): name on one line, price on the next.
+# Sur les vraies photos le ticket part souvent en plusieurs lignes :
 #   "TORSADES COMPLETES U BIO 500G"
 #   "1,10 €"
-#   "2,20 € 11"   ← line total (optional)
+#   "2,20 € 11"   <- total de la ligne, pas toujours là
 #   "2 x"
 _STANDALONE_PRICE = re.compile(
     rf"^(?P<price>{_PRICE})\s*(?:€|EUR)?\s*(?:\d+)?\s*$"
@@ -90,8 +87,8 @@ _SECTION_HEADER = re.compile(r"^>{1,2}\s+")
 _DATE_ONLY = re.compile(r"^(\d{2})[/\-.](\d{2})[/\-.](\d{2,4})$")
 _TIME_ONLY = re.compile(r"^(\d{1,2}):(\d{2})$")
 
-# Lines that should never be treated as products. Matched case-insensitively
-# against the *stripped* line. Keep this conservative.
+# Jamais des produits. Comparé en minuscules sur la ligne strippée.
+# Rester conservateur ici : un faux positif bouffe un vrai produit.
 _IGNORED_KEYWORDS: tuple[str, ...] = (
     "total",
     "sous-total",
@@ -149,22 +146,16 @@ _IGNORED_KEYWORDS: tuple[str, ...] = (
     "diététique",
 )
 
-# Hints for chain detection — *not* a hardcoded list of brands, but
-# generic French words appearing on supermarket headers we want to skip
-# when looking at body text. The chain itself is inferred dynamically
-# from the first non-noise line of the header.
+# Pas une liste d'enseignes en dur : juste le bruit d'en-tête (site, tel,
+# SIRET...) qu'on saute. L'enseigne, on la déduit de la 1re ligne utile.
 _HEADER_NOISE = re.compile(
     r"^(www\.|http|@|tel\b|tél\b|fax\b|siret|siren|rcs|tva\s*intracom)",
     re.IGNORECASE,
 )
 
 
-# --- Internal data carriers ------------------------------------------------
-
 @dataclass
 class _ParsedProduct:
-    """Internal representation of a product before it is serialised."""
-
     name: str
     unit_price: float
     units: int = 1
@@ -177,19 +168,11 @@ class _ParsedProduct:
         }
 
 
-# --- Public class ----------------------------------------------------------
-
 class ReceiptParser:
-    """Turn raw OCR text into the structured receipt dict.
+    """Le parser porte un backend OCR : même logique quel que soit le moteur."""
 
-    The parser owns an :class:`OcrBackend` instance (Strategy pattern),
-    so the same parsing logic works regardless of which OCR engine
-    produced the text. The backend can be swapped at construction time
-    without touching any of the parsing code.
-    """
-
+    # Combien de lignes du haut on regarde pour trouver enseigne + adresse.
     HEADER_LINE_COUNT = 6
-    """Number of leading lines inspected to find the chain + address."""
 
     def __init__(self, backend: OcrBackend) -> None:
         if not isinstance(backend, OcrBackend):
@@ -198,19 +181,12 @@ class ReceiptParser:
             )
         self._backend = backend
 
-    # -- Top-level API ------------------------------------------------------
-
     def parse(self, image_path: str) -> dict:
-        """Run OCR on ``image_path`` and return the structured dict."""
         try:
             text = self._backend.extract_text(image_path)
-        except OcrBackendError:
+        except (OcrBackendError, ReceiptParseError, FileNotFoundError):
             raise
-        except ReceiptParseError:
-            raise
-        except FileNotFoundError:
-            raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise OcrBackendError(
                 f"Unexpected error while running OCR on {image_path!r}: {exc}"
             ) from exc
@@ -218,10 +194,10 @@ class ReceiptParser:
         return self.parse_text(text)
 
     def parse_text(self, text: str) -> dict:
-        """Parse already-OCR'd ``text`` (useful for testing without a backend).
+        """Parse du texte déjà OCRisé — pratique pour tester sans backend.
 
-        If ``text`` is JSON from a VLM (object with a ``ticket`` key), it is
-        validated and returned directly. Otherwise the heuristic OCR parser runs.
+        Si c'est du JSON de VLM (objet avec une clé ticket) on le valide et on
+        le rend tel quel ; sinon on repart sur les heuristiques.
         """
         if not text or not text.strip():
             raise ReceiptParseError("OCR returned an empty string.")
@@ -247,23 +223,18 @@ class ReceiptParser:
             }
         }
 
-    # -- Header (chain + address) ------------------------------------------
-
     def _extract_header(
         self, lines: list[str]
     ) -> tuple[str, str, set[int]]:
-        """Infer the supermarket chain and address from the first few lines.
+        """Enseigne + adresse depuis les premières lignes.
 
-        We *never* match against a hardcoded list of brands. Instead:
+        Aucune liste d'enseignes en dur : l'enseigne, c'est la 1re ligne
+        d'en-tête pas-bruit et surtout alphabétique. L'adresse, ce sont les
+        lignes suivantes qui ressemblent à une rue / un code postal, jusqu'à
+        tomber sur une date, un prix ou un mot du corps du ticket.
 
-        * The chain is the first non-noise, mostly-alphabetical header line.
-        * The address is built from subsequent header lines that look like
-          a street / postal-code line, until we hit something resembling
-          a date, a price or a known body keyword.
-
-        Returns the chain, the joined address, and the set of indices
-        that were classified as header (so the product extractor knows
-        to skip them).
+        Rend aussi les indices consommés, pour que l'extraction produits
+        ne les repasse pas.
         """
         header = lines[: self.HEADER_LINE_COUNT]
 
@@ -282,7 +253,7 @@ class ReceiptParser:
                 consumed.add(idx)
                 break
             if re.search(_PRICE, stripped):
-                # We've hit the body — stop looking for header info.
+                # On est dans le corps du ticket : plus rien à prendre ici.
                 break
 
             if not chain and self._looks_like_chain(stripped):
@@ -299,13 +270,13 @@ class ReceiptParser:
 
     @staticmethod
     def _looks_like_chain(line: str) -> bool:
-        """Heuristic: chain name is short-ish and mostly letters."""
+        """Une enseigne, c'est court et surtout des lettres."""
         letters = sum(c.isalpha() for c in line)
         return letters >= 3 and letters / max(len(line), 1) >= 0.5
 
     @staticmethod
     def _looks_like_address(line: str) -> bool:
-        """Heuristic: address lines contain a postcode or a street keyword."""
+        """Une adresse, ça a un code postal ou un mot de voie."""
         if re.search(r"\b\d{5}\b", line):
             return True
         return bool(
@@ -316,10 +287,8 @@ class ReceiptParser:
             )
         )
 
-    # -- Date --------------------------------------------------------------
-
     def _extract_date(self, lines: Iterable[str]) -> str:
-        """Find the first parsable date and return it as ``yyyyMMdd HH:mm``."""
+        """1re date exploitable, au format yyyyMMdd HH:mm."""
         line_list = list(lines)
 
         for line in line_list:
@@ -334,7 +303,7 @@ class ReceiptParser:
                 except (ValueError, IndexError):
                     continue
 
-        # Receipts often print date and time on separate lines (e.g. 15/10/24 then 12:40).
+        # Beaucoup de tickets séparent date et heure sur deux lignes (15/10/24 puis 12:40).
         date_match = None
         time_match = None
         for line in line_list:
@@ -362,20 +331,15 @@ class ReceiptParser:
     def _looks_like_date(line: str) -> bool:
         return any(p.search(line) for p, _ in _DATE_PATTERNS)
 
-    # -- Products ----------------------------------------------------------
-
     def _extract_products(
         self, lines: list[str], header_skip: set[int] | None = None
     ) -> list[_ParsedProduct]:
-        """Walk through the body lines and assemble :class:`_ParsedProduct`s.
+        """Petite machine à états sur les lignes du corps.
 
-        We use a small state machine: a product line is captured, then if
-        the *next* line looks like a quantity (``3 x 1,29``) or weight
-        (``0,452 kg x 5,98``) we update the previous product accordingly.
-
-        ``header_skip`` is the set of line indices already classified as
-        header (chain / address / SIRET / phone / date). They are never
-        considered as products.
+        On capte une ligne produit, puis si la ligne SUIVANTE ressemble à une
+        quantité (3 x 1,29) ou à un poids (0,452 kg x 5,98), on rectifie le
+        produit précédent. Les lignes d'en-tête (header_skip) ne sont jamais
+        candidates.
         """
         products: list[_ParsedProduct] = []
         seen_first_product = False
@@ -422,7 +386,7 @@ class ReceiptParser:
                 i += 1
                 continue
 
-            # Weight line (per-kg) on its own or embedded.
+            # Ligne au poids, seule ou noyée dans la ligne.
             weight_match = _WEIGHT_LINE.search(stripped)
             if weight_match and pending_name:
                 unit_price = _parse_price(weight_match.group("unit_price"))
@@ -431,7 +395,7 @@ class ReceiptParser:
                 i += 1
                 continue
 
-            # Multi-line weight: "0,972 kg" then "2,79 €/kg" then "2,71 €"
+            # Poids étalé sur 3 lignes : "0,972 kg", "2,79 €/kg", "2,71 €"
             if pending_name and _KG_ONLY_LINE.match(stripped):
                 per_kg = None
                 if i + 1 < len(lines):
@@ -445,7 +409,7 @@ class ReceiptParser:
                     i += 1
                     continue
 
-            # Standalone quantity: "2 x" or "4x"
+            # Quantité toute seule : "2 x" ou "4x"
             qty_only = _STANDALONE_QTY.match(stripped) or _STANDALONE_QTY_COMPACT.match(
                 stripped
             )
@@ -455,12 +419,12 @@ class ReceiptParser:
                 i += 1
                 continue
 
-            # Standalone unit price after a product name on the previous line.
+            # Prix seul, juste après un nom de produit.
             price_only = _STANDALONE_PRICE.match(stripped)
             if price_only and pending_name:
                 unit_price = _parse_price(price_only.group("price"))
                 units = 1
-                # Look ahead: line total then "N x", or just "N x".
+                # On regarde devant : total de ligne puis "N x", ou juste "N x".
                 if i + 1 < len(lines):
                     nxt = lines[i + 1].strip()
                     total_m = _STANDALONE_PRICE.match(nxt)
@@ -513,7 +477,7 @@ class ReceiptParser:
                 i += 1
                 continue
 
-            # Candidate product name (no price on this line).
+            # Nom de produit potentiel (pas de prix sur cette ligne).
             if self._is_plausible_product_name(stripped) and not _STANDALONE_PRICE.match(
                 stripped
             ):
@@ -532,7 +496,7 @@ class ReceiptParser:
 
     @staticmethod
     def _is_footer_terminator(line: str) -> bool:
-        """Strong signal that the product block is over (total / payment)."""
+        """Là, le bloc produits est fini (total / paiement)."""
         lowered = line.lower()
         return any(
             kw in lowered
@@ -551,7 +515,7 @@ class ReceiptParser:
 
     @staticmethod
     def _is_plausible_product_name(name: str) -> bool:
-        """Reject names that are clearly not products (mostly digits, too short)."""
+        """Vire ce qui n'est visiblement pas un produit (trop court, que des chiffres)."""
         if len(name) < 2:
             return False
         if _PRICE_PER_KG_LINE.match(name) or _STANDALONE_PRICE.match(name):
@@ -559,24 +523,20 @@ class ReceiptParser:
         letters = sum(c.isalpha() for c in name)
         return letters >= 2
 
-    # -- Lines preprocessing -----------------------------------------------
-
     @staticmethod
     def _clean_lines(text: str) -> list[str]:
-        """Normalise whitespace, drop empty lines, keep order."""
+        """Normalise les espaces, jette les lignes vides, garde l'ordre."""
         cleaned: list[str] = []
         for raw in text.splitlines():
             stripped = raw.strip()
             if not stripped:
                 continue
-            # Collapse repeated whitespace inside the line.
+            # L'OCR crache des paquets d'espaces au milieu des lignes.
             stripped = re.sub(r"\s+", " ", stripped)
             cleaned.append(stripped)
         return cleaned
 
 
-# --- Helpers ---------------------------------------------------------------
-
 def _parse_price(token: str) -> float:
-    """Convert ``"12,34"`` or ``"12.34"`` to ``12.34``."""
+    """"12,34" ou "12.34" -> 12.34"""
     return float(token.replace(",", "."))

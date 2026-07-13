@@ -1,4 +1,4 @@
-"""Parse Pub/Sub push envelopes (GCS object notifications)."""
+"""Décodage des enveloppes push Pub/Sub (notifications d'objet GCS)."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import json
 import re
 from pathlib import PurePosixPath
 
-# Accepts both formats:
-# - 36-char UUID with hyphens: 550e8400-e29b-41d4-a716-446655440000
-# - 32-char hex without hyphens: 550e8400e29b41d4a716446655440000 (legacy backend bug)
+# On accepte les deux formats :
+# - UUID 36 car. avec tirets : 550e8400-e29b-41d4-a716-446655440000
+# - hex 32 car. sans tirets : 550e8400e29b41d4a716446655440000 (vieux bug backend)
 _TICKET_PATH_RE = re.compile(
     r"^tickets/raw/[^/]+/([0-9a-fA-F]{32}|[0-9a-fA-F-]{36})\.[a-zA-Z0-9]+$",
 )

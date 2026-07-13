@@ -24,7 +24,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Optional, Sequence
 
-# --- grammar literals -------------------------------------------------------
 
 _LIT_HEAD = '{"ticket":{"date":'
 _LIT_CHAINE = ',"chaine_supermarche":'

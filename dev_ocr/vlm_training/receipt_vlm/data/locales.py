@@ -18,17 +18,13 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class LocalePack:
     code: str
-    # --- content ---
     stores: tuple[tuple[str, str], ...]              # (name, address)
     products: tuple[tuple[str, float], ...]          # (name, base_price)
-    # --- currency ---
     currency_symbol: str = "€"
     currency_code: str = "EUR"
-    # --- date ---
     date_order: str = "dmy"                          # "dmy" or "mdy"
     date_default: str = "Le {d} a {t}"               # {d}=formatted date, {t}=time
     date_retail: str = "DATE {d}  HEURE {t}"
-    # --- UI words ---
     subtitle: str = "TICKET DE CAISSE"
     register_default: str = "Caisse {n}  Ticket {num}"
     register_discount: str = "CAISSE {nn}  No {num}"

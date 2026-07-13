@@ -1,4 +1,4 @@
-"""Thin adapter around ``receipt_ocr.extract_receipt``."""
+"""Adaptateur mince autour de receipt_ocr.extract_receipt."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ ENV_RECEIPT_BACKEND = "RECEIPT_OCR_BACKEND"
 
 
 class OcrProcessingError(Exception):
-    """Wraps failures from the receipt_ocr package."""
+    """Emballe les erreurs remontées par receipt_ocr."""
 
 
 def _configure_engine(engine: str) -> None:
@@ -33,10 +33,9 @@ def _configure_engine(engine: str) -> None:
 
 
 def run_ocr(image_bytes: bytes, engine: str = "groq") -> dict:
-    """Write bytes to a temp file, call ``extract_receipt``, return the raw dict.
+    """Écrit les bytes dans un fichier temporaire, appelle extract_receipt.
 
-    ``GROQ_API_KEY`` must be set in the environment when ``engine='groq'``.
-    Raises :class:`OcrProcessingError` on any :class:`ReceiptOcrError`.
+    GROQ_API_KEY doit être présent dans l'env quand engine='groq'.
     """
     _configure_engine(engine)
 

@@ -97,7 +97,6 @@ def main() -> int:
         t1 = time.perf_counter()
         text = backend.extract_text(str(image_path))
         print(f"  OCR:  {time.perf_counter() - t1:.1f}s")
-        print("\n--- Raw OCR text ---\n")
         print(text)
         return 0
 
@@ -105,9 +104,6 @@ def main() -> int:
     result = extract_receipt(str(image_path), backend=backend)
     elapsed = time.perf_counter() - t1
     print(f"  OCR+parse: {elapsed:.1f}s")
-    if elapsed > 3.0:
-        print("  Note: target for mobile CPU is <3s; desktop Python may be slower.")
-    print("\n--- Structured output ---\n")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
 

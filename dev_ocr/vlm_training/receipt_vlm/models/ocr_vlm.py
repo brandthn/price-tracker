@@ -50,8 +50,6 @@ class OcrVLM(nn.Module):
             tokenizer.vocab_size, embed_dim, dec_depth, num_heads, max_len, self.pad_id, dropout
         )
 
-    # ------------------------------------------------------------------
-
     def forward(
         self, pixel_values: torch.Tensor, target_ids: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -90,8 +88,6 @@ class OcrVLM(nn.Module):
         if return_text:
             return texts
         return [linear_to_ticket(t) for t in texts]
-
-    # ------------------------------------------------------------------
 
     def save(self, path: str) -> None:
         torch.save({"model_state": self.state_dict(), "config": self.config}, path)

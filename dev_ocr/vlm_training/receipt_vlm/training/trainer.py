@@ -56,8 +56,6 @@ class ReceiptTrainer:
         )
         self.model.to(self.device)
 
-    # ------------------------------------------------------------------
-
     def train_phase(
         self,
         phase: int,
@@ -127,8 +125,6 @@ class ReceiptTrainer:
                 f"phase{phase}_epoch{epoch + 1:02d}_loss{val_loss:.4f}.pt", record
             )
         return best
-
-    # ------------------------------------------------------------------
 
     def _set_trainable(self, patterns: tuple[str, ...]) -> None:
         for name, param in self.model.named_parameters():

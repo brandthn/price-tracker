@@ -146,7 +146,7 @@ def download_all(
         try:
             _download_huggingface(slug, target)
             written.append(target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             LOGGER.error("Failed to download HuggingFace dataset %s: %s", slug, exc)
 
     for slug in sorted(found.get("kaggle", set())):
@@ -157,7 +157,7 @@ def download_all(
         try:
             _download_kaggle(slug, target)
             written.append(target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             LOGGER.error("Failed to download Kaggle dataset %s: %s", slug, exc)
 
     for url in sorted(found.get("http", set())):
@@ -168,7 +168,7 @@ def download_all(
         try:
             _download_http(url, target)
             written.append(target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             LOGGER.error("Failed to download %s: %s", url, exc)
 
     return written

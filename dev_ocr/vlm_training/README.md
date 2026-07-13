@@ -1,102 +1,57 @@
-# receipt_vlm — hybrid French receipt VLM (training side)
+# receipt_vlm — le VLM maison (côté entraînement)
 
-Training code for the ~466M-parameter Vision-Language Model described in
-`dev_ocr/documentation/receipt_vlm_spec_adapted.md`:
+Le code du modèle vision-langage entraîné from scratch pour lire les tickets, et
+sortir directement le schéma canonique du projet
+(`{"ticket": {"date", "chaine_supermarche", "adresse", "produits": [...]}}`) — donc
+sans rien changer au parsing/validation de `receipt_ocr` à l'inférence.
 
-- **CLIP ViT-B/16** vision encoder — frozen pretrained (~86M)
-- **MultimodalProjector** — from scratch (cross-attention + 32 learned query tokens, ~14M)
-- **SmolLM2-360M-Instruct** decoder — frozen pretrained (~360M), adapted via
-- **hand-rolled LoRA** adapters on every `q_proj`/`v_proj` (~4M, no `peft`)
-- **JSON-constrained decoding** — from-scratch token-mask state machine (0 params)
+L'architecture, ~466M de paramètres dont ~18M réellement entraînés :
 
-The model is trained to emit the project's **canonical schema** directly
-(`{"ticket": {"date", "chaine_supermarche", "adresse", "produits": [...]}}`), so the
-existing `receipt_ocr` parsing/validation pipeline works unchanged at inference.
+- encodeur vision **CLIP ViT-B/16**, pré-entraîné, gelé (~86M) ;
+- **projecteur multimodal** écrit à la main (cross-attention + 32 query tokens
+  appris, ~14M) — c'est la pièce qu'on entraîne vraiment ;
+- décodeur **SmolLM2-360M-Instruct**, pré-entraîné, gelé (~360M) ;
+- **LoRA fait main** sur chaque `q_proj` / `v_proj` (~4M, sans `peft`) ;
+- **décodage contraint JSON** : machine à états qui masque les tokens, 0 paramètre.
 
-## Install
+## Ce qu'il y a dans le package
 
-```bash
-cd dev_ocr/vlm_training
-pip install -r requirements-training.txt
-pip install -e .                # this package
-pip install -e ..               # receipt_ocr (constants / image prep / Groq pseudo-labels)
+```
+receipt_vlm/
+├── models/      vlm.py, projector.py, lora.py, constrained.py (masque JSON),
+│                ocr_vlm.py + ocr_encoder/ocr_decoder (la variante OCR pure)
+├── data/        synthetic.py (génération de faux tickets français), tokenizer.py,
+│                schema.py, augmentation.py, real_photos.py,
+│                et les adaptateurs de datasets publics :
+│                cord_adapter, sroie_adapter, wildreceipt_adapter,
+│                trainingdatapro_adapter
+├── training/    trainer.py — le curriculum en 3 temps
+└── utils/       metrics.py
 ```
 
-## Workflow
+Le curriculum (`training/trainer.py`) : d'abord on chauffe le projecteur seul
+(le reste est gelé), puis on ouvre les LoRA, et enfin on aligne sur le JSON. Dans
+cet ordre, parce qu'un projecteur non entraîné qui pousse du bruit dans le
+décodeur ne fait qu'abîmer les LoRA.
 
-```bash
-# 1. Generate synthetic French receipts (canonical labels)
-python scripts/generate_synthetic.py --n 5000 --output data/synthetic
+Les données d'entraînement sont majoritairement synthétiques (`data/synthetic.py`
+fabrique des tickets français plausibles avec leurs labels) — on n'a pas de jeu
+labellisé assez gros, et labelliser à la main des centaines de tickets n'était pas
+tenable dans le temps du projet.
 
-# Optional: visually varied preview set (multi-layout + capture noise)
-python scripts/generate_synthetic.py --n 100 --output data/synthetic_preview_varied \\
-    --diverse --distort --distort-intensity heavy
+## Entraînement et éval
 
-# 2. Pseudo-label real photos with the Groq provider (then review manually)
-python scripts/pseudo_label.py --images ../data/raw/images_tickets_caisse --output data/real_labels
+**Pas en local.** L'entraînement comme l'évaluation tournent sur Kaggle (GPU) :
+un `generate` en local a déjà figé la machine, et il n'y a aucune raison de
+retenter. Le worker qui sert ce modèle le dit aussi
+(`workers/ocr-vlm-scratch/README.md`).
 
-# 3. Train the 3-phase curriculum
-python scripts/train.py --config configs/phase1.yaml
-python scripts/train.py --config configs/phase2.yaml --resume checkpoints/phase1_best.pt
-python scripts/train.py --config configs/phase3.yaml --resume checkpoints/phase2_best.pt
+Le package s'installe et s'importe normalement (`pip install -e .`), et les
+notebooks d'entraînement vivent côté Kaggle, pas dans le repo.
 
-# Local RTX 2070 (~2–8 h): on-the-fly diverse synthetic, no full CORD download load
-python scripts/train.py --config configs/phase1_local.yaml
-python scripts/train.py --config configs/phase2_local.yaml --resume checkpoints/phase1_best.pt
-python scripts/train.py --config configs/phase3_local.yaml --resume checkpoints/phase2_best.pt
+## Inférence
 
-# Google Colab (~3–4 h on T4): checkpoints saved to Drive — see COLAB.md
-python scripts/zip_colab_upload.py   # pack real photos + labels for Drive upload
-# then open notebooks/train_receipt_vlm_colab.ipynb in Colab
-
-# Vertex AI (GCP, ~3–4 h on T4): code+checkpoints in a GCS bucket
-python scripts/zip_selfcontained_colab.py            # one bundle (code + photos + labels)
-gsutil cp colab_upload/receipt_vlm_colab_bundle.zip gs://YOUR_BUCKET/receipt_vlm/
-# Workbench (persistent VM):      notebooks/train_receipt_vlm_vertex.ipynb            — see VERTEX.md
-# Colab Enterprise (ephemeral):   notebooks/train_receipt_vlm_colab_enterprise.ipynb — see COLAB_ENTERPRISE.md
-
-# 4. Merge LoRA + export a single inference-ready .pt
-python scripts/export_checkpoint.py --checkpoint checkpoints/phase3_best.pt \
-    --output checkpoints/receipt_vlm_500m_merged.pt
-
-# 5. Evaluate side-by-side vs the Groq baseline on the held-out set
-python scripts/evaluate.py --checkpoint checkpoints/receipt_vlm_500m_merged.pt \
-    --images ../data/raw/images_tickets_caisse --labels data/real_labels --split test
-```
-
-## Inference (runtime side)
-
-The merged checkpoint is consumed by `receipt_ocr.backends.vlm.receipt_vlm_provider`:
-
-```bash
-RECEIPT_OCR_BACKEND=vlm
-RECEIPT_VLM_MODEL=receipt-vlm-500m
-RECEIPT_VLM_MODE=json
-RECEIPT_VLM_MODEL_PATH=/models/receipt_vlm_500m_merged.pt
-```
-
-This package may import `receipt_ocr`; the reverse is forbidden (except the single
-provider file, which lazily imports `receipt_vlm` model code at inference time).
-
-## Vertex AI (GCP)
-
-Two flavours, both reusing the self-contained bundle (`scripts/zip_selfcontained_colab.py`)
-with checkpoints syncing to a GCS bucket after each phase so a teardown never loses progress:
-
-- **Workbench** (persistent JupyterLab VM) — guide [`VERTEX.md`](VERTEX.md); open
-  `notebooks/train_receipt_vlm_vertex.ipynb` on a GPU Workbench instance.
-- **Colab Enterprise** (managed, ephemeral runtime) — guide [`COLAB_ENTERPRISE.md`](COLAB_ENTERPRISE.md);
-  open `notebooks/train_receipt_vlm_colab_enterprise.ipynb` on a GPU runtime. `COLAB_ENTERPRISE.md`
-  has a Workbench-vs-Colab-Enterprise comparison.
-
-## Google Colab
-
-Full guide: [`COLAB.md`](COLAB.md)
-
-1. Push this repo (branch `ocr_worker_module` or your training branch).
-2. Pack real data: `python scripts/zip_colab_upload.py` → upload `colab_upload/receipt_vlm_colab_data.zip` to Drive.
-   If disk is tight, upload `../data/raw/images_tickets_caisse/` and `data/real_labels/` folders directly to `My Drive/receipt_vlm/` instead.
-3. Colab → T4 GPU → open `notebooks/train_receipt_vlm_colab.ipynb`, set `REPO_URL` and `DATA_ZIP_ON_DRIVE`, run all cells.
-4. Download `My Drive/receipt_vlm/receipt_vlm_500m_merged.pt`.
-
-Phase configs (`phase*_colab.yaml`) auto-merge `colab_paths.yaml` (Drive paths, batch 8, on-the-fly synthetic).
+Le checkpoint entraîné est consommé par le worker `workers/ocr-vlm-scratch`
+(`scratch_backend.py`), qui charge le `.pt` et le tokenizer posés par le bootstrap
+des poids depuis GCS. Ce package peut importer `receipt_ocr` ; l'inverse est
+interdit.

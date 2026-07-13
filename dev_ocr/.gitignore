@@ -1,8 +1,10 @@
-# Secrets
 .env
-
-# Moondream VLM weights (large binaries — never commit)
 data/models/
 data/benchmarks/
 *.mf
 *.mf.gz
+data/raw/
+data/labels/
+vlm_training/checkpoints/
+vlm_training/colab_upload/
+vlm_training/data/

@@ -8,32 +8,18 @@ from pricetracker_ocr import mapper
 
 
 def test_map_ticket_fields_enseigne(sample_ocr_result):
-    fields = mapper.map_ticket_fields(
-        sample_ocr_result,
-        "550e8400-e29b-41d4-a716-446655440000",
-        "tickets/raw/u/t.jpg",
-        "groq",
-        100,
-        1.0,
-    )
+    fields = mapper.map_ticket_fields(sample_ocr_result, "groq", 100, 1.0)
     assert fields["enseigne"] == "CARREFOUR MARKET"
 
 
 def test_map_ticket_fields_parses_date(sample_ocr_result):
-    fields = mapper.map_ticket_fields(
-        sample_ocr_result,
-        "550e8400-e29b-41d4-a716-446655440000",
-        "tickets/raw/u/t.jpg",
-        "groq",
-        100,
-        1.0,
-    )
+    fields = mapper.map_ticket_fields(sample_ocr_result, "groq", 100, 1.0)
     assert fields["ticket_date"] == date(2024, 3, 15)
 
 
 def test_map_ticket_fields_empty_date():
     ocr = {"ticket": {"date": "", "chaine_supermarche": "X", "produits": []}}
-    fields = mapper.map_ticket_fields(ocr, "id", "path", "groq", 1, 1.0)
+    fields = mapper.map_ticket_fields(ocr, "groq", 1, 1.0)
     assert fields["ticket_date"] is None
 
 

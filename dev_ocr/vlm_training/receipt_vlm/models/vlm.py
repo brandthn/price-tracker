@@ -56,12 +56,10 @@ class ReceiptVLM(nn.Module):
         self.lora_rank = lora_rank
         self.lora_alpha = lora_alpha
 
-        # --- Vision encoder: CLIP (frozen) ---
         self.vision_encoder = CLIPVisionModel.from_pretrained(CLIP_MODEL)
         for param in self.vision_encoder.parameters():
             param.requires_grad = False
 
-        # --- Multimodal projector (from scratch, trainable) ---
         self.projector = MultimodalProjector(
             vision_dim=VISION_DIM,
             lang_dim=LANG_DIM,
@@ -69,7 +67,6 @@ class ReceiptVLM(nn.Module):
             num_queries=NUM_VISUAL_TOKENS,
         )
 
-        # --- Language decoder: SmolLM2 (frozen) + hand-rolled LoRA ---
         self.tokenizer = AutoTokenizer.from_pretrained(LM_MODEL)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -90,9 +87,7 @@ class ReceiptVLM(nn.Module):
         self.system_prompt = SYSTEM_PROMPT
         self._token_texts: Optional[list[str]] = None
 
-    # ------------------------------------------------------------------
     # Training forward
-    # ------------------------------------------------------------------
 
     def encode_image(self, pixel_values: torch.Tensor) -> torch.Tensor:
         """CLIP-normalized pixels ``(B, 3, 224, 224)`` → ``(B, 32, 960)``."""
@@ -147,9 +142,7 @@ class ReceiptVLM(nn.Module):
             )
         return logits, loss
 
-    # ------------------------------------------------------------------
     # Inference
-    # ------------------------------------------------------------------
 
     def _vocab_texts(self) -> list[str]:
         if self._token_texts is None:
@@ -245,9 +238,7 @@ class ReceiptVLM(nn.Module):
                 pieces.append(forced)
         return "".join(pieces)
 
-    # ------------------------------------------------------------------
     # Checkpointing
-    # ------------------------------------------------------------------
 
     def export_merged_state(self) -> dict[str, Any]:
         """Fold LoRA into the base weights and return an inference checkpoint.

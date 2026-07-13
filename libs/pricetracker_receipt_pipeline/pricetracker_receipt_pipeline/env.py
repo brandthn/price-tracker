@@ -1,27 +1,12 @@
-"""Chargement du .env + lecture typée des variables d'env."""
+"""Lecture typée des variables d'env.
+
+Pas de chargement de .env ici : en prod la config vient de Cloud Run, pas
+d'un fichier. C'est dev_ocr qui charge un .env, pas la lib.
+"""
 
 from __future__ import annotations
 
 import os
-from pathlib import Path
-
-_LOADED = False
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-
-def load_project_env() -> None:
-    global _LOADED
-    if _LOADED:
-        return
-    _LOADED = True
-    env_path = _PROJECT_ROOT / ".env"
-    if not env_path.is_file():
-        return
-    try:
-        from dotenv import load_dotenv
-    except ImportError:
-        return
-    load_dotenv(env_path, override=False)
 
 
 def env_str(name: str, default: str) -> str:

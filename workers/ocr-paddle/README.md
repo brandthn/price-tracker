@@ -2,7 +2,7 @@
 
 Worker OCR, backend **PaddleOCR** (français, CPU).
 
-Un des 6 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
+Un des 5 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
 commun vit dans [`libs/pricetracker_receipt_pipeline`](../../libs/pricetracker_receipt_pipeline) ;
 seul `paddle_backend.py` est propre à ce worker.
 
@@ -54,4 +54,4 @@ gcloud builds submit . --config=workers/ocr-paddle/cloudbuild.yaml \
 ```
 
 Déploiement : bumper `worker_ocr_paddle_image_tag` dans
-`infra/envs/prod/variables_ocr_backends.tf`, puis `terraform apply`.
+`infra/envs/prod/variables.tf`, puis `terraform apply`.
