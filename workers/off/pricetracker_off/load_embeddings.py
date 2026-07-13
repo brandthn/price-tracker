@@ -1,27 +1,4 @@
-"""Loader « embedding-only » — vague 2 de réconciliation des embeddings.
-
-Lit l'artefact `enriched.jsonl.gz` (produit en local par `bulk/enrich.py --found-only`,
-uploadé sur GCS) et met à jour **uniquement** `products.embedding` (Cloud SQL) :
-
-    UPDATE products SET embedding = <vecteur> WHERE ean = <ean>
-
-Différence avec `load_artifact` (upsert complet) :
-  - NE touche PAS BQ `catalogue_produits` (l'embedding n'existe qu'en Cloud SQL) ;
-  - NE touche AUCUNE autre colonne de `products` (name/brand/image_url/scores/
-    source/enriched_at) → zéro régression sur les données curées (dont l'import
-    Maty). C'est le garde-fou du §3 du handoff.
-
-DOIT tourner **sur Cloud, dans le VPC** : la private IP de Cloud SQL est
-injoignable en local. Conçu comme un **Cloud Run Job** réutilisant l'image +
-le code du worker OFF.
-
-Config : mêmes env vars PG que le worker (`PRT_PG_*`, `GOOGLE_CLOUD_PROJECT`).
-URI de l'artefact : `PRT_OFF_ARTIFACT_URI` (ou argv[1]), ex:
-    gs://price-tracker-prod-01-silver/off-bulk/off_reembed.jsonl.gz
-
-Lancement (Cloud Run Job) :
-    python -m pricetracker_off.load_embeddings
-"""
+"""Load embeddings into Cloud SQL only."""
 
 from __future__ import annotations
 

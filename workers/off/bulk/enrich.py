@@ -1,32 +1,3 @@
-"""Bulk enrichment LOCAL — étape 1/2 du ré-enrichissement OFF sur liste explicite d'EAN.
-
-Contexte : pour (ré)enrichir plusieurs milliers d'EAN (init-scale), la politique
-OFF (§11 du spec) demande d'utiliser le **dump bulk** plutôt que l'API 1-par-1
-(15 req/min → ban). Ce script :
-
-  1. lit la liste d'EAN d'un CSV (colonne `ean`) ;
-  2. filtre le dump OFF local `food.parquet` sur ces EAN via DuckDB (SEMI JOIN,
-     colonnes ciblées) → mappe vers `OFFProduct` (réutilise le contrat du worker) ;
-  3. génère les embeddings Vertex `text-embedding-004` (dim 768) pour les trouvés ;
-  4. écrit un artefact `enriched.jsonl.gz` (champs OFF + embedding) que l'étape
-     Cloud (`pricetracker_off.load_artifact`) chargera dans BQ + Cloud SQL.
-
-Cloud SQL `products` étant injoignable en local, ce script n'écrit AUCUNE base :
-il produit uniquement l'artefact + (option) l'uploade sur GCS.
-
-Ce module vit hors du wheel déployé (`pricetracker_off`) : il dépend de `duckdb`
-qui n'a pas à être embarqué dans l'image Cloud Run.
-
-Usage :
-    cd workers/off
-    uv run --with duckdb python bulk/enrich.py \
-        --csv ../../data/catalog/catalog_feed/studio_results_20260624_1651.csv \
-        --parquet ../../data/off_bulk/off_food_dump.parquet \
-        --out ../../data/off_bulk/enriched.jsonl.gz
-    # dry-run rapide (mapping only, sans coût Vertex) :
-    uv run --with duckdb python bulk/enrich.py ... --limit 20 --no-embed
-"""
-
 from __future__ import annotations
 
 import argparse

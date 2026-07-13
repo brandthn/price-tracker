@@ -1,24 +1,4 @@
-"""Formule d'embedding « balanced » — SOURCE UNIQUE de vérité.
-
-Ce module centralise `build_embedding_text` (auparavant dupliqué dans
-`bulk/enrich.py`) pour que le **worker quotidien** (`main.py`, via l'API OFF)
-ET le **bulk** (`bulk/enrich.py`, via le dump OFF) produisent EXACTEMENT le
-même texte pour un même produit. Sinon l'espace vectoriel re-diverge (le worker
-ré-injecterait du legacy à chaque nouvel EAN).
-
-Contrat d'entrée : un `OFFProduct` dont les mappers (`off_client._to_off_product`
-côté API, `bulk/enrich._row_to_product` côté dump) ont NORMALISÉ à l'identique :
-  - `name` / `generic_name` : str (fr>main>en côté dump, *_fr>* côté API) ;
-  - `brand` : première marque (split ','), str ;
-  - `categories_tags` / `labels_tags` : listes brutes préfixées `en:`/`fr:`
-    (même format dans le dump et via l'API) — nettoyées ici ;
-  - `quantity` : str.
-
-Signal sémantique **positif** uniquement, optimisé pour la reco de substituts :
-`name . generic_name . marque <brand> . catégorie <hiérarchie COMPLÈTE> . <labels> . <quantité>`
-Exclut volontairement nutriscore/nova/ecoscore (scores ordinaux → colonnes de
-filtrage), ingrédients et allergènes (bruit / dilution).
-"""
+# Embedding text builder for OFF products
 
 from __future__ import annotations
 
@@ -47,13 +27,13 @@ _CATEGORY_DENYLIST = ("nutri score", "nutriscore", "eco score", "ecoscore")
 
 
 def _clean_tag(tag: str) -> str:
-    """`en:dairy-desserts` / `fr:sauce-aux-piments` -> `dairy desserts` / `sauce aux piments`."""
+    #`en:dairy-desserts` / `fr:sauce-aux-piments` -> `dairy desserts` / `sauce aux piments`
     t = re.sub(r"^[a-z]{2,3}:", "", tag or "")
     return t.replace("-", " ").strip()
 
 
 def _clean_categories(tags: list[str] | None) -> list[str]:
-    """Hiérarchie COMPLÈTE nettoyée, dédupliquée, ordre général -> spécifique."""
+    #Hiérarchie COMPLÈTE nettoyée, dédupliquée, ordre général -> spécifique
     if not tags:
         return []
     out: list[str] = []
@@ -71,8 +51,7 @@ def _clean_categories(tags: list[str] | None) -> list[str]:
 
 
 def _clean_labels(tags: list[str] | None, cap: int = 6) -> list[str]:
-    """Labels sémantiques (bio, vegan, gluten-free, aop...) ; on écarte les
-    logos réglementaires/emballage (denylist). Ordre d'origine, dédupliqué."""
+    #Labels sémantiques (bio, vegan, gluten-free, aop...) ; on écarte les logos réglementaires/emballage (denylist) Ordre d'origine, dédupliqué
     if not tags:
         return []
     out: list[str] = []
@@ -92,13 +71,7 @@ def _clean_labels(tags: list[str] | None, cap: int = 6) -> list[str]:
 
 
 def build_embedding_text(p: OFFProduct) -> str:
-    """Texte d'embedding 'balanced' à partir d'un `OFFProduct` déjà normalisé.
-
-    Idempotent vis-à-vis de la source (API OFF vs dump) : la seule différence
-    entre les deux — les champs multilingues `product_name`/`generic_name` — est
-    résolue en amont par les mappers, donc ce texte est identique pour un même
-    produit quelle que soit la voie d'acquisition.
-    """
+    #Build a balanced embedding text from an OFFProduct
     name = (p.name or "").strip()
     generic = (p.generic_name or "").strip()
     brand = (p.brand or "").strip()  # déjà "première marque" côté mappers
@@ -109,8 +82,6 @@ def build_embedding_text(p: OFFProduct) -> str:
     segments: list[str] = []
     if name:
         segments.append(name)
-    # generic_name seulement s'il apporte de l'info (pas un doublon du nom,
-    # pas de la métadonnée pipeline polluante)
     gl = generic.lower()
     if (
         generic

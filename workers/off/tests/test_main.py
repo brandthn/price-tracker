@@ -1,5 +1,3 @@
-"""Smoke tests app FastAPI worker OFF."""
-
 from __future__ import annotations
 
 import pytest

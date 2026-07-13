@@ -1,15 +1,4 @@
-"""kNN all-pairs EN MÉMOIRE (BLAS/numpy) pour le calcul batch des substituts (Étape 2).
-
-À l'échelle du catalogue (~12k produits), le kNN offline se calcule par **produit
-matriciel** (cosinus EXACT) en quelques secondes — bien plus rapide, exact et
-ROBUSTE qu'un ANN pgvector, qui en join corrélé plein-catalogue n'utilise pas
-l'index (force brute O(N²) → timeout). pgvector reste pour l'endpoint LIVE
-(latence unitaire) ; ici on est en batch offline.
-
-On ne compare que des produits de MÊME dimension d'unité (kg↔kg, L↔L) : on
-partitionne par unité et on fait un top-k intra-partition. Embeddings
-L2-normalisés → cosinus = produit scalaire.
-"""
+#In-memory kNN helpers for batch substitution scoring
 
 from __future__ import annotations
 
@@ -31,12 +20,7 @@ def compute_knn_pairs(
     source_eans: set[str],
     k: int,
 ) -> list[tuple[str, str, float]]:
-    """`[(source_ean, target_ean, cosine)]` : pour chaque source (∈ `source_eans`),
-    ses `k` plus proches voisins par cosinus, dans la MÊME dimension d'unité.
-
-    `embeddings` = matrice `(N, D)` alignée sur `eans` / `units`. Auto-exclusion
-    (un produit n'est pas son propre substitut).
-    """
+    # Return the top-k cosine neighbors for each source EAN
     n = len(eans)
     if n == 0 or embeddings.shape[0] != n:
         return []

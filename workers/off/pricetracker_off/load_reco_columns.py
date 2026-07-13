@@ -1,32 +1,4 @@
-"""Loader « socle reco » — backfill quantité + chemin catégories (Étapes 1+2).
-
-Lit l'artefact `enriched.jsonl.gz` (produit en local par `bulk/enrich.py --found-only`,
-uploadé sur GCS) et met à jour **uniquement** les colonnes socle reco de
-`products` (Cloud SQL) :
-
-    UPDATE products SET quantity_raw = …, quantity_value = …, quantity_unit = …,
-                        categories_tags = … WHERE ean = …
-
-Différence avec `load_artifact` (upsert complet) :
-  - NE touche PAS BQ `catalogue_produits` ;
-  - NE touche AUCUNE autre colonne de `products` (name/brand/image_url/scores/
-    embedding/source/enriched_at) → zéro régression sur les données curées (dont
-    l'import Maty). Même garde-fou que `load_embeddings`.
-
-Sert à alimenter les ~12 k produits DÉJÀ en base après la migration 0005. Le
-worker quotidien, lui, écrit ces colonnes à l'upsert des nouveaux EAN.
-
-DOIT tourner **sur Cloud, dans le VPC** : la private IP de Cloud SQL est
-injoignable en local. Conçu comme un **Cloud Run Job** réutilisant l'image + le
-code du worker OFF.
-
-Config : mêmes env vars PG que le worker (`PRT_PG_*`, `GOOGLE_CLOUD_PROJECT`).
-URI de l'artefact : `PRT_OFF_ARTIFACT_URI` (ou argv[1]), ex:
-    gs://price-tracker-prod-01-silver/off-bulk/off_reco_backfill.jsonl.gz
-
-Lancement (Cloud Run Job) :
-    python -m pricetracker_off.load_reco_columns
-"""
+#Backfill recommendation 
 
 from __future__ import annotations
 

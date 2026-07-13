@@ -1,13 +1,4 @@
-"""Token bucket asynchrone simple.
-
-Le worker OFF est limité à **15 req/min/IP** sur l'endpoint `GET /product`
-(politique officielle OFF). Le timing exact = 1 token toutes les 4 secondes,
-sans rafale au-delà de la capacité du bucket.
-
-On garde un bucket à `rpm` tokens (= 1 minute de marge), refill linéaire.
-Pourquoi pas `tenacity` natif : `tenacity` retry sur erreur, ici on rate-limit
-en aval **avant** que la requête parte. Les deux sont complémentaires.
-"""
+#Simple async token bucket
 
 from __future__ import annotations
 
@@ -31,11 +22,10 @@ class TokenBucket:
 
     @property
     def refill_rate(self) -> float:
-        """Tokens/seconde."""
         return self.rpm / 60.0
 
     async def acquire(self, n: int = 1) -> None:
-        """Bloque jusqu'à ce que `n` tokens soient disponibles."""
+        #Bloque jusqu'à ce que `n` tokens soient disponibles
         if n <= 0:
             return
         async with self._lock:
@@ -52,8 +42,4 @@ class TokenBucket:
                     return
                 missing = n - self._tokens
                 wait = missing / self.refill_rate
-                # Libère le lock pendant la sieste : le rate-limit s'applique
-                # globalement mais d'autres tâches asyncio peuvent progresser
-                # (logs, etc.). Ici on garde le lock pour simplicité — le
-                # worker n'a qu'un consommateur (la boucle principale).
                 await asyncio.sleep(wait)

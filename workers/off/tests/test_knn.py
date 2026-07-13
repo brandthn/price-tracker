@@ -1,5 +1,3 @@
-"""kNN en mémoire (BLAS) : top-k intra-unité, auto-exclusion, filtre sources."""
-
 from __future__ import annotations
 
 import numpy as np

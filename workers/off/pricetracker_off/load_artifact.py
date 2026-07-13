@@ -1,21 +1,4 @@
-"""Loader Cloud — étape 2/2 du ré-enrichissement bulk OFF.
-
-Lit l'artefact `enriched.jsonl.gz` (produit en local par `bulk/enrich.py`, uploadé
-sur GCS) et écrit dans :
-  - BQ Silver `catalogue_produits` via MERGE (`merge_catalogue`) ;
-  - Cloud SQL `products` (pgvector) via UPSERT (`upsert_products`).
-
-DOIT tourner **sur Cloud, dans le VPC** : la private IP de Cloud SQL est
-injoignable en local (cf. runbook). Conçu comme un **Cloud Run Job** (batch,
-run-to-completion) réutilisant l'image + le code du worker OFF.
-
-Config : mêmes env vars que le worker (`PRT_PG_*`, `PRT_BQ_*`, `GOOGLE_CLOUD_PROJECT`).
-URI de l'artefact : `PRT_OFF_ARTIFACT_URI` (ou argv[1]), ex:
-    gs://price-tracker-prod-01-silver/off-bulk/off_enriched.jsonl.gz
-
-Lancement (Cloud Run Job) :
-    python -m pricetracker_off.load_artifact
-"""
+#Load a bulk OFF artifact into BigQuery and Cloud SQL
 
 from __future__ import annotations
 
@@ -39,21 +22,11 @@ from .pg import open_pool, upsert_products
 configure_logging(level=os.environ.get("PRT_LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
 
-# Provenance des lignes chargées ici : le dump OFF (bulk), à distinguer de
-# `openfoodfacts` (worker API 1-par-1). Cf. handoff — sinon les deux voies sont
-# indistinguables dans catalogue_produits (BQ) et products (Cloud SQL).
 _DUMP_SOURCE = "openfoodfacts_dump"
-
-# Champs OFFProduct reconstruits depuis chaque record de l'artefact
-# (`embedding_text` et `embedding` sont hors dataclass → lus à part ; les champs
-# texte-embedding pur — generic_name/labels_tags — sont ignorés).
 _PRODUCT_FIELDS = (
     "ean", "name", "brand", "category_l1", "category_l2", "category_l3",
     "nutriscore", "nova", "ecoscore", "image_url", "found",
 )
-# Socle reco (Étapes 1+2) — reconstruits en plus (via .get : les artefacts d'avant
-# ces colonnes ne les portent pas → None, laissant simplement quantity_*/
-# categories_tags à NULL). `categories_tags` sert au chemin complet persisté.
 _RECO_FIELDS = (
     "quantity", "product_quantity", "product_quantity_unit", "categories_tags",
 )
@@ -80,7 +53,6 @@ def _parse_gs_uri(uri: str) -> tuple[str, str]:
 
 
 def read_artifact(gcs_uri: str) -> tuple[list[OFFProduct], list[list[float] | None]]:
-    """Télécharge l'artefact JSONL.gz depuis GCS → (products, embeddings) alignés."""
     bucket_name, blob_name = _parse_gs_uri(gcs_uri)
     client = storage.Client()
     raw = client.bucket(bucket_name).blob(blob_name).download_as_bytes()

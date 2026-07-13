@@ -1,10 +1,3 @@
-"""Formule d'embedding 'balanced' partagée + PARITÉ mapping API ↔ mapping dump.
-
-La parité est le cœur du chantier B : le worker quotidien (API) et le bulk (dump)
-doivent produire EXACTEMENT le même texte pour un même produit, sinon l'espace
-vectoriel re-diverge. On mappe un même produit par les deux voies et on compare.
-"""
-
 from __future__ import annotations
 
 import sys

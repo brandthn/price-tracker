@@ -1,13 +1,4 @@
-"""Mirror Cloud SQL `products` (pgvector) via asyncpg.
-
-Connexion : private IP de `prt-prod-sql-main` joignable depuis Cloud Run via
-Direct VPC egress (subnet `prt-subnet-ew1`). User `pt_app` + password lu en
-Secret Manager (`prt-prod-cloudsql-password`).
-
-Le vecteur pgvector se passe en littéral `'[v1,v2,...]'::vector(768)`.
-asyncpg ne sait pas serialiser un `list[float]` en `vector` nativement, on
-encode côté Python.
-"""
+#Cloud SQL helpers for products
 
 from __future__ import annotations
 
@@ -26,14 +17,11 @@ logger = get_logger(__name__)
 
 
 def _vector_literal(vec: Sequence[float]) -> str:
-    # pgvector accepte '[1.0,2.0,...]' en text — convertit côté SQL via
-    # le cast `::vector(768)`. Float repr Python est suffisamment précis.
     return "[" + ",".join(f"{v:.7f}" for v in vec) + "]"
 
 
 def _quantity_numeric(value: float | None) -> Decimal | None:
-    """float canonique (kg/L) → Decimal pour la colonne NUMERIC (asyncpg exige
-    un Decimal, pas un float, sur un type `numeric`). None passe tel quel."""
+    #float canonique (kg/L) → Decimal pour la colonne NUMERIC (asyncpg exige un Decimal, pas un float, sur un type `numeric`), None passe tel quel
     return Decimal(str(value)) if value is not None else None
 
 
@@ -67,15 +55,7 @@ async def upsert_products(
     embeddings: Sequence[Sequence[float] | None],
     source: str = "openfoodfacts",
 ) -> int:
-    """INSERT … ON CONFLICT (ean) DO UPDATE. Retourne le nombre de rows écrits.
-
-    `embeddings[i]` correspond à `products[i]` ; `None` autorisé (cas `off_found=false`
-    où l'embedding n'a pas été calculé).
-
-    `source` trace la provenance : `openfoodfacts` (worker API 1-par-1, défaut),
-    `openfoodfacts_dump` (chargement bulk depuis le dump OFF via load_artifact).
-    Distingue les deux voies d'acquisition, sinon indistinguables en base.
-    """
+    #Insert or update products and embeddings
     if len(products) != len(embeddings):
         raise ValueError("products and embeddings must have the same length.")
 
@@ -152,19 +132,11 @@ async def update_embeddings(
     products: Sequence[OFFProduct],
     embeddings: Sequence[Sequence[float] | None],
 ) -> dict[str, int]:
-    """Re-embed « embedding-only » (vague 2) : `UPDATE products SET embedding = …
-    WHERE ean = …`, SANS toucher aucune autre colonne.
-
-    Garde-fou (§3 handoff) : ne régresse jamais les données curées (name/brand/
-    image_url/scores/source, dont l'import Maty). Ne touche pas non plus
-    `enriched_at` (ce n'est pas une ré-enrichissement du produit, juste un
-    rafraîchissement du vecteur). Idempotent.
-
-    - Ignore les entrées sans embedding (tombstones) : rien à mettre à jour.
-    - Un EAN absent de `products` → l'UPDATE ne matche 0 ligne (no-op sûr).
+    """- Ignore les entrées sans embedding, rien à mettre à jour
+    - Un EAN absent de `products` → l'UPDATE matche 0 ligne
 
     Retourne {'candidates': N, 'updated': M} où `updated` = lignes réellement
-    modifiées (M ≤ N si des EAN ne sont pas en base).
+    modifiées (M ≤ N si des EAN ne sont pas en base)
     """
     if len(products) != len(embeddings):
         raise ValueError("products and embeddings must have the same length.")
@@ -193,21 +165,15 @@ async def update_reco_columns(
     *,
     products: Sequence[OFFProduct],
 ) -> dict[str, int]:
-    """Backfill des colonnes socle reco (Étapes 1+2) sur les produits DÉJÀ en base :
-    `UPDATE products SET quantity_raw/quantity_value/quantity_unit/categories_tags
-    = … WHERE ean = …`, SANS toucher aucune autre colonne.
+    """Backfill des colonnes socle reco sur les produits DÉJÀ en base
 
-    Même garde-fou que `update_embeddings` : zéro régression sur les données
-    curées (name/brand/image_url/scores/embedding/source, dont l'import Maty).
-    Idempotent. Sert à alimenter les ~12 k produits déjà en base (le worker
-    quotidien, lui, écrit ces colonnes à l'`upsert` des nouveaux EAN).
+    Même garde-fou que `update_embeddings`
 
     - quantité : `(value, unit)` via `normalize_quantity` (g→kg, ml→L) ; sans unité
       propre → value/unit NULL (exclu du €/unité), `quantity_raw` garde le texte OFF ;
-    - `categories_tags` : chemin OFF complet (pour la profondeur de préfixe commun,
-      tier catégorie §4). NULL si absent.
+    - `categories_tags` : chemin OFF complet (pour la profondeur de préfixe commun), NULL si absent
 
-    Retourne {'candidates': N, 'updated': M} — M ≤ N si des EAN ne sont pas en base.
+    Retourne {'candidates': N, 'updated': M} — M ≤ N si des EAN ne sont pas en base
     """
     sql = """
     UPDATE products
@@ -240,22 +206,12 @@ async def update_reco_columns(
     return {"candidates": candidates, "updated": updated}
 
 
-# --- Étape 2 : calcul des paires substitut→produit -------------------------
+# Calcul des paires substitut→produit
 
 
 async def fetch_scorable_products(
     pool: asyncpg.Pool,
 ) -> tuple[dict[str, dict[str, Any]], list[str], np.ndarray]:
-    """Produits candidats au scoring : embedding + quantité normalisée présents
-    (sans quoi ni kNN ni €/unité).
-
-    Renvoie `(meta, eans, embeddings)` :
-    - `meta` = `{ean: {name, brand, category_l3, categories_tags,
-      quantity_value(float), quantity_unit}}` (pour le scoring) ;
-    - `eans` = ordre stable, aligné avec `embeddings` ;
-    - `embeddings` = matrice `(N, 768)` float32 (pour le kNN BLAS en mémoire —
-      on sort les vecteurs de pgvector, cf. `knn.compute_knn_pairs`).
-    """
     sql = """
     SELECT ean, name, brand, category_l3, categories_tags,
            quantity_value, quantity_unit, embedding::text AS emb
@@ -282,7 +238,6 @@ async def fetch_scorable_products(
             "quantity_unit": r["quantity_unit"],
         }
         eans.append(ean)
-        # pgvector `::text` = "[0.1,0.2,...]" → vecteur float32.
         vectors.append(np.fromstring(r["emb"][1:-1], sep=",", dtype=np.float32))
 
     embeddings = np.vstack(vectors) if vectors else np.empty((0, 0), dtype=np.float32)
@@ -293,11 +248,6 @@ async def fetch_scorable_products(
 async def write_substitutions(
     pool: asyncpg.Pool, rows: Sequence[tuple[Any, ...]]
 ) -> int:
-    """Publie `product_substitutions` : TRUNCATE + INSERT (recompute plein, comme
-    les tables Gold). Atomique. `rows` = tuples alignés sur l'ordre des colonnes.
-
-    Les colonnes NUMERIC sont passées en float et castées `::float8` en SQL
-    (asyncpg exige sinon des Decimal sur un type numeric)."""
     if not rows:
         logger.warning("pg_write_substitutions_empty")
         async with pool.acquire() as conn:

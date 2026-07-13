@@ -1,5 +1,3 @@
-"""structlog → stdout JSON. Cf. worker-ingestion pour la justification."""
-
 from __future__ import annotations
 
 import logging

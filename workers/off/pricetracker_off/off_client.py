@@ -1,10 +1,4 @@
-"""Client OpenFoodFacts — un seul endpoint utilisé : GET /api/v2/product/<ean>.
-
-Rate-limit (15 req/min) tenu côté caller via `TokenBucket`. Le client se
-contente du retry sur 429/5xx (backoff exp via tenacity) et du parsing.
-
-Doc API : https://openfoodfacts.github.io/openfoodfacts-server/api/
-"""
+#Client OpenFoodFacts
 
 from __future__ import annotations
 
@@ -24,14 +18,6 @@ from .ratelimit import TokenBucket
 
 logger = get_logger(__name__)
 
-# Champs explicitement demandés à OFF — limite la taille de la réponse et
-# rend le contrat de schéma explicite côté worker.
-# - generic_name / labels_tags / quantity servent au texte d'embedding « balanced »
-#   (cf. embedding_text.build_embedding_text) ; `quantity` est EN PLUS persisté
-#   tel quel dans products.quantity_raw (affichage/audit).
-# - product_quantity + product_quantity_unit : socle unité (§5.2) — persistés
-#   normalisés (g→kg, ml→L) dans products.quantity_value / quantity_unit.
-# Tous existent aussi dans le dump OFF, d'où la parité API↔dump.
 _FIELDS = ",".join(
     [
         "code",
@@ -56,20 +42,7 @@ _FIELDS = ",".join(
 
 @dataclass
 class OFFProduct:
-    """Vue normalisée des champs OFF utilisés par le worker.
-
-    `generic_name` / `categories_tags` / `labels_tags` servent uniquement à
-    construire le texte d'embedding (`embedding_text.build_embedding_text`) et ne
-    sont pas persistés tels quels.
-
-    Les champs quantité SONT persistés (socle unité, Étape 1 reco) :
-    - `quantity` (texte libre OFF) → products.quantity_raw + texte d'embedding ;
-    - `product_quantity` + `product_quantity_unit` (colonnes OFF normalisées) →
-      products.quantity_value / quantity_unit via `quantity.normalize_quantity`.
-
-    Tous ont un défaut pour que les « tombstone » et la reconstruction depuis
-    l'artefact (load_artifact) restent inchangées.
-    """
+    #Normalized OFF product view
 
     ean: str
     name: str | None
@@ -82,7 +55,6 @@ class OFFProduct:
     ecoscore: str | None
     image_url: str | None
     found: bool
-    # --- champs texte-embedding (non persistés tels quels) ---
     generic_name: str | None = None
     categories_tags: list[str] | None = None  # hiérarchie brute (en:/fr:), général->spécifique
     labels_tags: list[str] | None = None  # brut (en:/fr:)
@@ -93,9 +65,7 @@ class OFFProduct:
 
 
 def _str_or_none(v: Any) -> str | None:
-    """OFF renvoie `product_quantity` tantôt en nombre, tantôt en string. On le
-    stocke en texte (parité avec le dump, VARCHAR) ; le cast float a lieu au
-    calcul (`quantity.normalize_quantity`)."""
+    #Coerce OFF numeric values to strings
     if v is None:
         return None
     s = str(v).strip()
@@ -103,10 +73,7 @@ def _str_or_none(v: Any) -> str | None:
 
 
 def _parse_categories(tags: list[str] | None) -> tuple[str | None, str | None, str | None]:
-    """`categories_tags` OFF = liste ordonnée du général au spécifique
-    (`en:foods`, `en:beverages`, `en:drinks-with-sugar`...). On prend le
-    premier / un milieu / le dernier comme L1/L2/L3.
-    """
+    #Map OFF category tags to L1/L2/L3
     if not tags:
         return None, None, None
     l1 = tags[0]
@@ -174,16 +141,8 @@ class OFFClient:
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        # capacity=1 par défaut : OFF rate-limit est anti-burst, pas seulement
-        # anti-débit-moyen. Un bucket plein (15 tokens) déclenche 429 dès la
-        # 7-8e requête en rafale. Forcer capacity=1 = strict 1 req tous les
-        # 60/rpm secondes, pas de burst possible.
         self._bucket = TokenBucket(rpm=rate_limit_rpm, capacity=burst_capacity)
         self._max_retries = max_retries
-        # Backoff aligné sur la reco officielle OFF (60s/120s/240s sur 429/503).
-        # Cf. docs/OFF_API_Specification_PriceTracker.md §4 : "Si ces limites
-        # sont dépassées, l'IP peut être bannie". Tests : override à 0 pour
-        # ne pas patienter.
         self._retry_wait_min_s = retry_wait_min_s
         self._retry_wait_max_s = retry_wait_max_s
         self._retry_wait_multiplier = retry_wait_multiplier
@@ -214,9 +173,6 @@ class OFFClient:
         )
         async for attempt in retrying:
             with attempt:
-                # Acquire DANS la boucle retry : sinon un retry sur 429 repart
-                # immédiatement sans consommer de token, ce qui aggrave le
-                # rate-limit côté OFF (vu en prod : 4 tentatives en rafale).
                 await self._bucket.acquire(1)
                 resp = await self._client.get(path, params={"fields": _FIELDS})
                 if resp.status_code == 404:
@@ -244,12 +200,12 @@ class OFFClient:
                     raise _RetryableStatus(resp.status_code)
                 resp.raise_for_status()
                 return _to_off_product(ean, resp.json())
-        # Boucle terminée sans return (impossible — `reraise=True` propage), pour mypy.
+        # Boucle terminée sans return (impossible — `reraise=True` propage), pour mypy
         raise RuntimeError("unreachable")
 
 
 class _RetryableStatus(Exception):
-    """Marqueur interne pour les statuts HTTP qui doivent déclencher un retry."""
+    #Marqueur interne pour les statuts HTTP qui doivent déclencher un retry
 
     def __init__(self, status_code: int) -> None:
         super().__init__(f"retryable status {status_code}")
