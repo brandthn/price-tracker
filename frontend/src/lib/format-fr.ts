@@ -1,6 +1,4 @@
-// Formats français partagés par toute l'app (prix, variations, dates).
-// Règle produit : une variation porte TOUJOURS son signe explicite (+/−),
-// la couleur seule ne suffit jamais (accessibilité daltonisme).
+// une variation garde toujours son signe: la couleur seule ne suffit pas (daltonisme)
 
 const EUR = new Intl.NumberFormat("fr-FR", {
   style: "currency",
