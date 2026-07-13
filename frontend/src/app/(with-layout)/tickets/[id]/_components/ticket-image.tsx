@@ -41,7 +41,7 @@ export function TicketImage({ ticketId }: { ticketId: string }) {
         )}
         {state.kind === "ready" && (
           <a href={state.url} target="_blank" rel="noopener noreferrer">
-            {/* Signed GCS URL (blob distant) — pas de next/image. */}
+            {/* signed url GCS, pas optimisable par next/image */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={state.url}

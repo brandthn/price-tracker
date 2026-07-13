@@ -1,14 +1,5 @@
-// Initialisation du Firebase Web SDK (client only).
-//
-// On utilise UNIQUEMENT le SDK web côté navigateur (pas de firebase-admin sur le
-// frontend) : la policy org `iam.disableServiceAccountKeyCreation` interdit les
-// clés JSON de SA, donc pas de session cookie via Admin SDK. Le flux est :
-//   login Web SDK -> ID token (JWT) -> envoyé au backend FastAPI qui le vérifie.
-//
-// Les `NEXT_PUBLIC_FIREBASE_*` sont des valeurs PUBLIQUES (cf. doc Firebase) :
-// l'apiKey web n'est pas un secret, la sécurité repose sur les règles backend +
-// le domaine autorisé dans la console Firebase. Elles sont inlinées dans le
-// bundle JS au moment du `next build` (cf. Dockerfile / cloudbuild.yaml).
+// pas d'admin sdk: policy org bloque les clés SA
+// web sdk -> id token -> verif backend
 
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
@@ -26,15 +17,13 @@ export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId,
 );
 
-// On n'initialise Firebase QUE si la config est présente : sinon `getAuth()`
-// lève `auth/invalid-api-key` au chargement du module (casse le build SSR et le
-// mode démo). `firebaseAuth` est donc nullable — les consommateurs doivent
-// vérifier `isFirebaseConfigured` avant de l'utiliser.
+// sans config getAuth() lève auth/invalid-api-key au load du module
+// => nullable, check isFirebaseConfigured avant usage
 let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: Auth | null = null;
 
 if (isFirebaseConfigured) {
-  // Idempotent : évite la double-init au HMR / multiples imports.
+  // getApps() sinon double init au HMR
   firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   firebaseAuth = getAuth(firebaseApp);
 }

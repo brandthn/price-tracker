@@ -1,9 +1,6 @@
 import { apiFetch } from "./client";
 import type { EnseigneDetailOut, EnseignesOut } from "./types";
 
-// Comparateur d'enseignes (public). Le panorama classe les enseignes par indice
-// de cherté relative ; la fiche détaille où l'enseigne est la moins / plus chère.
-
 export function getEnseignes(
   opts: { minMatched?: number; windowWeeks?: number } = {},
 ): Promise<EnseignesOut> {

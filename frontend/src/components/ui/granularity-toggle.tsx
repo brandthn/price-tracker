@@ -4,9 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import type { Granularity } from "@/lib/api/indices";
 
-// Sélecteur segmenté Semaine / Mois. Pilote la granularité de tout
-// l'Observatoire via le searchParam `?g=` (lu côté serveur). On garde
-// l'URL comme source de vérité pour que l'état survive au partage/refresh.
+// l'état vit dans l'URL (?g=) pour survivre au refresh et au partage de lien
 const OPTIONS: { value: Granularity; label: string }[] = [
   { value: "week", label: "Semaine" },
   { value: "month", label: "Mois" },

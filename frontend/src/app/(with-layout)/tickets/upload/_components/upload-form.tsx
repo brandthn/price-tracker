@@ -29,7 +29,7 @@ export function UploadForm() {
   const [error, setError] = useState<string | null>(null);
   const dragRef = useRef<HTMLLabelElement>(null);
 
-  // Aperçu local (objet URL) — révoqué à chaque changement / démontage.
+  // revoke sinon fuite sur l'object URL
   useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
@@ -69,7 +69,7 @@ export function UploadForm() {
       setStage("polling");
       toast.success("Ticket reçu, analyse en cours.");
 
-      // Polling jusqu'à status !== pending|processing
+      // poll tant que pending|processing
       let attempts = 0;
       const tick = async () => {
         attempts += 1;
@@ -108,7 +108,7 @@ export function UploadForm() {
     } catch (err) {
       setStage("failed");
       if (err instanceof ApiError) {
-        setError(`Erreur ${err.status} — ${err.detail ?? "réessayez dans un instant."}`);
+        setError(`Erreur ${err.status} : ${err.detail ?? "réessayez dans un instant."}`);
       } else {
         setError("Impossible de joindre le serveur. Vérifiez votre connexion.");
       }
@@ -149,7 +149,7 @@ export function UploadForm() {
         />
         {previewUrl ? (
           <>
-            {/* Aperçu local avant envoi — pas besoin de next/image (blob URL). */}
+            {/* blob url, next/image sert à rien ici */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewUrl}

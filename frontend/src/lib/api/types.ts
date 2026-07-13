@@ -1,5 +1,4 @@
-// Types miroir des schémas Pydantic backend (`backend/pricetracker_api/schemas/`).
-// Garder synchrone avec ces fichiers si l'API évolue.
+// miroir de backend/pricetracker_api/schemas/ - garder synchro
 
 export type TicketStatus =
   | "pending"
@@ -200,10 +199,9 @@ export interface BasketSummary {
   top_products: BasketProduct[];
 }
 
-// Comparateur d'enseignes — indice de cherté relative (matched-basket).
 export interface EnseigneSummary {
   enseigne: string;
-  // null = couverture insuffisante (< min_matched produits comparables).
+  // null = moins de min_matched produits comparables
   cherte_index: number | null;
   matched_products: number;
   observations: number | null;
@@ -224,7 +222,7 @@ export interface EnseigneProductRank {
   in_catalog: boolean;
   price_eur: number | null;
   ref_price_eur: number | null;
-  // Écart au prix de référence, en %. −12.0 = 12 % moins cher que la médiane.
+  // % d'écart à la médiane, signé (-12.0 = 12% moins cher)
   delta_pct: number;
 }
 
@@ -240,13 +238,12 @@ export interface EnseigneDetailOut {
   dearer: EnseigneProductRank[];
 }
 
-// Reco « substitut moins cher » — /me/recommendations
 export interface RecoProductRef {
   ean: string;
   name: string | null;
   brand: string | null;
   image_url: string | null;
-  // €/unité (jamais le prix paquet)
+  // €/unité, pas le prix paquet
   price_per_unit: number;
 }
 
@@ -257,7 +254,7 @@ export interface RecommendationItem {
   tier: number;
   score: number;
   saving_per_unit: number;
-  // Pourcentage d'économie, ex: 18.4 = 18,4 % moins cher
+  // 18.4 = 18,4% moins cher
   saving_pct: number;
   monthly_packs: number;
   monthly_saving_eur: number;

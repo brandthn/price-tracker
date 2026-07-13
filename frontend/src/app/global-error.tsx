@@ -1,8 +1,7 @@
 "use client";
 
-// Filet de sécurité ultime : capture les erreurs survenant dans le layout
-// racine lui-même (où `(with-layout)/error.tsx` ne s'applique pas). Doit
-// rendre ses propres <html>/<body> car il REMPLACE le layout racine.
+// erreurs du layout racine (error.tsx ne couvre pas ce cas)
+// doit rendre ses propres html/body: il remplace le layout
 
 import { useEffect } from "react";
 

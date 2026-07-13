@@ -30,7 +30,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await signUp(email, password, displayName || undefined);
-      // L'AuthProvider pose le cookie via onIdTokenChanged ; on entre dans l'app.
+      // le cookie est posé par l'AuthProvider (onIdTokenChanged)
       router.replace("/");
     } catch (err) {
       setError(authErrorMessage(err));
