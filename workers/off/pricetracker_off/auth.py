@@ -1,4 +1,4 @@
-"""Vérif OIDC du JWT Cloud Scheduler. Cf. worker-ingestion."""
+#OIDC checks for the worker
 
 from __future__ import annotations
 

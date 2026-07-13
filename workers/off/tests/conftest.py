@@ -1,5 +1,3 @@
-"""Isolation env, OIDC bypass, project fixture."""
-
 from __future__ import annotations
 
 import os

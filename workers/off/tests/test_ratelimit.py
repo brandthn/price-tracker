@@ -1,5 +1,3 @@
-"""Vérifie le token-bucket : capacité initiale = rpm, refill linéaire."""
-
 from __future__ import annotations
 
 import asyncio

@@ -1,24 +1,4 @@
-"""Calcul plein-catalogue des paires substitut→produit (reco Étape 2).
-
-Étape SÉPARÉE de la boucle d'enrichissement quotidienne (§5.5 handoff) : conçu
-comme un **Cloud Run Job** dans le VPC réutilisant l'image `off` (qui a le client
-BQ ET le pool Cloud SQL).
-
-Pipeline :
-  1. médian prix/EAN depuis BQ `open_prices_clean` (fenêtre 12 mois, ≥1 obs) ;
-  2. produits scorables (embedding + quantité) + kNN pgvector depuis Cloud SQL ;
-  3. pour chaque source : €/unité, accord catégoriel, score (catégorie dominante /
-     embedding borné), on garde les substituts MOINS CHERS au €/unité, top-N,
-     diversité de marque ;
-  4. TRUNCATE + INSERT `product_substitutions` (Cloud SQL).
-
-Un **échantillon de paires** est loggué (noms, cosinus, cat_agree, tier, €/unité,
-économie) → réglage des knobs « à l'œil sur du réel » sans lire Cloud SQL en local.
-
-Config : mêmes env vars que le worker (`PRT_PG_*`, `PRT_BQ_*`, `PRT_RECO_*`,
-`GOOGLE_CLOUD_PROJECT`). Lancement (Cloud Run Job) :
-    python -m pricetracker_off.compute_substitutions
-"""
+#Build substitution rows for the catalogue
 
 from __future__ import annotations
 
@@ -76,8 +56,7 @@ def _build_rows(
     pairs: list[tuple[str, str, float]],
     s: Settings,
 ) -> tuple[list[tuple[Any, ...]], list[dict[str, Any]], Counter]:
-    """Assemble les lignes `product_substitutions` + un échantillon lisible +
-    la distribution des tiers. Pur (testable, sans I/O)."""
+    #Assemble les lignes `product_substitutions` + un échantillon lisible +la distribution des tiers
     weights = _weights(s)
     by_source: dict[str, list[tuple[str, float]]] = defaultdict(list)
     for src_ean, tgt_ean, cosine in pairs:
@@ -175,11 +154,9 @@ async def compute() -> dict[str, object]:
     )
     try:
         products, eans, embeddings = await fetch_scorable_products(pool)
-        # Sources = produits scorables AYANT un prix (sans prix, pas d'économie à
-        # calculer → inutile de chercher leurs voisins). Candidats = tous.
+        # Sources = produits scorables AYANT un prix (sans prix, pas d'économie à calculer → inutile de chercher leurs voisins). Candidats = tous.
         priced_sources = {ean for ean in eans if ean in prices}
         units = [products[ean]["quantity_unit"] for ean in eans]
-        # kNN EN MÉMOIRE (BLAS) — pas d'ANN pgvector en batch (cf. knn.py).
         pairs = await asyncio.to_thread(
             compute_knn_pairs,
             eans, embeddings, units,
@@ -205,7 +182,6 @@ async def compute() -> dict[str, object]:
         "duration_s": duration_s,
     }
     logger.info("compute_substitutions_done", **result)
-    # Échantillon lisible pour régler les knobs (DoD §7).
     for e in sample:
         logger.info("substitution_sample", **e)
     return result

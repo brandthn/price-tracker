@@ -1,6 +1,3 @@
-"""Normalisation quantité OFF → unité canonique (kg/L). Décision §5.2 : aucune
-inférence, unité non reconnue = exclu."""
-
 from __future__ import annotations
 
 import pytest

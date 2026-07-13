@@ -1,5 +1,3 @@
-"""Scoring substituts : catégorie = high-signal, embedding = borné (Étape 2)."""
-
 from __future__ import annotations
 
 import pytest

@@ -1,9 +1,4 @@
-"""Embeddings via Vertex AI `text-embedding-004` (dim 768).
-
-Batches de `prt_vertex_batch` instances pour amortir le coût de réseau.
-L'auth se fait via ADC — la SA Cloud Run `prt-prod-worker-sa` a déjà
-`roles/aiplatform.user` (cf. infra/README.md §Service Accounts).
-"""
+"""Embeddings via Vertex AI `text-embedding-004` (dim 768)"""
 
 from __future__ import annotations
 
@@ -18,11 +13,6 @@ logger = get_logger(__name__)
 def _batches_by_budget(
     texts: Sequence[str], max_count: int, max_chars: int
 ) -> Iterable[list[str]]:
-    """Regroupe les textes en batches respectant DEUX bornes de l'API Vertex :
-    - `max_count` instances par requête (250) ;
-    - `max_chars` caractères cumulés par requête (proxy du plafond de 20000
-      tokens/requête — le français accentué ~2.9 char/token).
-    Packing glouton ; un texte seul dépassant le budget forme son propre batch."""
     batch: list[str] = []
     chars = 0
     for t in texts:
@@ -37,10 +27,7 @@ def _batches_by_budget(
 
 
 class VertexEmbedder:
-    """Wrap `vertexai.language_models.TextEmbeddingModel` mais lazy-loaded :
-    on n'importe le SDK que lors du premier `embed()` pour ne pas payer le
-    coût d'import (et de check ADC) au boot du worker.
-    """
+    # Lazy-loaded Vertex embedding client
 
     def __init__(
         self,
@@ -57,8 +44,6 @@ class VertexEmbedder:
         self._location = location
         self._model_name = model_name
         self._batch_size = max(1, min(batch_size, 250))
-        # Plafond de caractères par requête : ~20000 tokens/requête côté API.
-        # 45000 chars laisse une marge pour le français accentué (~2.9 char/token).
         self._max_request_chars = max_request_chars
         self._task_type = task_type
         self._output_dim = output_dim
@@ -75,7 +60,7 @@ class VertexEmbedder:
         return self._model
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
-        """Renvoie 1 vecteur par texte, dans le même ordre."""
+        #Renvoie 1 vecteur par texte, dans le même ordre
         if not texts:
             return []
         model = self._load()
@@ -87,9 +72,6 @@ class VertexEmbedder:
         ):
             inputs = [TextEmbeddingInput(text=t, task_type=self._task_type) for t in batch]
             kwargs: dict[str, Any] = {}
-            # `text-embedding-004` supporte `output_dimensionality` ; on le
-            # passe explicitement pour figer la dim côté contrat (pgvector
-            # déclare `vector(768)`).
             kwargs["output_dimensionality"] = self._output_dim
             embeddings = model.get_embeddings(inputs, **kwargs)
             out.extend(emb.values for emb in embeddings)

@@ -1,11 +1,4 @@
-"""FastAPI app worker OFF — POST /run orchestre tout le pipeline.
-
-Découpage volontaire :
-- discovery (BQ)
-- fetch loop OFF (rate-limited, timeout-bounded)
-- embeddings (Vertex)
-- écritures (BQ MERGE + pg UPSERT en parallèle)
-"""
+"""FastAPI app worker OFF — POST /run orchestre tout le pipeline"""
 
 from __future__ import annotations
 
@@ -57,8 +50,6 @@ async def _fetch_loop(
     client: OFFClient,
     deadline_monotonic: float,
 ) -> list[OFFProduct]:
-    """Itère les EAN, respecte le timeout global du run, arrête proprement
-    si on dépasse `deadline_monotonic`."""
     products: list[OFFProduct] = []
     for ean in eans:
         if time.monotonic() >= deadline_monotonic:
@@ -73,7 +64,7 @@ async def _fetch_loop(
         except Exception as exc:
             # Une erreur sur un EAN ne doit pas faire échouer tout le batch.
             # On log et on continue ; cet EAN sera repicked au run suivant
-            # (toujours absent de catalogue_produits).
+            # (toujours absent de catalogue_produits)
             logger.error("off_fetch_failed", ean=ean, error=str(exc))
             continue
         products.append(product)
@@ -139,12 +130,9 @@ async def run(_oidc: dict = Depends(verify_oidc)) -> dict[str, object]:
         task_type=settings.prt_vertex_task_type,
         output_dim=settings.prt_vertex_output_dim,
     )
-    # MÊME formule que le bulk (module partagé) → l'espace vectoriel ne re-diverge
-    # pas : chaque nouvel EAN quotidien reçoit un embedding 'balanced', pas legacy.
     embed_inputs = [build_embedding_text(p) for p in found]
     embeddings_found = await asyncio.to_thread(embedder.embed, embed_inputs)
 
-    # Recombine : products[] et embeddings[] alignés (None pour not_found)
     by_ean_emb: dict[str, list[float]] = {
         p.ean: emb for p, emb in zip(found, embeddings_found, strict=True)
     }

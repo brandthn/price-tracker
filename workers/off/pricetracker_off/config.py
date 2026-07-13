@@ -1,4 +1,4 @@
-"""Settings worker OFF — env vars pydantic-settings."""
+#Settings worker OFF
 
 from __future__ import annotations
 
@@ -13,16 +13,16 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # GCP -----------------------------------------------------------------
+    # GCP
     google_cloud_project: str = Field(default="")
     prt_gcp_region: str = Field(default="europe-west1")
 
-    # BigQuery ------------------------------------------------------------
+    # BigQuery
     prt_bq_dataset_silver: str = Field(default="prt_prod_silver")
     prt_bq_table_open_prices: str = Field(default="open_prices_clean")
     prt_bq_table_catalogue: str = Field(default="catalogue_produits")
 
-    # Open Food Facts -----------------------------------------------------
+    # Open Food Facts 
     prt_off_base_url: str = Field(default="https://world.openfoodfacts.org")
     prt_off_user_agent: str = Field(
         default="pricetracker-prt-prod/0.1 (+https://github.com/PriceTracker/contact)",
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     prt_off_http_timeout_s: float = Field(default=20.0)
     prt_off_max_retries: int = Field(default=4)
 
-    # Vertex AI -----------------------------------------------------------
+    # Vertex AI 
     prt_vertex_model: str = Field(default="text-embedding-004")
     prt_vertex_batch: int = Field(default=250, description="Max instances par appel Vertex.")
     prt_vertex_task_type: str = Field(
@@ -58,9 +58,6 @@ class Settings(BaseSettings):
     )
     prt_vertex_output_dim: int = Field(default=768)
 
-    # Reco substituts (Étape 2) — knobs à régler sur 20-30 paires réelles -----
-    # Prix : médian/EAN depuis open_prices_clean. Décision Étape 0 : fenêtre
-    # large + seuil bas (la CTE weekly d'indices, per-week min 3, écrase à ~27).
     prt_reco_price_window_weeks: int = Field(default=52)
     prt_reco_price_min_obs: int = Field(default=1)
     prt_reco_knn_k: int = Field(
@@ -70,7 +67,7 @@ class Settings(BaseSettings):
     prt_reco_max_per_brand: int = Field(
         default=2, description="Plafond de substituts d'une même marque (diversité)."
     )
-    # Score : catégorie dominante, embedding borné (cf. substitutions.ScoreWeights).
+    # Score : catégorie dominante, embedding borné
     prt_reco_w_cat: float = Field(default=0.75)
     prt_reco_w_emb: float = Field(default=0.50)
     prt_reco_cos_floor: float = Field(default=0.35)
@@ -78,7 +75,7 @@ class Settings(BaseSettings):
     prt_reco_tier1_cat: float = Field(default=0.80)
     prt_reco_tier2_cat: float = Field(default=0.30)
 
-    # Cloud SQL -----------------------------------------------------------
+    # Cloud SQL
     prt_pg_host: str = Field(default="")
     prt_pg_port: int = Field(default=5432)
     prt_pg_db: str = Field(default="price_tracker")
@@ -86,7 +83,7 @@ class Settings(BaseSettings):
     prt_pg_password: str = Field(default="")
     prt_pg_pool_size: int = Field(default=4)
 
-    # OIDC ----------------------------------------------------------------
+    # OIDC 
     prt_oidc_disable: bool = Field(default=False)
     prt_oidc_required_audience: str = Field(default="")
     prt_oidc_allowed_issuers: str = Field(

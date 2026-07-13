@@ -1,8 +1,4 @@
-"""Accès BigQuery :
-- `discover_eans_to_enrich` : liste les EAN distincts présents dans
-  `open_prices_clean` mais absents de `catalogue_produits`.
-- `merge_catalogue` : MERGE des enregistrements OFF dans `catalogue_produits`.
-"""
+#BigQuery access helpers
 
 from __future__ import annotations
 
@@ -30,16 +26,7 @@ def discover_eans_to_enrich(
     limit: int,
     location: str = "EU",
 ) -> list[str]:
-    """Renvoie au plus `limit` EAN à enrichir, ordre déterministe.
-
-    Critères :
-    - `product_code IS NOT NULL` ET longueur >= 8 (EAN-8 / EAN-13).
-      Le cleaner v2 rejette déjà toute ligne sans `product_code` valide,
-      donc toutes les rows de `open_prices_clean` sont de type PRODUCT
-      (les CATEGORY HF sont filtrées en amont).
-    - absent de `catalogue_produits` (`LEFT JOIN ... WHERE c.ean IS NULL`)
-    - tri par `product_code` pour rendre le picking idempotent sur re-runs.
-    """
+    """Return up to `limit` EANs to enrich."""
     client = _client(project_id, location)
     sql = f"""
     SELECT op.product_code AS ean
@@ -71,13 +58,7 @@ def fetch_median_prices(
     min_obs: int,
     location: str = "EU",
 ) -> dict[str, tuple[float, int]]:
-    """Médian de prix par EAN sur une fenêtre glissante → `{ean: (median_eur, obs)}`.
-
-    Décision Étape 0 : fenêtre LARGE (12 mois) + seuil bas (≥1 obs) — PAS la CTE
-    `weekly` d'`indices` (min 3 obs *par semaine*), qui écrase à ~27 EAN sur du
-    flux de prix épars. On médiane sur toute la fenêtre, tous relevés confondus,
-    hors outliers IQR. `obs` = nb de relevés (confiance du prix, pour pondérer/tri).
-    """
+    #Médian de prix par EAN sur une fenêtre glissante
     client = _client(project_id, location)
     src = f"`{project_id}.{dataset}.{table_open_prices}`"
     sql = f"""
@@ -117,13 +98,7 @@ def merge_catalogue(
     source: str = "openfoodfacts",
     location: str = "EU",
 ) -> int:
-    """Charge les `products` en staging puis MERGE vers `catalogue_produits`.
-    Retourne le nombre de lignes affectées par le MERGE.
-
-    `source` : provenance — `openfoodfacts` (worker API, défaut) ou
-    `openfoodfacts_dump` (chargement bulk depuis le dump OFF). Sans ça, les deux
-    voies sont indistinguables dans BQ (elles réutilisent le même code).
-    """
+    #Load rows into staging then merge into the catalogue
     rows = [
         {
             "ean": p.ean,

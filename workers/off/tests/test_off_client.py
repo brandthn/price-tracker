@@ -1,5 +1,3 @@
-"""Parser + comportements HTTP du client OFF (mocks via pytest-httpx)."""
-
 from __future__ import annotations
 
 import pytest

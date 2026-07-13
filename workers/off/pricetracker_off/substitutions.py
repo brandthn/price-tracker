@@ -1,21 +1,5 @@
-"""Scoring des paires substitut→produit (Étape 2 reco) — SOURCE UNIQUE, pure & testable.
-
-Philosophie (décision Brandon 2026-07-06) : la **CATÉGORIE est le signal HAUTE
-confiance** ; l'**embedding un filet sémantique BORNÉ** — il se fait piéger
-(« Nutella pâte à tartiner » ↔ « *Biscuit* Nutella » : cosinus fort, marque
-identique, mais PAS un substitut).
-
-    confidence = min(1, W_CAT·cat_agreement + W_EMB·emb_norm)
-
-- embedding **seul** plafonne à `W_EMB` (0.50) : jamais « sûr » sans appui catégorie ;
-- même catégorie profonde (`cat_agreement ≈ 1`) → `W_CAT` (0.75) de base, tiré vers
-  1.0 par l'embedding → **quasi-max**.
-
-Les **tiers** sont pilotés par la SEULE catégorie (le high-signal) : un cosinus
-élevé sans catégorie reste **Tier 3 « à vérifier »**, jamais promu.
-
-Ne compare que des produits **moins chers au €/unité** et de **même dimension**
-(kg↔kg, L↔L) — les deux garantis en amont (filtres SQL + prix).
+"""Scoring des paires substitut→produit 
+Ne compare que des produits moins chers à l'unité et de même dimension (kg↔kg, L↔L)
 """
 
 from __future__ import annotations
@@ -29,7 +13,6 @@ def _clamp01(x: float) -> float:
 
 @dataclass(frozen=True)
 class ScoreWeights:
-    """Knobs de score — à régler sur 20-30 paires réelles (DoD §7), pas sur le papier."""
 
     w_cat: float = 0.75  # poids catégorie (dominant)
     w_emb: float = 0.50  # plafond embedding : emb seul ne dépasse jamais ça
@@ -45,19 +28,6 @@ def category_agreement(
     source_tags: list[str] | None,
     target_tags: list[str] | None,
 ) -> float:
-    """Force de l'accord catégoriel ∈ [0, 1].
-
-    - même `category_l3` (feuille OFF exacte) → **1.0** (signal le plus fort) ;
-    - sinon : **spécificité du tag commun le plus profond** dans le chemin source
-      (`categories_tags` complet). Robuste à la folksonomie OFF : deux vrais
-      substituts peuvent avoir des l3 différents mais partager un tag profond
-      (`en:chocolate-spreads`) → l'accord reste élevé ;
-    - aucun tag commun → **0.0**.
-
-    La spécificité = position (1-indexée) du tag partagé le plus profond ÷ longueur
-    du chemin source. Un tag partagé en fin de chemin (spécifique) ≈ 1.0 ; une
-    racine générique (`en:foods`, position 1) ≈ 1/profondeur (faible).
-    """
     if source_l3 and target_l3 and source_l3 == target_l3:
         return 1.0
     if not source_tags or not target_tags:
@@ -71,11 +41,6 @@ def category_agreement(
 
 
 def score_and_tier(cosine: float, cat_agree: float, w: ScoreWeights) -> tuple[float, int]:
-    """`(confidence ∈ [0,1], tier ∈ {1,2,3})`.
-
-    Tier = fonction de la SEULE `cat_agree` (catégorie = high-signal). Le cosinus
-    module le score numérique mais ne promeut PAS de tier.
-    """
     emb_norm = _clamp01((cosine - w.cos_floor) / (w.cos_ref - w.cos_floor))
     confidence = min(1.0, w.w_cat * cat_agree + w.w_emb * emb_norm)
     if cat_agree >= w.tier1_cat:
@@ -89,7 +54,6 @@ def score_and_tier(cosine: float, cat_agree: float, w: ScoreWeights) -> tuple[fl
 
 @dataclass(frozen=True)
 class RawCandidate:
-    """Voisin kNN d'un produit source, avant filtrage/scoring."""
 
     target_ean: str
     cosine: float
@@ -120,13 +84,6 @@ def rank_substitutes(
     top_n: int,
     max_per_brand: int,
 ) -> list[RankedSubstitute]:
-    """Filtre (moins cher au €/unité + cosinus ≥ plancher), score, trie et
-    diversifie par marque. Renvoie le top-N.
-
-    Tri : `(confidence DESC, saving_pct DESC)`. Diversité : au plus `max_per_brand`
-    substituts de la même marque (le but est souvent l'alternative d'une AUTRE
-    marque moins chère) ; les produits sans marque ne sont pas plafonnés.
-    """
     scored: list[tuple[float, float, str, RankedSubstitute]] = []
     for c in candidates:
         if not (c.target_ppu < source_ppu):  # doit être strictement moins cher au €/unité
