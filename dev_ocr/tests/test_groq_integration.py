@@ -1,4 +1,4 @@
-"""Live Groq API integration — requires API key and receipt images on disk."""
+"""Tape la vraie API Groq. Demande une clé et des images sur le disque."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def _groq_env(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.groq
 def test_groq_extract_receipt_schema(receipt_image: Path):
-    """Call Groq vision API and assert README-compatible output."""
+    """Appelle Groq et vérifie que la sortie respecte le schéma."""
     resolve_groq_api_key()
 
     result = extract_receipt(str(receipt_image))

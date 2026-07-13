@@ -1,14 +1,15 @@
-# Journal de dev receipt_ocr
+# Notes de dev OCR
 
 Trace de ce qu'on a fait et des trucs intéressants tombés en route.
+Le journal court, au fil de l'eau, est dans journal_dev_ocr.md.
 
 
 ## 2026-05-19 première version
 
 Package qui sort un dict structuré depuis une photo de ticket. Le découpage : un
 backend OCR rend du texte brut, ReceiptParser en fait le dict. Les deux ne se
-connaissent pas, donc on change de moteur sans toucher au parsing c'est tout
-l'intérêt et ça n'a pas bougé depuis.
+connaissent pas, donc on change de moteur sans toucher au parsing. C'est tout
+l'intérêt, et ça n'a pas bougé depuis.
 
 Deux choix qui ont tenu : aucune enseigne en dur (on la déduit des premières
 lignes), et les imports des libs OCR faits à l'instanciation du backend, pas au
@@ -69,7 +70,7 @@ Groq répétait parfois le même produit 3-4 fois, sortait deux blocs JSON
 concaténés, ou des unités fractionnaires (0.972 pour du poids au kilo). Le schéma
 n'était jamais cassé, mais les doublons polluent directement le total. D'où une
 normalisation + dédoublonnage après n'importe quel VLM. Subtilité : deux produits
-ne fusionnent que si nom, prix ET quantité sont identiques même nom à prix
+ne fusionnent que si nom, prix ET quantité sont identiques. Même nom à prix
 différent, ça arrive vraiment sur un ticket.
 
 
@@ -79,8 +80,9 @@ Coquille événementielle autour du package : Pub/Sub → GCS → OCR → Cloud 
 package n'a pas été réécrit.
 
 Le point à retenir, c'est la sémantique HTTP : une image illisible renvoie 204 (on
-marque le ticket en échec et on ACK inutile de faire rejouer Pub/Sub, ça
-échouera pareil). Seules les pannes d'infra renvoient 5xx, là où un retry a du sens.
+marque le ticket en échec et on ACK, parce qu'il est inutile de faire rejouer
+Pub/Sub : ça échouera pareil). Seules les pannes d'infra renvoient 5xx, là où un
+retry a du sens.
 
 Les tests pg tournent sur un vrai Postgres (testcontainers). Trois sur quatre
 plantaient : conteneur partagé mais la fixture rejouait tout le DDL à chaque test,
@@ -121,8 +123,8 @@ TrainingDataPro, SRD).
 
 Leçon au passage : le pseudo-labelling est le goulot d'étranglement (le quota Groq
 gratuit s'épuise vers environ 128 tickets/jour). Donc on a privilégié les datasets qui
-livrent déjà le texte transcrit un adaptateur et zéro appel LLM. C'est ce qui a
-permis de passer le millier sans rien payer.
+livrent déjà le texte transcrit : un adaptateur, et zéro appel LLM. C'est ce qui
+a permis de passer le millier sans rien payer.
 
 Attention quand même : ces sources ne se valent pas. CORD est indonésien en
 roupies, WildReceipt a un texte de référence sans espaces. Bon pour mesurer la
@@ -171,11 +173,11 @@ Les backends étaient interchangeables en théorie mais un seul service tournait
 comparer deux moteurs voulait dire basculer une variable d'env en prod. Donc : un
 Cloud Run par backend, et le pipeline commun extrait dans une lib partagée.
 
-Chaque worker copie seulement le backend qu'il utilise paddlepaddle ne part pas
-dans l'image Groq, torch ne part pas dans l'image Paddle.
+Chaque worker copie seulement le backend qu'il utilise : paddlepaddle ne part
+pas dans l'image Groq, torch ne part pas dans l'image Paddle.
 
 Le modèle from-scratch, lui, n'avait aucun provider : il court-circuite toute la
-machinerie VLM (prompts, retries, escalade de crop) parce qu'il n'en a pas besoin —
+machinerie VLM (prompts, retries, escalade de crop) parce qu'il n'en a pas besoin :
 il ne prend pas de prompt et décode le ticket directement. C'est aussi le seul qui
 a besoin de deux fichiers de poids (checkpoint + tokenizer caractère) : sans le
 tokenizer avec lequel il a été entraîné, le checkpoint ne vaut rien.
@@ -192,7 +194,7 @@ backend sélectionné demande.
 
 Le résultat, sur les mêmes 18 photos :
 
-| | hybride (457M) | from-scratch (8.7M) | Groq |
+| Métrique | hybride (457M) | from-scratch (8.7M) | Groq |
 |---|---|---|---|
 | Lecture (1−CER) | 0.064 | 0.113 | 0.790 |
 | Product recall | 0.000 | 0.000 | 0.682 |
@@ -203,7 +205,7 @@ L'hybride lit deux fois moins bien que le modèle from-scratch 52 fois plus
 petit, alors qu'il est bâti sur deux backbones pré-entraînés. Son ANLS est
 pourtant meilleur, et ce n'est pas contradictoire : ANLS récompense une structure
 plausible, la lecture compte les caractères réellement lus. L'hybride produit des
-tickets bien formés dont le contenu est plus faux le décodeur contraint garantit
+tickets bien formés dont le contenu est plus faux. Le décodeur contraint garantit
 la forme, pas la vérité.
 
 La cause probable est bête : le checkpoint exporté vient de la phase 2, la phase 3

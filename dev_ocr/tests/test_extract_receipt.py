@@ -1,7 +1,5 @@
-"""Tests for the public entry point :func:`receipt_ocr.extract_receipt`.
-
-Focuses on backend selection, env-variable handling and the
-backend-swap guarantee of the Strategy pattern.
+"""Le point d'entrée public : choix du backend, variable d'env, et le fait qu'on
+puisse échanger un backend sans que le parsing s'en aperçoive.
 """
 
 from __future__ import annotations
@@ -25,7 +23,7 @@ def _clear_backend_cache():
 
 
 class _FakeBackend(OcrBackend):
-    """A tiny in-test backend that returns a hard-coded string."""
+    """Un backend bidon qui rend toujours la même chaîne."""
 
     def __init__(self, text: str) -> None:
         self._text = text
@@ -53,14 +51,14 @@ def test_extract_receipt_swapping_backends_returns_same_schema():
     result_a = extract_receipt("a.jpg", backend=backend_a)
     result_b = extract_receipt("b.jpg", backend=backend_b)
 
-    # Same schema for both — proves the Strategy pattern works.
+    # Même schéma dans les deux cas : c'est tout l'intérêt d'échanger un backend.
     assert set(result_a["ticket"].keys()) == set(result_b["ticket"].keys())
     assert result_a["ticket"]["chaine_supermarche"] != result_b["ticket"]["chaine_supermarche"]
 
 
 def test_extract_receipt_propagates_file_not_found(monkeypatch):
-    """Wrong image path → FileNotFoundError (raised by the real backend)."""
-    # Use the abstract path-validation helper directly via a tiny subclass
+    """Mauvais chemin d'image : c'est le backend réel qui lève FileNotFoundError."""
+    # On passe par une sous-classe minimale pour taper la validation de chemin
     # that calls it without depending on any OCR library.
     class _PathOnlyBackend(OcrBackend):
         def extract_text(self, image_path: str) -> str:

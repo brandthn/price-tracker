@@ -1,14 +1,10 @@
-"""SROIE adapter — phase-1 vision→language alignment only.
+"""Adaptateur SROIE : comme CORD, pour l'alignement seulement.
 
-SROIE (ICDAR 2019) labels four entities per receipt: ``company``, ``date``,
-``address``, ``total``. Products are not annotated, so the canonical mapping
-keeps header fields only — again, layout grounding, not French extraction.
+SROIE annote quatre entites par ticket (company, date, address, total). Les produits ne
+sont pas annotes, donc on ne garde que les champs d'en-tete.
 
-Expected local layout (official SROIE task-2 format)::
-
-    sroie_dir/
-        X00016469612.jpg
-        X00016469612.txt      # {"company": ..., "date": ..., "address": ..., "total": ...}
+Disposition attendue : le format officiel de la tache 2, une image et un .txt par
+ticket.
 """
 
 from __future__ import annotations
@@ -31,9 +27,9 @@ _DATE_PATTERNS = (
 
 
 def normalize_sroie_date(raw: str) -> str:
-    """SROIE date string → canonical ``yyyyMMdd HH:mm`` (time unknown → 00:00).
+    """Date SROIE vers le format canonique. L'heure est inconnue, donc 00:00.
 
-    Returns an empty string when the date cannot be parsed.
+    Rend une chaine vide quand la date est illisible.
     """
     text = (raw or "").strip()
     if not text:
@@ -60,7 +56,7 @@ def ticket_from_sroie_entities(entities: dict) -> Ticket:
 def load_sroie_samples(
     sroie_dir: str | Path, limit: Optional[int] = None
 ) -> list[ReceiptSample]:
-    """Load SROIE pairs (image + entity .txt) from a local directory."""
+    """Charge les paires SROIE (une image, un .txt d'entites) depuis un dossier local."""
     directory = Path(sroie_dir)
     samples: list[ReceiptSample] = []
     for image_path in sorted(directory.glob("*.jpg")):

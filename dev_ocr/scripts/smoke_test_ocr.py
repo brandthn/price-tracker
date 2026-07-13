@@ -1,17 +1,9 @@
-"""Quick smoke test: OCR one receipt image and print structured output.
-
-Usage (from repo root)::
+"""OCR une image de ticket et affiche la sortie structurée.
 
     python scripts/smoke_test_ocr.py
-    python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/image_2.jpg
-    python scripts/smoke_test_ocr.py --backend ppocrv4
+    python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/image_2.jpg --backend ppocrv4
 
-Environment variables (optional)::
-
-    RECEIPT_OCR_MAX_IMAGE_SIDE=1280
-    RECEIPT_OCR_PPOCRV4_MAX_IMAGE_SIDE=640
-    RECEIPT_OCR_CPU_THREADS=2
-    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+Variables utiles : RECEIPT_OCR_MAX_IMAGE_SIDE, RECEIPT_OCR_CPU_THREADS.
 """
 
 from __future__ import annotations
@@ -58,12 +50,12 @@ def main() -> int:
         "--backend",
         choices=("paddle", "ppocrv4", "vlm"),
         default="ppocrv4",
-        help="OCR backend to use (default: ppocrv4).",
+        help="Backend OCR (défaut : ppocrv4).",
     )
     parser.add_argument(
         "--raw-only",
         action="store_true",
-        help="Print raw OCR text only (skip structured parsing).",
+        help="Affiche seulement le texte OCR brut, sans parsing.",
     )
     args = parser.parse_args()
 

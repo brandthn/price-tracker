@@ -1,4 +1,4 @@
-"""Pytest fixtures — env isolation and settings cache reset."""
+"""Fixtures : on nettoie les PRT_* et on vide le cache de get_settings."""
 
 from __future__ import annotations
 

@@ -1,1 +1,1 @@
-"""Metrics and small helpers."""
+"""Metriques et petits utilitaires."""

@@ -1,4 +1,4 @@
-"""Tests for :mod:`receipt_ocr.vlm_parse`."""
+"""Parsing et nettoyage du JSON de VLM."""
 
 from __future__ import annotations
 

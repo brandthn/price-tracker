@@ -1,9 +1,11 @@
-"""Seq2seq dataset + collate for the OCR-VLM.
+"""Dataset seq2seq et collate pour l'OCR-VLM.
 
-Each item: a receipt image -> pixel tensor (own OCR normalization) paired with the tokenized
-linearized-schema target (``[BOS] ... [EOS]``). The collate pads targets to the batch max with
-the tokenizer's PAD id (masked out of the loss). Reuses :class:`ReceiptSample` so synthetic
-(live callables) and real (paths) sources share one interface.
+Une image de ticket vers un tenseur de pixels (normalisation maison, pas celle de
+CLIP), appariee a la cible tokenisee du schema linearise. Le collate pade les cibles
+au max du batch avec le PAD du tokenizer, qui est masque hors de la loss.
+
+On reutilise ReceiptSample pour que le synthetique (des callables) et le reel (des
+chemins) passent par la meme interface.
 """
 
 from __future__ import annotations
@@ -51,13 +53,13 @@ class OcrDataset(Dataset):
             target = ticket_to_linear(sample.ticket)
         pixels = prepare_ocr_pixels(image, self.img_h, self.img_w)
         ids = self.tokenizer.encode(target)[: self.max_len]
-        if ids[-1] != self.tokenizer.eos_id:  # keep EOS after truncation
+        if ids[-1] != self.tokenizer.eos_id:  # on garde l'EOS meme apres troncature
             ids[-1] = self.tokenizer.eos_id
         return torch.from_numpy(pixels), torch.tensor(ids, dtype=torch.long)
 
 
 def make_ocr_collate(pad_id: int):
-    """Collate fn: stack pixels, right-pad target ids to the batch max with ``pad_id``."""
+    """Empile les pixels, et pade les cibles a droite jusqu'au max du batch."""
 
     def collate(batch: list[tuple[torch.Tensor, torch.Tensor]]):
         pixels = torch.stack([b[0] for b in batch])

@@ -1,4 +1,4 @@
-"""Pytest fixtures — env isolation and settings cache reset."""
+"""Fixtures : env isolé et cache de settings remis à zéro entre les tests."""
 
 from __future__ import annotations
 

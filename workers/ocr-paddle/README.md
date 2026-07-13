@@ -33,7 +33,7 @@ téléchargement ni d'accès réseau au cold start.
 | `PRT_PG_HOST` / `PORT` / `DB` / `USER` / `PASSWORD` / `POOL_SIZE` | — / 5432 / `price_tracker` / `pt_app` / — / 4 | Cloud SQL. `PASSWORD` = secret `prt-prod-cloudsql-password`. |
 | `PRT_OIDC_DISABLE` | `0` | `1` = bypass OIDC (dev local uniquement). |
 | `PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS` | — | Allowlist des appelants. |
-| `PRT_LOG_LEVEL` | `INFO` | |
+| `PRT_LOG_LEVEL` | `INFO` | Niveau des logs structlog. |
 
 ## Développement
 

@@ -1,8 +1,7 @@
-"""Receipt-specific augmentations simulating real capture conditions.
+"""Augmentations qui simulent les conditions reelles de prise de vue.
 
-Final resize is 224×224 (CLIP ViT-B/16 @ patch 16 → 197 tokens). The draft
-spec's 448×448 would yield 785 patches and break the frozen CLIP positional
-embeddings — see adapted spec §1 item 5.
+Le resize final est en 224x224 : c'est ce qu'attend CLIP ViT-B/16. Monter a 448
+donnerait 785 patchs et casserait les embeddings positionnels du CLIP gele.
 """
 
 from __future__ import annotations
@@ -10,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image
 
-# CLIP's own normalization stats — mandatory for the frozen encoder.
+# Les stats de normalisation de CLIP. Obligatoires, l'encodeur est gele.
 CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
 
@@ -18,29 +17,29 @@ IMAGE_SIZE = 224
 
 
 def build_train_augmentations():
-    """Training pipeline: capture-noise simulation + resize + CLIP normalize."""
+    """Pipeline d'entrainement : bruit de prise de vue, resize, normalisation CLIP."""
     import albumentations as A
 
     return A.Compose(
         [
-            # Perspective distortion (phone held at an angle).
+            # Le telephone tenu de travers.
             A.Perspective(scale=(0.02, 0.08), p=0.6),
-            # Bad lighting / shadows.
+            # Mauvaise lumiere, ombres.
             A.RandomBrightnessContrast(
                 brightness_limit=0.3, contrast_limit=0.3, p=0.7
             ),
-            # Out-of-focus capture.
+            # Photo floue.
             A.OneOf(
                 [A.MotionBlur(blur_limit=5), A.GaussianBlur(blur_limit=5)],
                 p=0.3,
             ),
-            # Paper crinkle.
+            # Papier froisse.
             A.ElasticTransform(alpha=20, sigma=5, p=0.3),
-            # Thermal paper fade / partial shadowing.
+            # Papier thermique delave, ombre partielle.
             A.RandomShadow(p=0.3),
-            # Not perfectly straight.
+            # Jamais parfaitement droit.
             A.Rotate(limit=5, border_mode=0, p=0.5),
-            # Phone JPEG artifacts.
+            # Les artefacts JPEG du telephone.
             A.ImageCompression(quality_range=(60, 95), p=0.4),
             A.Resize(IMAGE_SIZE, IMAGE_SIZE),
             A.Normalize(mean=CLIP_MEAN, std=CLIP_STD),
@@ -49,7 +48,7 @@ def build_train_augmentations():
 
 
 def build_eval_transform():
-    """Deterministic eval pipeline: resize + CLIP normalize only."""
+    """Pipeline d'eval, deterministe : resize et normalisation CLIP, rien d'autre."""
     import albumentations as A
 
     return A.Compose(
@@ -61,14 +60,14 @@ def build_eval_transform():
 
 
 def prepare_pixels(image: Image.Image, transform) -> "np.ndarray":
-    """PIL image → CHW float32 array via an albumentations transform."""
+    """Image PIL vers un tableau CHW float32, via albumentations."""
     array = np.asarray(image.convert("RGB"))
     transformed = transform(image=array)["image"]
     return np.transpose(transformed, (2, 0, 1)).astype(np.float32)
 
 
 def clip_normalize_pil(image: Image.Image) -> "np.ndarray":
-    """Albumentations-free eval path (used by the runtime provider).
+    """Chemin d'eval sans albumentations, celui qu'utilise le provider a l'inference.
 
     Resize to 224×224 + CLIP mean/std normalize, returns CHW float32.
     """

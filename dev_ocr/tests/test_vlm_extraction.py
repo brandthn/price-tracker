@@ -1,4 +1,4 @@
-"""Tests for VLM extraction orchestration."""
+"""L'orchestration de l'extraction VLM : modes, retries, prompt strict."""
 
 from __future__ import annotations
 

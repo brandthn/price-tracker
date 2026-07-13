@@ -1,14 +1,8 @@
-"""Integration tests against real receipt images on disk.
+"""Tests sur les vraies photos de tickets du disque.
 
-By default only images under ``data/raw/images_tickets_caisse/`` are used
-(local project receipts). The Kaggle cache (~370 images) is **not**
-included unless you opt in with ``--integration-all-data``.
-
-Use ``--integration-max-images N`` to cap how many images are OCR'd per
-run (default ``3``) so ``pytest -m integration`` stays practical on a
-laptop.
-
-A single :class:`PaddleOcrBackend` is shared for the whole session.
+Par défaut on ne prend que images_tickets_caisse/, et seulement 3 images. Le cache
+Kaggle (environ 370 images) n'entre pas dans la danse sans --integration-all-data :
+une OCR par image, ça se compte en heures sur un laptop.
 """
 
 from __future__ import annotations
@@ -63,7 +57,7 @@ def _apply_max_images(images: list[Path], max_images: int) -> list[Path]:
 
 
 def pytest_generate_tests(metafunc):
-    """Parametrize integration tests with a bounded image list at collection time."""
+    """Paramètre les tests avec une liste d'images plafonnée dès la collecte."""
     if "image_path" not in metafunc.fixturenames:
         return
 
@@ -87,7 +81,7 @@ def pytest_generate_tests(metafunc):
 
 @pytest.fixture(scope="session")
 def paddle_backend():
-    """One shared backend for the whole integration session."""
+    """Un seul backend pour toute la session : recharger les poids coûte trop cher."""
     try:
         return PaddleOcrBackend()
     except ImportError:
@@ -99,7 +93,7 @@ def test_extract_receipt_returns_valid_schema(
     image_path: Path,
     paddle_backend: PaddleOcrBackend,
 ) -> None:
-    """OCR + parsing on a real image must return the expected dict schema."""
+    """OCR + parsing sur une vraie image doit rendre le schéma attendu."""
     result = extract_receipt(str(image_path), backend=paddle_backend)
 
     assert "ticket" in result, f"Missing 'ticket' key for {image_path.name}"

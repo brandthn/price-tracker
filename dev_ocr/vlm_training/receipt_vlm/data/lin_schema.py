@@ -1,18 +1,16 @@
-"""Linearized schema — the compact Donut-style target the OCR-VLM decoder emits.
+"""Schema linearise : la cible compacte que le decodeur OCR-VLM produit.
 
-The decoder produces a flat token sequence with field markers; this module converts a
-canonical :class:`Ticket` to/from that sequence. ``linear_to_ticket`` is deliberately
-*forgiving* (best-effort recovery from partial/imperfect model output) — that's the
-"algorithmically treat the output to build the final JSON" step. Round-trips exactly for
-well-formed input (see the unit test at the bottom / ``tests``).
-
-Sequence shape (markers are atomic special tokens, values are raw text)::
+Le decodeur sort une sequence plate avec des marqueurs de champ. Ce module fait la
+conversion dans les deux sens avec le Ticket canonique.
 
     [STORE] Carrefour [DATE] 20260101 12:00 [ADDR] 12 rue ... [ITEM] LAIT 1L [PRICE] 1.09
-        [ITEM] EGGS X6 [QTY] 2 [PRICE] 3.98 [END]
+        [ITEM] OEUFS X6 [QTY] 2 [PRICE] 3.98 [END]
 
-Per item the order is ``[ITEM] name ([QTY] q)? [PRICE] p`` — ``[PRICE]`` closes the item, so
-quantity (omitted when 1) must precede it. Empty header fields are omitted.
+Dans un item, [PRICE] ferme la ligne, donc la quantite (omise quand elle vaut 1) doit
+venir avant. Les champs d'en-tete vides sont omis.
+
+linear_to_ticket est volontairement tolerant : la sortie du modele est rarement
+parfaite, et on prefere recuperer ce qui est recuperable plutot que tout jeter.
 """
 
 from __future__ import annotations
@@ -21,7 +19,7 @@ import re
 
 from receipt_vlm.data.schema import Product, Ticket
 
-# Atomic field-marker tokens (also registered as specials in the tokenizer).
+# Les marqueurs de champ. Ce sont des tokens uniques cote tokenizer.
 TOK_STORE = "[STORE]"
 TOK_DATE = "[DATE]"
 TOK_ADDR = "[ADDR]"
@@ -36,12 +34,12 @@ _MARKER_RE = re.compile("|".join(re.escape(t) for t in FIELD_TOKENS))
 
 
 def _clean(value: str) -> str:
-    """Strip any literal marker substrings + surrounding whitespace from a value."""
+    """Enleve les marqueurs de champ et les espaces autour d'une valeur."""
     return _MARKER_RE.sub(" ", str(value or "")).strip()
 
 
 def ticket_to_linear(ticket: Ticket) -> str:
-    """Serialize a :class:`Ticket` to the linearized target string."""
+    """Serialise un Ticket vers la sequence linearisee."""
     parts: list[str] = []
     store = _clean(ticket.chaine_supermarche)
     if store:
@@ -80,13 +78,13 @@ def _parse_qty(text: str) -> int:
 
 
 def linear_to_ticket(text: str) -> Ticket:
-    """Best-effort parse of a (possibly imperfect) linearized string into a Ticket.
+    """Reconstruit un Ticket depuis une sequence linearisee, meme imparfaite.
 
-    Tolerates missing/duplicated markers, trailing junk, and a missing ``[END]``. A
+    Tolere les marqueurs manquants ou dupliques, la bouillie en fin de sequence, et un
     ``[PRICE]`` (or a new ``[ITEM]``/``[END]``) closes the current product; items without a
     price are dropped. Never raises — returns whatever could be recovered.
     """
-    # Split into (marker, value) chunks, ignoring text before the first marker.
+    # Decoupe en paires (marqueur, valeur), en ignorant ce qui precede le 1er marqueur.
     chunks: list[tuple[str, str]] = []
     pos = 0
     for m in _MARKER_RE.finditer(text or ""):
@@ -116,7 +114,7 @@ def linear_to_ticket(text: str) -> Ticket:
         elif marker == TOK_ADDR:
             addr = value[:120]
         elif marker == TOK_ITEM:
-            _flush(None)  # a new item without a price for the previous one -> drop previous
+            _flush(None)  # un nouvel item sans prix pour le precedent : on jette le precedent
             cur_name = value
         elif marker == TOK_PRICE:
             _flush(_parse_price(value))

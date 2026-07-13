@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""Download Moondream 0.5B int8 weights into data/models/ (gitignored).
-
-Usage (from dev_ocr/)::
+"""Télécharge les poids Moondream 0.5B int8 dans data/models/ (gitignoré).
 
     python scripts/download_moondream_weights.py
     python scripts/download_moondream_weights.py --decompress-only
@@ -44,12 +42,12 @@ def main() -> int:
     parser.add_argument(
         "--decompress-only",
         action="store_true",
-        help="Only decompress an existing .mf.gz in data/models/.",
+        help="Décompresse seulement un .mf.gz déjà présent dans data/models/.",
     )
     parser.add_argument(
         "--keep-gz",
         action="store_true",
-        help="Keep the .mf.gz after decompressing.",
+        help="Garde le .mf.gz après décompression.",
     )
     args = parser.parse_args()
 

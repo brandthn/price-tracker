@@ -1,10 +1,12 @@
-"""Character-level tokenizer for the OCR-VLM decoder target.
+"""Tokenizer caractere pour la cible du decodeur.
 
-Vocabulary = specials (``[PAD] [BOS] [EOS] [UNK]``) + the atomic field-marker tokens from
-:mod:`receipt_vlm.data.lin_schema` + individual characters. Character-level keeps it truly
-open-vocabulary (any Latin-script product name / diacritic decodes, no OOV words); the field
-markers stay single tokens so the schema structure is one symbol each. A small BPE can replace
-this later (plan M3) without touching the model — same ``encode``/``decode`` interface.
+Vocabulaire : les tokens speciaux, les marqueurs de champ du schema linearise, et les
+caracteres. Le caractere garde un vocabulaire vraiment ouvert (n'importe quel nom de
+produit, n'importe quel accent, aucun mot hors vocabulaire), et les marqueurs restent
+des tokens uniques pour que la structure du schema soit un symbole chacun.
+
+Un BPE pourrait le remplacer plus tard sans toucher au modele : meme interface
+encode/decode.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from receipt_vlm.data.lin_schema import FIELD_TOKENS
 PAD, BOS, EOS, UNK = "[PAD]", "[BOS]", "[EOS]", "[UNK]"
 _SPECIALS = (PAD, BOS, EOS, UNK)
 
-# Broad Latin-script default charset (used when not built from a corpus): ASCII printable +
+# Le jeu de caracteres par defaut, quand on ne construit pas depuis un corpus :
 # common Latin-1/Extended-A letters with diacritics, so real receipts rarely hit [UNK].
 _DEFAULT_CHARS = (
     " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`"
@@ -31,10 +33,10 @@ _DEFAULT_CHARS = (
 
 
 class CharTokenizer:
-    """Reversible char + field-marker tokenizer. IDs: specials, then markers, then chars."""
+    """Tokenizer reversible. Les ids vont dans l'ordre : speciaux, marqueurs, caracteres."""
 
     def __init__(self, chars: Iterable[str]) -> None:
-        # Deduplicate chars, keep any that aren't already a special/marker single char.
+        # On dedoublonne, en gardant ce qui n'est pas deja un special ou un marqueur.
         seen: list[str] = []
         for ch in chars:
             if ch and ch not in seen:
@@ -78,7 +80,7 @@ class CharTokenizer:
 
     @classmethod
     def from_corpus(cls, texts: Iterable[str], extra: str = "") -> "CharTokenizer":
-        """Build from the characters actually present in ``texts`` (+ optional extras)."""
+        """Construit le vocabulaire depuis les caracteres reellement presents."""
         chars: list[str] = []
         seen: set[str] = set()
         for text in texts:

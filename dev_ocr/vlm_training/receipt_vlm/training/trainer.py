@@ -1,9 +1,8 @@
-"""Hand-rolled 3-phase training loop — no HuggingFace Trainer.
+"""La boucle d'entrainement, ecrite a la main (pas de Trainer HuggingFace).
 
-Phases (adapted spec §6):
-    1. Projector warmup     — projector only, CORD+SROIE+synthetic
-    2. LoRA fine-tuning     — projector + LoRA, all sources
-    3. JSON alignment       — projector + LoRA, low LR, real photos + synthetic
+Trois temps, et l'ordre compte : on chauffe d'abord le projecteur seul, puis on ouvre
+les LoRA, puis on aligne sur le JSON a faible LR. Un projecteur non entraine qui pousse
+du bruit dans le decodeur ne ferait qu'abimer les LoRA.
 """
 
 from __future__ import annotations
@@ -24,14 +23,7 @@ from receipt_vlm.utils.metrics import evaluate_tickets
 
 
 class ReceiptTrainer:
-    """Raw-PyTorch trainer with mixed precision, clipping and best-val checkpoints.
-
-    Args:
-        model: a :class:`~receipt_vlm.models.vlm.ReceiptVLM`.
-        train_loader / val_loader: dataloaders yielding the dict batches
-            produced by :func:`receipt_vlm.data.dataset.collate_receipts`.
-        config: arbitrary config dict; must contain ``checkpoint_dir``.
-    """
+    """Raw-PyTorch trainer with mixed precision, clipping and best-val checkpoints."""
 
     def __init__(
         self,
@@ -50,7 +42,7 @@ class ReceiptTrainer:
             self.device.type == "cuda" and torch.cuda.is_bf16_supported()
         )
         self.amp_dtype = torch.bfloat16 if self.use_bf16 else torch.float16
-        # GradScaler is only needed for fp16 (bf16 has enough dynamic range).
+        # Le GradScaler ne sert qu'en fp16. Le bf16 a assez de dynamique.
         self.scaler = torch.amp.GradScaler(
             enabled=self.device.type == "cuda" and not self.use_bf16
         )
@@ -67,7 +59,7 @@ class ReceiptTrainer:
         log_every: int = 0,
         start_epoch: int = 0,
     ) -> dict[str, Any]:
-        """Run one curriculum phase; returns the best validation record.
+        """Joue une phase du curriculum, et rend le meilleur score de validation.
 
         Each epoch writes two checkpoints: ``phase{p}_best.pt`` (overwritten on
         improvement, used by export) and a per-epoch ``phase{p}_epoch{NN}_loss{L}.pt``
@@ -119,8 +111,8 @@ class ReceiptTrainer:
             if val_loss < best["val_loss"]:
                 best = record
                 self._save_checkpoint(f"phase{phase}_best.pt", best)
-            # Per-epoch snapshot LAST so a stdout-watching notebook can mirror both
-            # files to durable storage when it sees this "_epoch" save line.
+            # Le snapshot d'epoch est ecrit EN DERNIER : le notebook surveille stdout et
+            # copie les deux fichiers vers un stockage durable quand il voit cette ligne.
             self._save_checkpoint(
                 f"phase{phase}_epoch{epoch + 1:02d}_loss{val_loss:.4f}.pt", record
             )
@@ -192,18 +184,18 @@ class ReceiptTrainer:
             total_loss += loss.item()
             n_batches += 1
 
-            # Generation-based metrics on a budget (constrained decoding is
-            # sequential and would dominate epoch time otherwise). Set
-            # max_gen_samples=0 in config to skip entirely (recommended phase 1).
+            # Les metriques qui passent par une generation sont plafonnees : le decodage
+            # contraint est sequentiel, et il bouffe sinon tout le temps de l'epoch.
+            # max_gen_samples=0 les coupe (a faire en phase 1).
             if max_gen_samples <= 0:
                 continue
             remaining = max_gen_samples - len(predictions)
             if remaining > 0:
-                # Generation must run under the SAME autocast as the training
-                # forward. AMP caches bf16 copies of the autocast-eligible
-                # weights (the LoRA-wrapped q_proj/v_proj); calling generate()
-                # outside autocast feeds an fp32 input into a bf16 weight and
-                # raises "mat1 and mat2 have different dtype". Disabled on CPU.
+                # La generation doit tourner sous le MEME autocast que le forward
+                # d'entrainement. AMP garde des copies bf16 des poids concernes (les
+                # q_proj/v_proj enveloppes de LoRA) : appeler generate() hors autocast
+                # envoie du fp32 dans un poids bf16, et torch leve
+                # "mat1 and mat2 have different dtype".
                 with self._autocast():
                     outputs = self.model.generate(
                         pixel_values[:remaining], constrained=True
@@ -217,7 +209,7 @@ class ReceiptTrainer:
 
     @staticmethod
     def _is_adapter_key(key: str) -> bool:
-        """True for the only tensors we actually train.
+        """Vrai pour les seuls tenseurs qu'on entraine vraiment.
 
         The from-scratch projector and the LoRA adapters are the sole trained
         weights; the frozen CLIP + SmolLM2 backbones are re-created identically
@@ -244,9 +236,9 @@ class ReceiptTrainer:
             "adapter_only": True,
         }
 
-        # Atomic write + read-back verify: a truncated checkpoint (full disk,
-        # killed process, bad transfer) must fail loudly HERE, not hours later
-        # when a downstream phase tries to resume from it.
+        # Ecriture atomique puis relecture. Un checkpoint tronque (disque plein, process
+        # tue, transfert foireux) doit casser ICI, pas trois heures plus tard quand une
+        # phase suivante essaiera de reprendre dessus.
         tmp = path.with_name(path.name + ".tmp")
         torch.save(payload, tmp)
         try:
@@ -263,11 +255,11 @@ class ReceiptTrainer:
 
 
 def load_model_state(model: nn.Module, checkpoint_path: str | Path) -> None:
-    """Load a training checkpoint produced by :class:`ReceiptTrainer`.
+    """Recharge un checkpoint ecrit par le trainer.
 
-    Checkpoints store only the trained projector + LoRA tensors; the frozen
-    backbones already exist from the pretrained init, so the load is non-strict
-    (missing backbone keys are expected). Legacy full checkpoints still load.
+    Un checkpoint ne contient que le projecteur et les LoRA. Les backbones geles
+    viennent deja de l'init pre-entrainee, donc le chargement est non-strict : les
+    cles manquantes sont normales.
     """
     checkpoint = torch.load(
         str(checkpoint_path), map_location="cpu", weights_only=False

@@ -1,7 +1,5 @@
-"""Root :mod:`pytest` configuration.
-
-Adds the ``integration`` marker and the ``--no-integration`` flag, and
-auto-skips integration tests when the real receipt data is missing.
+"""Config pytest : le marqueur `integration`, le flag `--no-integration`, et le
+skip automatique quand les vraies photos de tickets ne sont pas là.
 """
 
 from __future__ import annotations

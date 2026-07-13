@@ -40,7 +40,7 @@ uv run pytest -m "not integration"
 |---|---|
 | `GOOGLE_CLOUD_PROJECT` | Projet GCP |
 | `PRT_BRONZE_BUCKET` | Bucket GCS bronze |
-| `PRT_OCR_ENGINE` | `groq` \| `paddleocr` \| `tesseract` |
+| `PRT_OCR_ENGINE` | `groq` (défaut) ou `paddleocr` |
 | `PRT_PG_HOST` / `_PORT` / `_DB` / `_USER` / `_PASSWORD` | Cloud SQL |
 | `GROQ_API_KEY` | Clé API Groq (secret Manager) |
 | `PRT_OIDC_DISABLE` | `1` en dev uniquement |

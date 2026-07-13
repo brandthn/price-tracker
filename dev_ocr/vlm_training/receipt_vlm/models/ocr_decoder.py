@@ -1,9 +1,8 @@
-"""From-scratch autoregressive decoder for the OCR-VLM.
+"""Decodeur autoregressif de l'OCR-VLM.
 
-A small transformer decoder that cross-attends to the encoder's visual tokens and emits the
-linearized-schema token sequence (see :mod:`receipt_vlm.data.lin_schema`). Hand-rolled
-``torch.nn`` — no pretrained language model. Teacher-forced at train time; greedy at generate
-time (driven from :class:`receipt_vlm.models.ocr_vlm.OcrVLM`).
+Un petit transformer qui fait de la cross-attention sur les tokens visuels de
+l'encodeur et sort la sequence du schema linearise. Teacher forcing a l'entrainement,
+decodage glouton a la generation.
 """
 
 from __future__ import annotations
@@ -44,7 +43,8 @@ class OcrDecoder(nn.Module):
     ) -> torch.Tensor:
         T = tgt_ids.size(1)
         x = self.token_embedding(tgt_ids) + self.pos_embedding[:, :T]
-        # Bool causal mask (True = masked); bool for both masks avoids the mixed-type warning.
+        # Masque causal en booleen (True = masque). Les deux masques en bool, sinon
+        # torch rale sur les types melanges.
         causal = torch.ones(T, T, dtype=torch.bool, device=tgt_ids.device).triu(1)
         h = self.transformer(
             x, memory, tgt_mask=causal, tgt_key_padding_mask=tgt_key_padding_mask

@@ -1,9 +1,9 @@
-"""CORD-v2 adapter — phase-1 vision→language alignment only.
+"""Adaptateur CORD : pour l'alignement vision-langage, rien de plus.
 
-CORD (`naver-clova-ix/cord-v2`) is a Korean/English receipt dataset. The
-mapping to the canonical schema is intentionally lossy (no store chain or
-address in most samples): it teaches *layout grounding*, not French
-extraction — see adapted spec §1 item 6.
+CORD est un jeu de tickets coreens et anglais. Le mapping vers le schema canonique perd
+beaucoup (ni enseigne ni adresse dans la plupart des echantillons), et c'est assume :
+ce dataset apprend au modele a situer le texte dans une mise en page, pas a extraire un
+ticket francais.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ _NUMERIC = re.compile(r"[-+]?\d[\d.,]*")
 
 
 def _parse_price(raw) -> Optional[float]:
-    """CORD prices come as strings like '2,000' or '12.000' (KRW) or '3.50'."""
+    """Les prix CORD arrivent en chaine : '2,000', '12.000' (des wons) ou '3.50'."""
     if raw is None:
         return None
     if isinstance(raw, (int, float)):
@@ -28,7 +28,7 @@ def _parse_price(raw) -> Optional[float]:
     if not match:
         return None
     text = match.group(0)
-    # Thousands separators: drop separators followed by exactly 3 digits.
+    # Separateurs de milliers : on jette ceux suivis d'exactement 3 chiffres.
     text = re.sub(r"[,.](?=\d{3}(\D|$))", "", text)
     text = text.replace(",", ".")
     try:
@@ -56,7 +56,7 @@ def _menu_entries(gt_parse: dict) -> Iterator[dict]:
 
 
 def ticket_from_cord_ground_truth(ground_truth: str | dict) -> Ticket:
-    """Map a CORD ``ground_truth`` payload to a canonical :class:`Ticket`."""
+    """Convertit un ground_truth CORD en Ticket canonique."""
     payload = (
         json.loads(ground_truth) if isinstance(ground_truth, str) else ground_truth
     )
@@ -79,7 +79,7 @@ def ticket_from_cord_ground_truth(ground_truth: str | dict) -> Ticket:
 
 
 class _CordImageLoader:
-    """Lazy, picklable image accessor (decodes one image per call).
+    """Acces paresseux et picklable : une image decodee par appel, pas 800 en RAM.
 
     Avoids holding hundreds of decoded PIL images in RAM and survives
     DataLoader worker pickling on Windows (a lambda would not).
@@ -94,13 +94,13 @@ class _CordImageLoader:
 
 
 def load_cord_samples(split: str = "train", limit: Optional[int] = None) -> list[ReceiptSample]:
-    """Load CORD-v2 from the HuggingFace hub as canonical ReceiptSamples.
+    """Charge CORD-v2 depuis HuggingFace et le convertit en ReceiptSample.
 
-    Ground truths are mapped eagerly (cheap column access — images stay
+    Les ground truths sont mappes tout de suite (l'acces colonne est bon marche,
     undecoded); images load lazily at __getitem__ time. Samples whose mapping
     yields zero products are dropped (useless targets).
     """
-    from datasets import load_dataset  # heavy import, training-only
+    from datasets import load_dataset  # import lourd, uniquement a l'entrainement
 
     dataset = load_dataset("naver-clova-ix/cord-v2", split=split)
     samples: list[ReceiptSample] = []

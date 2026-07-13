@@ -9,10 +9,9 @@ Un des 5 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
 commun vit dans [`libs/pricetracker_receipt_pipeline`](../../libs/pricetracker_receipt_pipeline).
 Contrairement aux autres backends VLM, il n'existait **aucun provider** dans
 `receipt_ocr` pour ce modèle (il n'était appelé que par les scripts d'éval) :
-`scratch_backend.py` est donc écrit ici, et implémente `OcrBackend` **en
-direct** — pas de `VlmBackend`/`VlmProvider`, puisque le modèle n'a ni prompt,
-ni modes, ni retries. La recette d'inférence reproduit
-`dev_ocr/vlm_training/scripts/evaluate_ocr_vlm.py`.
+`scratch_backend.py` est donc écrit ici et implémente `OcrBackend` en direct :
+pas de `VlmBackend` ni de `VlmProvider`, puisque le modèle n'a ni prompt, ni modes,
+ni retries. Il prend une image, il rend un ticket.
 
 Le **code du modèle** reste dans `dev_ocr/vlm_training` (paquet `receipt_vlm`),
 consommé en lecture seule via `[tool.uv.sources]` — même mécanisme que
@@ -26,8 +25,9 @@ consommé en lecture seule via `[tool.uv.sources]` — même mécanisme que
 `ReceiptParser` (court-circuit `try_parse_vlm_json`) → `alias_lookup` (EAN) →
 écriture atomique.
 
-Réponses : `204` = ACK (succès **ou** échec déterministe), `400` = payload
-malformé (ACK), `5xx` = erreur transitoire → NACK → retry → DLQ après 5 essais.
+Contrat HTTP commun à tous les workers OCR : `204` acquitte le message (que
+l'OCR ait réussi ou qu'il ait échoué pour de bon), `400` pour un payload malformé,
+et `5xx` uniquement sur panne transitoire, là où un retry a du sens.
 
 ## Poids modèle — DEUX fichiers
 
@@ -71,7 +71,7 @@ réelle a lieu sur Cloud Run.
 | `PRT_PG_HOST` / `PORT` / `DB` / `USER` / `PASSWORD` / `POOL_SIZE` | — / 5432 / `price_tracker` / `pt_app` / — / 4 | Cloud SQL. `PASSWORD` = secret `prt-prod-cloudsql-password`. |
 | `PRT_OIDC_DISABLE` | `0` | `1` = bypass OIDC (dev local uniquement). |
 | `PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS` | — | Allowlist des appelants. |
-| `PRT_LOG_LEVEL` | `INFO` | |
+| `PRT_LOG_LEVEL` | `INFO` | Niveau des logs structlog. |
 
 ## Développement
 

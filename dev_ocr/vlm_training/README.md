@@ -5,27 +5,29 @@ sortir directement le schéma canonique du projet
 (`{"ticket": {"date", "chaine_supermarche", "adresse", "produits": [...]}}`) — donc
 sans rien changer au parsing/validation de `receipt_ocr` à l'inférence.
 
-L'architecture, ~466M de paramètres dont ~18M réellement entraînés :
+L'architecture, environ 457M de paramètres mais seulement une vingtaine de
+millions réellement entraînés :
 
-- encodeur vision **CLIP ViT-B/16**, pré-entraîné, gelé (~86M) ;
+- encodeur vision **CLIP ViT-B/16**, pré-entraîné, gelé ;
 - **projecteur multimodal** écrit à la main (cross-attention + 32 query tokens
-  appris, ~14M) — c'est la pièce qu'on entraîne vraiment ;
-- décodeur **SmolLM2-360M-Instruct**, pré-entraîné, gelé (~360M) ;
-- **LoRA fait main** sur chaque `q_proj` / `v_proj` (~4M, sans `peft`) ;
+  appris) : c'est la pièce qu'on entraîne vraiment ;
+- décodeur **SmolLM2-360M-Instruct**, pré-entraîné, gelé ;
+- **LoRA fait main** sur chaque `q_proj` / `v_proj`, sans `peft` ;
 - **décodage contraint JSON** : machine à états qui masque les tokens, 0 paramètre.
 
 ## Ce qu'il y a dans le package
 
 ```
 receipt_vlm/
-├── models/      vlm.py, projector.py, lora.py, constrained.py (masque JSON),
-│                ocr_vlm.py + ocr_encoder/ocr_decoder (la variante OCR pure)
-├── data/        synthetic.py (génération de faux tickets français), tokenizer.py,
-│                schema.py, augmentation.py, real_photos.py,
-│                et les adaptateurs de datasets publics :
-│                cord_adapter, sroie_adapter, wildreceipt_adapter,
-│                trainingdatapro_adapter
-├── training/    trainer.py — le curriculum en 3 temps
+├── models/      vlm.py (l'assemblage), projector.py, lora.py,
+│                constrained.py (le masque JSON),
+│                ocr_vlm.py + ocr_encoder.py / ocr_decoder.py (la variante OCR pure)
+├── data/        synthetic.py (génération de faux tickets), samples.py, dataset.py,
+│                ocr_dataset.py, tokenizer.py, schema.py, lin_schema.py,
+│                augmentation.py, ocr_transform.py, locales.py, real_photos.py,
+│                et les adaptateurs de datasets publics : cord_adapter,
+│                sroie_adapter, wildreceipt_adapter, trainingdatapro_adapter
+├── training/    trainer.py, le curriculum en 3 temps
 └── utils/       metrics.py
 ```
 

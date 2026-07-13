@@ -1,11 +1,12 @@
 # pricetracker-receipt-pipeline
 
-Code commun des workers OCR « un worker par backend » (`workers/ocr-paddle`,
-`ocr-ppocrv4`, `ocr-vlm-moondream`, `ocr-vlm-groq`, `ocr-vlm-receipt`,
-`ocr-vlm-scratch`).
+Code commun des workers OCR « un worker par backend » : `workers/ocr-paddle`,
+`ocr-vlm-moondream`, `ocr-vlm-scratch`.
 
-`dev_ocr/` reste la source de recherche, non modifiée. Cette lib en est une
-copie figée, adaptée au déploiement.
+`dev_ocr/` reste la source de recherche. Cette lib en est une copie figée, adaptée
+au déploiement : un correctif de parsing doit donc être porté ici pour atteindre la
+prod, ce qui est le prix à payer pour que `dev_ocr` puisse bouger sans redéployer
+quoi que ce soit.
 
 ## Deux couches
 
@@ -17,15 +18,16 @@ copie figée, adaptée au déploiement.
 | `constants.py` | Schéma de sortie, enums, noms des env vars `RECEIPT_*`. |
 | `exceptions.py` | `ReceiptOcrError` → `OcrBackendError`, `ReceiptParseError`. |
 | `vlm_parse.py` / `vlm_validate.py` / `vlm_image_prep.py` / `vlm_text_cleanup.py` | Helpers VLM (parsing JSON, validation → retry, crop+resize, nettoyage). |
-| `image_utils.py` | Redimensionnement pour les backends OCR classiques. |
+| `env.py` | Lecture typée des env vars (pas de chargement de `.env` : la config vient de Cloud Run). |
 | `backends/base.py` | ABC `OcrBackend` : `extract_text(image_path) -> str`. |
 | `backends/vlm_backend.py` | `VlmBackend(provider)` — provider **obligatoire** (pas de registre). |
 | `backends/vlm/` | ABC `VlmProvider`, `run_vlm_extraction` (modes + retries), multipass, prompts. |
 
 Non copié depuis `dev_ocr` : `extract_receipt.py` et `backends/vlm/registry.py`
-(factories — chaque worker câble un seul backend en dur), `env.py` (remplacé par
-pydantic-settings), les stubs tesseract/easyocr, et les backends concrets (ils
-vivent dans le worker qui les utilise).
+(des factories, inutiles quand le worker câble un seul backend en dur), les stubs
+tesseract/easyocr, et les backends concrets. Ces derniers vivent dans le worker qui
+les utilise, pour que `paddlepaddle` ne parte pas dans l'image Moondream ni `torch`
+dans l'image Paddle.
 
 ### 2. Runtime worker (`worker/`) — calqué sur `workers/ocr-llm`
 

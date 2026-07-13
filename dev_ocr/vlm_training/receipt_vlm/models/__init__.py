@@ -1,1 +1,1 @@
-"""Model components: projector, LoRA, constrained decoding, full assembly."""
+"""Projecteur, LoRA, decodage contraint, assemblage."""

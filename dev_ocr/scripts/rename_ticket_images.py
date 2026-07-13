@@ -1,21 +1,12 @@
 #!/usr/bin/env python3
-"""Rename receipt images to ``image_1.ext``, ``image_2.ext``, … (extensions unchanged).
+"""Renomme les images de tickets en image_1.ext, image_2.ext, etc.
 
-Quick guide
------------
-**What it does:** Sorts images in a folder (A→Z), renames them ``image_1.jpg``,
-``image_2.png``, etc., and writes ``rename_manifest.json`` (old → new names).
+Tri alphabétique du dossier, puis renommage, et un rename_manifest.json qui garde
+la correspondance ancien -> nouveau. Les fichiers déjà nommés image_N.ext sont
+sautés, donc le script est rejouable après avoir ajouté des photos.
 
-**Default folder:** ``data/raw/images_tickets_caisse/``
-
-**Preview (no changes):** ``python scripts/rename_ticket_images.py --dry-run``
-
-**Rename:** ``python scripts/rename_ticket_images.py``
-
-**Custom folder:** ``python scripts/rename_ticket_images.py --dir path/to/my/images``
-
-**Note:** Already-named ``image_N.ext`` files are skipped. Re-run after adding new
-photos; check ``rename_manifest.json`` for the full mapping.
+    python scripts/rename_ticket_images.py --dry-run
+    python scripts/rename_ticket_images.py --dir chemin/vers/mes/images
 """
 
 from __future__ import annotations
@@ -34,7 +25,7 @@ def rename_ticket_images(
     *,
     dry_run: bool = False,
 ) -> list[tuple[str, str]]:
-    """Rename images alphabetically to ``image_N<ext>``. Returns old→new names."""
+    """Renomme les images dans l'ordre alphabétique. Rend les paires ancien/nouveau."""
     if not directory.is_dir():
         raise FileNotFoundError(directory)
 

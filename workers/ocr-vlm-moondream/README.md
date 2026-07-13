@@ -12,8 +12,9 @@ seul `moondream_provider.py` est propre à ce worker.
 `tickets.gcs_path` → image GCS → `MoondreamProvider` (poids `.mf` locaux) →
 `ReceiptParser` → `alias_lookup` (EAN) → écriture atomique.
 
-Réponses : `204` = ACK (succès **ou** échec déterministe), `400` = payload
-malformé (ACK), `5xx` = erreur transitoire → NACK → retry → DLQ après 5 essais.
+Contrat HTTP commun aux workers OCR : `204` acquitte (succès comme échec
+déterministe), `400` sur payload malformé, `5xx` seulement sur panne transitoire,
+qui part alors en retry puis en DLQ.
 
 ## Poids modèle
 
@@ -42,7 +43,7 @@ gsutil cp dev_ocr/data/models/moondream-0_5b-int8.mf \
 | `PRT_PG_HOST` / `PORT` / `DB` / `USER` / `PASSWORD` / `POOL_SIZE` | — / 5432 / `price_tracker` / `pt_app` / — / 4 | Cloud SQL. `PASSWORD` = secret `prt-prod-cloudsql-password`. |
 | `PRT_OIDC_DISABLE` | `0` | `1` = bypass OIDC (dev local uniquement). |
 | `PRT_OIDC_ALLOWED_SERVICE_ACCOUNTS` | — | Allowlist des appelants. |
-| `PRT_LOG_LEVEL` | `INFO` | |
+| `PRT_LOG_LEVEL` | `INFO` | Niveau des logs structlog. |
 
 ## Développement
 

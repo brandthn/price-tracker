@@ -1,4 +1,4 @@
-"""Tests for MoondreamProvider (mocked — no real model weights)."""
+"""MoondreamProvider, mocké : aucun poids réel n'est chargé."""
 
 from __future__ import annotations
 

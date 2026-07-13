@@ -1,36 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke test: extract one receipt via Groq vision (JSON mode).
+"""Passe un ticket dans Groq (mode JSON) et affiche le résultat.
 
-Runs ``extract_receipt`` with the Groq provider and prints the structured JSON
-to stdout (README schema: ticket date, store, address, products).
+Demande requirements-groq.txt installé et GROQ_API_KEY dans le .env. Sans argument,
+prend la première image de data/raw/images_tickets_caisse/.
 
-Prerequisites
--------------
-- ``pip install -r requirements-groq.txt``
-- API key in ``.env`` at the repo root: ``GROQ_API_KEY`` or ``groq_key``
-- From the repo root, set ``PYTHONPATH`` so the package imports
-
-Usage — specific image path
----------------------------
-Pass the full or relative path to one receipt image as the first argument.
-The script prints the parsed JSON; progress and timing go to stderr.
-
-PowerShell (repo root)::
-
-    $env:PYTHONPATH = "src"
     python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/image_2.jpg
-
-bash::
-
-    export PYTHONPATH=src
-    python scripts/test_groq_receipt.py data/raw/images_tickets_caisse/image_2.jpg
-
-Windows absolute path example::
-
-    python scripts/test_groq_receipt.py "D:\\photos\\mon_ticket.jpg"
-
-If you omit the argument, the script uses the first ``.jpg`` / ``.png`` / ``.webp``
-file in ``data/raw/images_tickets_caisse/`` (or errors if that folder is empty).
 """
 
 from __future__ import annotations
@@ -54,7 +28,7 @@ from receipt_ocr.constants import ENV_VLM_MODE, ENV_VLM_MODEL, VlmModelName, Vlm
 
 
 def _resolve_image_path(raw: str) -> Path:
-    """Resolve ``raw`` against repo root; accept file or directory."""
+    """Résout le chemin depuis la racine du repo. Accepte un fichier ou un dossier."""
     path = Path(raw)
     if not path.is_absolute():
         path = ROOT / path
@@ -78,7 +52,7 @@ def main() -> int:
         "image",
         nargs="?",
         default=str(ROOT / "data" / "raw" / "images_tickets_caisse"),
-        help="Receipt image path (default: first file in images_tickets_caisse/)",
+        help="Chemin de l'image (défaut : la première de images_tickets_caisse/)",
     )
     args = parser.parse_args()
 

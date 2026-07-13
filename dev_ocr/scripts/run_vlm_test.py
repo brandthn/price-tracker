@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run VLM extract_receipt on one image and print JSON."""
+"""Lance le backend VLM sur une image et affiche le JSON."""
 
 from __future__ import annotations
 

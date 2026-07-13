@@ -1,4 +1,4 @@
-"""Tests for :class:`receipt_ocr.backends.ppocr_v4_backend.PpOcrV4MobileBackend`."""
+"""Tests de PpOcrV4MobileBackend."""
 
 from __future__ import annotations
 
