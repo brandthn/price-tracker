@@ -1,0 +1,6 @@
+# Phase 2 — LoRA fine-tuning: French receipt understanding.
+phase: 2
+lr: 1.0e-4
+epochs: 10
+trainable: [projector, lora_]
+sources: [synthetic, real]

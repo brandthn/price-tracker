@@ -1,0 +1,22 @@
+# Phase 1 — local RTX 2070 friendly subset (~2–4 h).
+# On-the-fly diverse synthetic (no extra PNG disk use) + small CORD slice.
+phase: 1
+lr: 3.0e-4
+epochs: 3
+trainable: [projector]
+sources: [cord, synthetic]
+max_gen_samples: 0      # skip slow constrained-decoding val in phase 1
+log_every: 100
+batch_size: 4
+
+model:
+  gradient_checkpointing: true
+
+data:
+  synthetic_on_the_fly: true
+  synthetic_count: 1200
+  synthetic_diverse: true
+  synthetic_distort: true
+  synthetic_distort_intensity: medium
+  cord_limit: 150
+  synthetic_val_fraction: 0.05

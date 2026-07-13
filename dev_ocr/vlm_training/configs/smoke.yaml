@@ -1,0 +1,11 @@
+# Pipeline smoke test — tiny subset, 1 epoch, validates the full loop end-to-end.
+phase: 1
+lr: 3.0e-4
+epochs: 1
+trainable: [projector]
+sources: [synthetic]
+batch_size: 4
+num_workers: 0
+max_gen_samples: 2
+data:
+  synthetic_limit: 48

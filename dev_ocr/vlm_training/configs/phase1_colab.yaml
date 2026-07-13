@@ -1,0 +1,12 @@
+# Phase 1 on Colab — projector warmup (CORD + on-the-fly synthetic).
+# Est. ~45–90 min on T4 with max_gen_samples: 0.
+
+phase: 1
+lr: 3.0e-4
+epochs: 5
+trainable: [projector]
+sources: [cord, synthetic]
+max_gen_samples: 0
+
+data:
+  synthetic_count: 3000
