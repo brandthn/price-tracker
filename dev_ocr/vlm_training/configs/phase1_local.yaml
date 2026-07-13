@@ -1,0 +1,22 @@
+# Phase 1 en local : un sous-ensemble reduit, synthetique a la volee et petite
+# tranche de CORD.
+phase: 1
+lr: 3.0e-4
+epochs: 3
+trainable: [projector]
+sources: [cord, synthetic]
+max_gen_samples: 0
+log_every: 100
+batch_size: 4
+
+model:
+  gradient_checkpointing: true
+
+data:
+  synthetic_on_the_fly: true
+  synthetic_count: 1200
+  synthetic_diverse: true
+  synthetic_distort: true
+  synthetic_distort_intensity: medium
+  cord_limit: 150
+  synthetic_val_fraction: 0.05

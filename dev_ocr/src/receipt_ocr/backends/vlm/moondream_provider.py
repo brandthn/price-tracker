@@ -1,4 +1,4 @@
-"""Moondream local provider (0.5B int8 by default)."""
+"""Moondream en local (0.5B int8 par défaut)."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from receipt_ocr.constants import (
     MOONDREAM_0_5B_FILENAMES,
     VlmModelName,
 )
+from receipt_ocr.env import env_float, env_int
 from receipt_ocr.exceptions import OcrBackendError
 from receipt_ocr.vlm_image_prep import (
     VlmImageConfig,
@@ -27,34 +28,11 @@ from receipt_ocr.vlm_image_prep import (
     prepare_vlm_image,
 )
 
-# Set to True to allow Moondream Cloud (MOONDREAM_API_KEY) when no local .mf file.
-_ENABLE_MOONDREAM_CLOUD = False
-
 _DEFAULT_MODEL_DIRS = (
     Path("data/models"),
     Path.home() / ".cache" / "receipt_ocr" / "models",
     Path.home() / ".cache" / "moondream",
 )
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return int(raw.strip())
-    except ValueError:
-        return default
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return float(raw.strip())
-    except ValueError:
-        return default
 
 
 def resolve_moondream_model_path(explicit: str | Path | None = None) -> Path | None:
@@ -103,8 +81,8 @@ class MoondreamProvider(VlmProvider):
                 jpeg_quality=self._image_config.jpeg_quality,
             )
         self._local_path = resolve_moondream_model_path(model_path)
-        self._temperature = _env_float(ENV_VLM_TEMPERATURE, DEFAULT_VLM_TEMPERATURE)
-        self._max_tokens = _env_int(ENV_VLM_MAX_TOKENS, DEFAULT_VLM_MAX_TOKENS)
+        self._temperature = env_float(ENV_VLM_TEMPERATURE, DEFAULT_VLM_TEMPERATURE)
+        self._max_tokens = env_int(ENV_VLM_MAX_TOKENS, DEFAULT_VLM_MAX_TOKENS)
         self._model: Any = None
         self._init_model()
 
@@ -125,31 +103,17 @@ class MoondreamProvider(VlmProvider):
                 "Install with: pip install -r requirements-vlm.txt"
             ) from exc
 
+        if self._local_path is None:
+            raise OcrBackendError(
+                "Moondream local weights not found. Set "
+                f"{ENV_VLM_MODEL_PATH}, or drop the .mf in data/models/."
+            )
+
         try:
-            if self._local_path is not None:
-                self._model = md.vl(model=str(self._local_path))
-            elif _ENABLE_MOONDREAM_CLOUD:
-                api_key = os.environ.get("MOONDREAM_API_KEY")
-                if api_key:
-                    self._model = md.vl(api_key=api_key)
-                else:
-                    raise OcrBackendError(self._missing_local_weights_message())
-            else:
-                raise OcrBackendError(self._missing_local_weights_message())
-        except OcrBackendError:
-            raise
+            self._model = md.vl(model=str(self._local_path))
         except Exception as exc:
             raise OcrBackendError(f"Failed to load Moondream model: {exc}") from exc
 
-    @staticmethod
-    def _missing_local_weights_message() -> str:
-        return (
-            "Moondream local weights not found. During development only local "
-            "inference is enabled (cloud API fallback is off).\n"
-            f"  1. Download moondream-0_5b-int8.mf and set {ENV_VLM_MODEL_PATH}, or\n"
-            "  2. Place the file in data/models/ or ~/.cache/receipt_ocr/models/.\n"
-            "See README (VLM backend section) for download links."
-        )
 
     def analyze(self, image_path: str, prompt: str) -> str:
         return self.analyze_with_options(image_path, prompt, crop_mode=None)
@@ -168,7 +132,8 @@ class MoondreamProvider(VlmProvider):
             crop_mode_override=crop_mode,
         )
         try:
-            return self._query(inference_path, prompt)
+            encoded = self._encode_path(inference_path)
+            return self._query_encoded(encoded, prompt)
         except OcrBackendError:
             raise
         except Exception as exc:
@@ -179,7 +144,7 @@ class MoondreamProvider(VlmProvider):
             cleanup_temp_files(temp_files)
 
     def analyze_queries(self, image_path: str, prompts: list[str]) -> list[str]:
-        """Encode the image once, then run several prompts (multi-pass mode)."""
+        """Encode l'image une fois, puis enchaîne les prompts (mode multipass)."""
         path = OcrBackend._validate_image_path(image_path)
         inference_path, temp_files = prepare_vlm_image(path, self._image_config)
         try:
@@ -205,10 +170,6 @@ class MoondreamProvider(VlmProvider):
             if hasattr(self._model, "encode_image"):
                 return self._model.encode_image(rgb)
             return rgb
-
-    def _query(self, image_path: str, prompt: str) -> str:
-        encoded = self._encode_path(image_path)
-        return self._query_encoded(encoded, prompt)
 
     def _query_encoded(self, encoded: Any, prompt: str) -> str:
         settings = {

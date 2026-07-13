@@ -1,14 +1,7 @@
-"""Integration tests — EAN resolution via product_aliases (testcontainers).
+"""Résolution EAN via product_aliases, sur un vrai Postgres (testcontainers).
 
-Exercises the SHARED matcher (`pricetracker_matching.alias_lookup.resolve_line_eans`)
-against a real Postgres seeded with a small product_aliases corpus, then proves
-the tier-1 write path (`pg.upsert_prix_extraits`) persists the filled fields.
-The tier-2 worker calls the exact same function at the same hook; its parity is
-covered by workers/ocr-llm/tests/test_alias_lookup.py.
-
-Covered: exact hit (catalogue), exact hit (user-validation), source priority,
-enseigne discordante, plain miss, null-EAN alias, normaliser symmetry (accents
-+ case + punctuation).
+Le matcher est partagé avec le tier-2, qui l'appelle au même endroit : la parité
+entre les deux est vérifiée dans workers/ocr-llm/tests/test_alias_lookup.py.
 """
 
 from __future__ import annotations
@@ -77,14 +70,14 @@ CREATE TABLE IF NOT EXISTS product_aliases (
 _ALIASES = [
     ("Pain Complet", "Carrefour", "catalogue", "3270190123456", 0.7, False),
     ("LAIT UHT", "Carrefour Market", "user-validation", "3560070111111", 1.0, True),
-    # Same normalised key + enseigne from two sources → user-validation must win.
+    # Même clé normalisée et même enseigne, deux sources : la validation utilisateur gagne.
     ("YAOURT NATURE", "Carrefour", "catalogue", "3000000000001", 0.7, False),
     ("YAOURT NATURE", "Carrefour", "user-validation", "3000000000002", 1.0, True),
-    # Different enseigne → must NOT match a Carrefour ticket.
+    # Enseigne différente : ne doit pas matcher un ticket Carrefour.
     ("Beurre Doux", "Leclerc", "catalogue", "3111111111111", 0.7, False),
-    # No EAN → cannot resolve anything.
+    # Pas d'EAN, donc rien à résoudre.
     ("VRAC LEGUMES", "Carrefour", "catalogue", None, 0.7, False),
-    # Accents + case + punctuation exercised by the shared normaliser.
+    # Accents, casse et ponctuation : c'est le normaliseur partagé qui encaisse.
     ("cafe ethiopie 250g", "Carrefour", "catalogue", "3222222222222", 0.7, False),
 ]
 
@@ -177,7 +170,7 @@ async def test_source_priority_user_beats_catalogue(pool):
 
 @pytest.mark.integration
 async def test_enseigne_discordante_no_match(pool):
-    # Beurre Doux only exists under Leclerc → a Carrefour ticket must not match.
+    # Le Beurre Doux n'existe que chez Leclerc : un ticket Carrefour ne doit pas matcher.
     rows, _ = await _resolve(pool, "CARREFOUR MARKET", ["BEURRE DOUX"])
     row = rows[0]
     assert row["ean"] is None
@@ -228,7 +221,7 @@ async def test_stats_counters(pool):
     assert stats.n_resolved_user == 2
     assert stats.n_resolved_catalogue == 2
     assert stats.n_resolved_total == 4
-    # user hits (2) clear needs_validation ; the other 5 lines still need it.
+    # Les 2 lignes validees par l'utilisateur sortent de la file ; les 5 autres y restent.
     assert stats.n_needs_validation == 5
 
 
@@ -247,8 +240,8 @@ class _RaisingPool:
 
 
 async def test_read_failure_is_best_effort_no_raise():
-    # A DB read failure must NEVER block ticket persistence: the matcher swallows
-    # it, leaves lines unresolved, and returns truthful counters — no exception.
+    # Une panne de lecture en base ne doit jamais bloquer l'écriture du ticket : le
+    # matcher l'absorbe, laisse les lignes non résolues, et ne lève rien.
     rows = [_line(0, "PAIN COMPLET"), _line(1, "lait uht")]
     stats = await alias_lookup.resolve_line_eans(_RaisingPool(), "CARREFOUR MARKET", rows)
     for row in rows:

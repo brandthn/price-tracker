@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark VLM modes on local receipt images."""
+"""Compare les trois modes VLM (transcribe / json / multipass) sur des tickets locaux."""
 
 from __future__ import annotations
 

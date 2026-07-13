@@ -1,33 +1,27 @@
-"""PP-OCRv4 mobile backend — optimised for speed (ONNX-first).
+"""PP-OCRv4 mobile — la variante rapide (~1-3 s/image sur un CPU correct),
+poids mobile + entrée réduite à 640 px.
 
-Targets ~1–3 s per image on mobile-class CPUs when using ONNX Runtime
-with ``PP-OCRv4_mobile_det`` and a reduced input size (640 px default).
+On essaie les profils dans l'ordre jusqu'à ce qu'un tienne sur la machine :
+static+mobile d'abord, dynamic+modèles par défaut en dernier recours.
 
-Initialisation tries engines in order until one works on the host:
-
-1. ``paddle_static`` + ``PP-OCRv4_mobile_det`` (fastest on many hosts)
-2. ``paddle_dynamic`` + default models (last-resort fallback; slower)
-
-Note: PaddleOCR 3.5's public ``engine=`` parameter does not include
-``onnxruntime`` (that is a per-model binding inside PaddleX). A dedicated
-ONNX Runtime backend can be added later for true mobile deployment.
+Le `engine=` public de PaddleOCR 3.5 ne propose pas onnxruntime (c'est un
+binding par modèle dans PaddleX) — donc pas d'ONNX ici pour l'instant.
 """
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from receipt_ocr.backends.base import OcrBackend
-from receipt_ocr.backends.paddle_backend import PaddleOcrBackend, _env_int
+from receipt_ocr.backends.paddle_backend import PaddleOcrBackend
 from receipt_ocr.constants import (
     DEFAULT_PPOCRV4_MAX_IMAGE_SIDE,
     ENV_PPOCRV4_MAX_IMAGE_SIDE,
     PADDLE_MOBILE_DET_MODEL,
 )
+from receipt_ocr.env import env_int
 from receipt_ocr.exceptions import OcrBackendError
 
-# Engine profiles tried in order (fast / mobile-first).
 _INIT_PROFILES: tuple[dict[str, Any], ...] = (
     {
         "label": "ppocrv4-static-mobile",
@@ -43,22 +37,6 @@ _INIT_PROFILES: tuple[dict[str, Any], ...] = (
 
 
 class PpOcrV4MobileBackend(OcrBackend):
-    """Fast OCR using PP-OCRv4 mobile weights via PaddleOCR 3.x.
-
-    Wraps :class:`PaddleOcrBackend` internally and picks the first working
-    engine profile on this machine.
-
-    Parameters
-    ----------
-    lang:
-        Language code for recognition (default ``"fr"``).
-    max_image_side:
-        Longest image side before OCR (default 640). Override via
-        ``RECEIPT_OCR_PPOCRV4_MAX_IMAGE_SIDE``.
-    **paddle_kwargs:
-        Extra arguments forwarded to :class:`paddleocr.PaddleOCR`.
-    """
-
     def __init__(
         self,
         lang: str | None = "fr",
@@ -68,7 +46,7 @@ class PpOcrV4MobileBackend(OcrBackend):
         side = (
             max_image_side
             if max_image_side is not None
-            else _env_int(ENV_PPOCRV4_MAX_IMAGE_SIDE, DEFAULT_PPOCRV4_MAX_IMAGE_SIDE)
+            else env_int(ENV_PPOCRV4_MAX_IMAGE_SIDE, DEFAULT_PPOCRV4_MAX_IMAGE_SIDE)
         )
 
         errors: list[str] = []

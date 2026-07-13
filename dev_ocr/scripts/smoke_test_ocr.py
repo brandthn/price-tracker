@@ -1,17 +1,9 @@
-"""Quick smoke test: OCR one receipt image and print structured output.
-
-Usage (from repo root)::
+"""OCR une image de ticket et affiche la sortie structurée.
 
     python scripts/smoke_test_ocr.py
-    python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/image_2.jpg
-    python scripts/smoke_test_ocr.py --backend ppocrv4
+    python scripts/smoke_test_ocr.py data/raw/images_tickets_caisse/image_2.jpg --backend ppocrv4
 
-Environment variables (optional)::
-
-    RECEIPT_OCR_MAX_IMAGE_SIDE=1280
-    RECEIPT_OCR_PPOCRV4_MAX_IMAGE_SIDE=640
-    RECEIPT_OCR_CPU_THREADS=2
-    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+Variables utiles : RECEIPT_OCR_MAX_IMAGE_SIDE, RECEIPT_OCR_CPU_THREADS.
 """
 
 from __future__ import annotations
@@ -58,12 +50,12 @@ def main() -> int:
         "--backend",
         choices=("paddle", "ppocrv4", "vlm"),
         default="ppocrv4",
-        help="OCR backend to use (default: ppocrv4).",
+        help="Backend OCR (défaut : ppocrv4).",
     )
     parser.add_argument(
         "--raw-only",
         action="store_true",
-        help="Print raw OCR text only (skip structured parsing).",
+        help="Affiche seulement le texte OCR brut, sans parsing.",
     )
     args = parser.parse_args()
 
@@ -97,7 +89,6 @@ def main() -> int:
         t1 = time.perf_counter()
         text = backend.extract_text(str(image_path))
         print(f"  OCR:  {time.perf_counter() - t1:.1f}s")
-        print("\n--- Raw OCR text ---\n")
         print(text)
         return 0
 
@@ -105,9 +96,6 @@ def main() -> int:
     result = extract_receipt(str(image_path), backend=backend)
     elapsed = time.perf_counter() - t1
     print(f"  OCR+parse: {elapsed:.1f}s")
-    if elapsed > 3.0:
-        print("  Note: target for mobile CPU is <3s; desktop Python may be slower.")
-    print("\n--- Structured output ---\n")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
 

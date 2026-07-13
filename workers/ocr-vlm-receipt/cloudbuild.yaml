@@ -1,0 +1,45 @@
+# Build config Cloud Build pour worker-ocr-vlm-receipt (backend receipt-vlm-500m).
+# Soumettre depuis la RACINE du monorepo (libs/ + dev_ocr/vlm_training/receipt_vlm
+# sont dans le contexte) :
+#   gcloud builds submit . --config=workers/ocr-vlm-receipt/cloudbuild.yaml \
+#     --substitutions=_SHORT_SHA=$(git rev-parse --short HEAD) \
+#     --project=price-tracker-prod-01
+#
+# Prérequis (une fois) : checkpoint mergé sur GCS
+#   gsutil cp dev_ocr/vlm_training/checkpoints/receipt_vlm_500m_merged.pt \
+#     gs://price-tracker-prod-01-models/vlm/receipt-vlm/v1/
+#
+# Puis bumper worker_ocr_vlm_receipt_image_tag dans
+# infra/envs/prod/variables.tf et `terraform apply`.
+
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-f'
+      - 'workers/ocr-vlm-receipt/Dockerfile'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-receipt:${_SHORT_SHA}'
+      - '.'
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-receipt:${_SHORT_SHA}'
+
+images:
+  - 'europe-west1-docker.pkg.dev/${PROJECT_ID}/prt-prod-docker/worker-ocr-vlm-receipt:${_SHORT_SHA}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # Image multi-Go (torch CPU + backbones HF baked) : machine de build plus large.
+  machineType: E2_HIGHCPU_8
+
+timeout: 3600s
+
+substitutions:
+  _SHORT_SHA: 'latest'

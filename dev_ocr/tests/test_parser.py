@@ -1,7 +1,6 @@
-"""Unit tests for :class:`receipt_ocr.parser.ReceiptParser`.
+"""Tests du parser, sur les textes en dur de tests/fixtures.
 
-These tests never touch a real OCR engine — they exercise the parser
-against the in-memory fixtures in :mod:`tests.fixtures.sample_texts`.
+Aucun moteur OCR réel n'est touché ici.
 """
 
 from __future__ import annotations
@@ -102,7 +101,7 @@ def test_parse_only_header_noise_yields_empty_products_and_no_chain():
     parser = ReceiptParser(_make_backend(sample_texts.ONLY_HEADER_NOISE))
     ticket = parser.parse("any.jpg")["ticket"]
     assert ticket["produits"] == []
-    # The fixture intentionally contains only noise lines, no real chain.
+    # Cette fixture ne contient que du bruit d'en-tête, aucune vraie enseigne.
     assert ticket["chaine_supermarche"] == ""
 
 
@@ -148,7 +147,7 @@ def test_product_prices_are_rounded_to_two_decimals():
 
 
 def test_parse_super_u_multiline_layout():
-    """Real OCR layout: product name and price on separate lines."""
+    """Mise en page réelle : nom du produit et prix sur des lignes séparées."""
     parser = ReceiptParser(_make_backend())
     ticket = parser.parse_text(SUPER_U_OCR)["ticket"]
 

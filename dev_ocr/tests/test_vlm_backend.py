@@ -1,4 +1,4 @@
-"""Tests for VLM registry and backend wiring."""
+"""Le registre VLM et le câblage du backend."""
 
 from __future__ import annotations
 

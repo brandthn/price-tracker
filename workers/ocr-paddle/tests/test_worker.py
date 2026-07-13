@@ -57,7 +57,7 @@ def test_run_ocr_parses_raw_ocr_text():
 
 def test_map_ticket_fields_totals():
     result = ocr.run_ocr(_FakeBackend(OCR_TEXT), b"bytes")
-    fields = mapper.map_ticket_fields(result, "tid", "obj.jpg", "paddleocr", 42, 1.0)
+    fields = mapper.map_ticket_fields(result, "paddleocr", 42, 1.0)
 
     assert fields["enseigne"] == "CARREFOUR MARKET"
     assert fields["total_amount"] == 3.35

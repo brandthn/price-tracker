@@ -1,4 +1,4 @@
-"""Parser tests for VLM JSON output."""
+"""Le parser face à du JSON de VLM."""
 
 from __future__ import annotations
 

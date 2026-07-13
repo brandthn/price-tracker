@@ -1,7 +1,7 @@
-"""Evaluation metrics: field F1, ANLS, price MAE, product recall, date EM.
+"""Metriques d'eval : F1 par champ, ANLS, MAE des prix, rappel produit, date exacte.
 
-All metrics operate on canonical :class:`~receipt_vlm.data.schema.Ticket`
-pairs so the same code scores the hybrid VLM and the Groq baseline.
+Tout travaille sur des paires de Ticket canoniques, donc le meme code note le modele
+maison et la baseline Groq.
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from receipt_vlm.data.schema import Product, Ticket
 
 
-def levenshtein(a: str, b: str) -> int:
-    """Plain dynamic-programming edit distance."""
+def levenshtein(a, b) -> int:
+    """Distance d'edition. Marche sur des chaines comme sur des listes de mots."""
     if not a:
         return len(b)
     if not b:
@@ -77,7 +77,7 @@ class _Counts:
 
 
 def _score_pair(pred: Ticket, gold: Ticket, counts: _Counts) -> None:
-    # Scalar fields: exact match contributes to F1 when the gold value exists.
+    # Champs scalaires : le match exact compte dans le F1, si la valeur de reference existe.
     for pred_value, gold_value in (
         (pred.date, gold.date),
         (pred.chaine_supermarche.lower(), gold.chaine_supermarche.lower()),

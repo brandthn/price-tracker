@@ -1,0 +1,11 @@
+# Phase 3 sur Colab. Demande phase2_best.pt.
+phase: 3
+lr: 5.0e-5
+epochs: 5
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 32
+
+data:
+  synthetic_count: 2000
+  synthetic_distort_intensity: heavy

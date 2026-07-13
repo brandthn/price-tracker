@@ -1,17 +1,15 @@
-"""Backend OCR-VLM « from scratch » (encodeur + décodeur maison, sans CLIP ni LLM).
+"""Backend pour l'OCR-VLM maison (encodeur + décodeur écrits ici, sans CLIP ni LLM).
 
-Le modèle (:class:`receipt_vlm.models.ocr_vlm.OcrVLM`) ne prend aucun prompt et
-décode directement un ticket canonique : il implémente donc :class:`OcrBackend`
-en direct, sans passer par ``VlmBackend`` / ``VlmProvider`` (pas de prompts,
-pas d'escalade de crop, pas de retries).
+Le modèle ne prend aucun prompt et décode directement un ticket canonique. Il
+implémente donc OcrBackend en direct, sans passer par VlmBackend / VlmProvider :
+toute cette machinerie existe pour les prompts, l'escalade de crop et les retries,
+dont ce modèle n'a aucun usage.
 
-La recette d'inférence reproduit ``dev_ocr/vlm_training/scripts/evaluate_ocr_vlm.py`` :
-``CharTokenizer.load`` → ``OcrVLM.from_checkpoint`` → ``prepare_ocr_pixels`` →
-``generate`` → ``Ticket.to_dict()`` → JSON. Le JSON canonique traverse ensuite
-``ReceiptParser.parse_text`` (branche ``try_parse_vlm_json``) sans modification.
+Le JSON qui sort est déjà au schéma canonique, donc ReceiptParser.parse_text le
+court-circuite (branche try_parse_vlm_json) et les heuristiques ne tournent jamais.
 
-Torch et ``receipt_vlm`` sont importés paresseusement (dans ``__init__``) pour
-que le module reste importable sans eux, comme les backends de ``dev_ocr``.
+Torch et receipt_vlm sont importés dans __init__ et pas en tête de module, pour que
+celui-ci reste importable sans eux.
 """
 
 from __future__ import annotations
@@ -25,8 +23,8 @@ from pricetracker_receipt_pipeline.backends.base import OcrBackend
 from pricetracker_receipt_pipeline.constants import ENV_VLM_MODEL_PATH
 from pricetracker_receipt_pipeline.exceptions import OcrBackendError
 
+# Chemin local du tokenizer*.json, posé par le bootstrap des poids.
 ENV_TOKENIZER_PATH = "RECEIPT_VLM_TOKENIZER_PATH"
-"""Chemin local du ``tokenizer*.json`` (posé par le bootstrap des poids)."""
 
 
 def _resolve_path(explicit: str | None, env_var: str, label: str) -> Path:
@@ -78,7 +76,7 @@ class OcrVlmScratchBackend(OcrBackend):
             self._model = OcrVLM.from_checkpoint(
                 str(self._checkpoint), tokenizer, device=self._device
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise OcrBackendError(
                 f"Failed to load the from-scratch OCR-VLM checkpoint "
                 f"{self._checkpoint}: {exc}"
@@ -100,7 +98,7 @@ class OcrVlmScratchBackend(OcrBackend):
 
             generate_kwargs = {"max_len": self._max_len} if self._max_len else {}
             tickets = self._model.generate(batch, **generate_kwargs)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise OcrBackendError(
                 f"From-scratch OCR-VLM inference failed on {image_path!r}: {exc}"
             ) from exc

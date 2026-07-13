@@ -98,24 +98,20 @@ async def push(
 
         ticket_fields = mapper.map_ticket_fields(
             ocr_result,
-            ticket_id,
-            object_path,
             settings.prt_ocr_engine_label,
             duration_ms,
             confidence=1.0,
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
-        # Résolution EAN via product_aliases (lecture seule). MÊME fonction et
-        # MÊME point que le tier-1 (juste après map_prix_extraits_rows, avant
-        # l'écriture) → comportement strictement identique.
+        # Même étage EAN que le tier-1, au même endroit : juste après le mapping
+        # et avant l'écriture, pour que les deux tiers se comportent pareil.
         match_stats = await alias_lookup.resolve_line_eans(
             pool, ticket_fields.get("enseigne"), prix_rows
         )
 
-        # Écriture ATOMIQUE (delete → insert → bump ocr_attempts) en une seule
-        # transaction : le poll frontend ne voit jamais un état mi-écrit, et un
-        # échec laisse le résultat tier-1 intact (cf. pg.persist_tier2_result).
+        # Une seule transaction : le poll du front ne doit jamais tomber sur un
+        # état à moitié écrit, et si ça casse le résultat tier-1 reste en place.
         await pg.persist_tier2_result(
             pool, ticket_id, ticket_fields, model, prix_rows
         )

@@ -117,16 +117,14 @@ async def push(
 
         ticket_fields = mapper.map_ticket_fields(
             ocr_result,
-            ticket_id,
-            gcs_object_path,
             settings.prt_ocr_engine,
             duration_ms,
             confidence=1.0,
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
-        # Résolution EAN via product_aliases (lecture seule). Étage post-OCR
-        # agnostique moteur/tier : MÊME fonction, MÊME point que le tier-2.
+        # Résolution EAN via product_aliases, en lecture seule. C'est un étage
+        # post-OCR : il ne connaît ni le moteur ni le tier.
         match_stats = await alias_lookup.resolve_line_eans(
             pool, ticket_fields.get("enseigne"), prix_rows
         )

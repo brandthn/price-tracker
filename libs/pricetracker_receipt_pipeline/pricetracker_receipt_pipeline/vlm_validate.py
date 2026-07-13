@@ -1,24 +1,11 @@
-"""Quality checks for VLM outputs — drives retry logic."""
+"""Contrôles qualité sur la sortie VLM — c'est ça qui déclenche les retries."""
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from pricetracker_receipt_pipeline.constants import VlmMode
-from pricetracker_receipt_pipeline.vlm_parse import try_parse_vlm_json
-
-_CHAT_MARKERS = (
-    "note:",
-    "the image shows",
-    "i think",
-    "newspaper",
-    "this image",
-    " cette image",
-    "je pense",
-)
-_STORE_BAD_CHARS = re.compile(r"[(){}]|^(?:here|note|the image)", re.IGNORECASE)
-
+from pricetracker_receipt_pipeline.vlm_parse import _CHAT_MARKERS, looks_like_store_name, try_parse_vlm_json
 
 @dataclass(frozen=True)
 class VlmValidationResult:
@@ -27,7 +14,7 @@ class VlmValidationResult:
 
 
 def validate_vlm_output(mode: str, text: str) -> VlmValidationResult:
-    """Return whether ``text`` is acceptable for the given extraction mode."""
+    """Est-ce que cette sortie est exploitable, vu le mode demandé ?"""
     if not text or not text.strip():
         return VlmValidationResult(False, "empty output")
 
@@ -71,19 +58,3 @@ def _validate_json(text: str) -> VlmValidationResult:
         return VlmValidationResult(False, "invalid chaine_supermarche")
 
     return VlmValidationResult(True)
-
-
-def looks_like_store_name(value: str) -> bool:
-    """Heuristic: reject explanatory / chatty chain names."""
-    stripped = value.strip()
-    if not stripped:
-        return True
-    if len(stripped) > 80:
-        return False
-    lowered = stripped.lower()
-    for marker in _CHAT_MARKERS:
-        if marker in lowered:
-            return False
-    if _STORE_BAD_CHARS.search(stripped):
-        return False
-    return True

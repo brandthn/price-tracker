@@ -1,13 +1,10 @@
-"""Map receipt_ocr canonical dict → Cloud SQL row shapes."""
+"""Dict canonique de receipt_ocr -> lignes Cloud SQL."""
 
 from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-
-# Phase 8 — EAN matching not yet implemented: ean/match_* are always unset.
-
 
 def _parse_ticket_date(raw: str) -> date | None:
     if not raw or not str(raw).strip():
@@ -20,16 +17,14 @@ def _parse_ticket_date(raw: str) -> date | None:
 
 def map_ticket_fields(
     ocr_result: dict,
-    ticket_id: str,
-    gcs_path: str,
     engine: str,
     duration_ms: int,
     confidence: float,
 ) -> dict[str, Any]:
-    """Return columns for ``UPDATE tickets`` on OCR success.
+    """Colonnes de l'``UPDATE tickets`` quand l'OCR a réussi.
 
-    Keys use the Python-layer names (ticket_date, total_amount) — pg.py maps
-    these to the actual DB column names (date_ticket, total_eur).
+    On garde les noms côté Python (ticket_date, total_amount) ; c'est pg.py qui
+    fait la correspondance avec les vraies colonnes (date_ticket, total_eur).
     """
     ticket = ocr_result.get("ticket") or {}
     produits = ticket.get("produits") or []
@@ -55,7 +50,7 @@ def map_ticket_fields(
 
 
 def map_prix_extraits_rows(ocr_result: dict, ticket_id: str) -> list[dict[str, Any]]:
-    """Return one row dict per product for ``prix_extraits`` upsert."""
+    """Une ligne par produit, pour l'upsert dans prix_extraits."""
     ticket = ocr_result.get("ticket") or {}
     produits = ticket.get("produits") or []
     rows: list[dict[str, Any]] = []
@@ -70,7 +65,8 @@ def map_prix_extraits_rows(ocr_result: dict, ticket_id: str) -> list[dict[str, A
         quantity = float(item.get("unites") or 1)
         line_total = round(unit_price * quantity, 2)
 
-        # Phase 8 — EAN matching not yet implemented
+        # ean / match_* partent vides : c'est alias_lookup, après l'OCR,
+        # qui les remplit (même étage pour tous les tiers).
         rows.append(
             {
                 "ticket_id": ticket_id,

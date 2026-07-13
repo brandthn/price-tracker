@@ -1,4 +1,4 @@
-"""Groq provider guardrails (no live API — see test_groq_integration)."""
+"""Garde-fous du provider Groq. Aucun appel réseau ici, cf. test_groq_integration."""
 
 from __future__ import annotations
 

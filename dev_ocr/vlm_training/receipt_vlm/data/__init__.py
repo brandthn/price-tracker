@@ -1,1 +1,1 @@
-"""Data pipeline: canonical schema, synthetic generator, adapters, dataset."""
+"""Schema canonique, generation synthetique, adaptateurs de datasets, dataset torch."""

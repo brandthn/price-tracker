@@ -1,4 +1,4 @@
-"""Tests for :mod:`receipt_ocr.vlm_validate`."""
+"""Validation de la sortie VLM, c'est elle qui déclenche les retries."""
 
 from __future__ import annotations
 

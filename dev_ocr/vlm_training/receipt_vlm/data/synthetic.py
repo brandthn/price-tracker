@@ -1,9 +1,9 @@
-"""Synthetic French receipt generator — perfect canonical labels.
+"""Generateur de tickets de caisse synthetiques, avec leurs labels parfaits.
 
-Generates (image, Ticket) pairs: plausible French supermarket receipts in
-several visual styles (thermal, compact, discount, faded, …) plus optional
-pre-render ink/layout noise and post-render capture distortions (rotation,
-perspective, blur, JPEG, shadows, vignette, off-centre framing).
+Rend des paires (image, Ticket) : des tickets plausibles dans plusieurs styles visuels
+(thermique, compact, discount, delave...), avec du bruit d'encre et de mise en page
+optionnel, puis des distorsions de prise de vue (rotation, perspective, flou, JPEG,
+ombres, vignettage, cadrage de travers).
 """
 
 from __future__ import annotations
@@ -16,111 +16,19 @@ import re
 from pathlib import Path
 from typing import Optional
 
-# A line that is only separators / whitespace (====, ----, ....) carries no text.
-_SEPARATOR_LINE = re.compile(r"^[\s\-=*#._]*$")
-
-
-def _lines_to_transcription(lines: list[str]) -> str:
-    """Joined visible text of a rendered receipt (drops separator-only lines) — the READ target."""
-    kept = [ln.strip() for ln in lines if not _SEPARATOR_LINE.match(ln)]
-    return "\n".join(ln for ln in kept if ln)
-
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 from receipt_vlm.data.schema import Product, Ticket, serialize_ticket
 
-# NOTE: store names + product lexicon now live in receipt_vlm/data/locales.py (per-locale).
-# The lists below are unused legacy French content, kept only for reference; generate_ticket
-# reads the locale packs. Safe to delete.
-_LEGACY_FRENCH_STORES = [
-    {"name": "Carrefour Market", "address": "12 rue de la République, 69002 Lyon"},
-    {"name": "Carrefour City", "address": "8 avenue Jean Jaurès, 75019 Paris"},
-    {"name": "Monoprix", "address": "21 boulevard Haussmann, 75009 Paris"},
-    {"name": "Lidl", "address": "45 route de Vannes, 44100 Nantes"},
-    {"name": "Franprix", "address": "3 rue de la Paix, 75002 Paris"},
-    {"name": "Super U", "address": "10 place du Marché, 35000 Rennes"},
-    {"name": "Intermarché", "address": "ZAC des Vergers, 13100 Aix-en-Provence"},
-    {"name": "E.Leclerc", "address": "120 avenue de la Liberté, 59000 Lille"},
-    {"name": "Auchan", "address": "Centre Commercial Englos, 59320 Englos"},
-    {"name": "Casino", "address": "5 cours Gambetta, 34000 Montpellier"},
-    {"name": "Picard", "address": "18 rue des Halles, 37000 Tours"},
-    {"name": "Aldi", "address": "27 rue Nationale, 67000 Strasbourg"},
-    {"name": "GIFI", "address": "14 avenue Charles de Gaulle, 33600 Pessac"},
-    {"name": "Action", "address": "ZAC du Port, 44200 Nantes"},
-]
+# Une ligne qui n'est que des separateurs (====, ----, ....) ne porte aucun texte.
+_SEPARATOR_LINE = re.compile(r"^[\s\-=*#._]*$")
 
-PRODUCTS_BY_CATEGORY: dict[str, list[tuple[str, float]]] = {
-    "produits_laitiers": [
-        ("LAIT DEMI-ECREME 1L", 1.09),
-        ("YAOURT NATURE X8", 2.45),
-        ("FROMAGE RAPE 200G", 2.89),
-        ("BEURRE DOUX 250G", 2.65),
-        ("CREME FRAICHE 30CL", 1.75),
-        ("CAMEMBERT 250G", 2.39),
-        ("YAOURT FRUITS X4", 2.10),
-        ("MOZZARELLA 125G", 1.15),
-    ],
-    "epicerie": [
-        ("PATES SPAGHETTI 500G", 0.99),
-        ("RIZ BASMATI 1KG", 2.19),
-        ("HUILE TOURNESOL 1L", 1.89),
-        ("FARINE T55 1KG", 0.95),
-        ("SUCRE EN POUDRE 1KG", 1.35),
-        ("CONFITURE FRAISE 370G", 2.25),
-        ("CEREALES CHOCO 375G", 2.79),
-        ("CAFE MOULU 250G", 3.49),
-        ("THE VERT X25", 2.15),
-        ("CHOCOLAT NOIR 100G", 1.59),
-        ("BISCUITS PETIT DEJ 400G", 2.05),
-        ("MIEL FLEURS 250G", 3.85),
-    ],
-    "boissons": [
-        ("EAU MINERALE 6X1.5L", 2.99),
-        ("JUS D'ORANGE 1L", 2.49),
-        ("SODA COLA 1.5L", 1.85),
-        ("SIROP GRENADINE 75CL", 2.55),
-        ("BIERE BLONDE 6X25CL", 4.95),
-        ("VIN ROUGE 75CL", 4.50),
-    ],
-    "fruits_legumes": [
-        ("BANANES VRAC", 1.99),
-        ("POMMES GALA 1KG", 2.49),
-        ("TOMATES GRAPPE 500G", 2.15),
-        ("CAROTTES 1KG", 1.29),
-        ("SALADE BATAVIA", 1.05),
-        ("CITRONS X3", 1.65),
-        ("AVOCAT PIECE", 1.25),
-        ("COURGETTES 1KG", 2.35),
-    ],
-    "viandes_poissons": [
-        ("FILET POULET 400G", 5.49),
-        ("STEAK HACHE X2", 4.25),
-        ("JAMBON BLANC X4", 2.95),
-        ("SAUMON FUME 120G", 4.85),
-        ("LARDONS FUMES 200G", 2.45),
-    ],
-    "hygiene": [
-        ("SAVON LIQUIDE 300ML", 2.15),
-        ("DENTIFRICE 75ML", 1.89),
-        ("SHAMPOOING 250ML", 3.25),
-        ("GEL DOUCHE 250ML", 2.49),
-        ("PAPIER TOILETTE X6", 3.95),
-        ("MOUCHOIRS X10", 1.45),
-    ],
-    "entretien": [
-        ("LIQUIDE VAISSELLE 500ML", 1.79),
-        ("LESSIVE LIQUIDE 1.5L", 6.95),
-        ("EPONGES X3", 1.55),
-        ("SACS POUBELLE 30L X20", 2.25),
-    ],
-    "boulangerie": [
-        ("BAGUETTE TRADITION", 1.15),
-        ("PAIN DE MIE 500G", 1.65),
-        ("CROISSANTS X4", 2.45),
-        ("BRIOCHE TRANCHEE 500G", 2.19),
-    ],
-}
+
+def _lines_to_transcription(lines: list[str]) -> str:
+    """Le texte visible du ticket, mis bout a bout. C'est la cible de lecture."""
+    kept = [ln.strip() for ln in lines if not _SEPARATOR_LINE.match(ln)]
+    return "\n".join(ln for ln in kept if ln)
 
 _WINDOWS_FONTS = ("consola.ttf", "cour.ttf", "lucon.ttf", "arial.ttf", "calibri.ttf")
 _UNIX_FONTS = (
@@ -130,18 +38,18 @@ _UNIX_FONTS = (
     "/System/Library/Fonts/Menlo.ttc",
 )
 
-# Visual palettes: (paper_rgb, ink_rgb, accent_rgb or None)
+# Les palettes : (papier, encre, accent eventuel)
 _PALETTES: list[tuple[tuple[int, int, int], tuple[int, int, int], Optional[tuple[int, int, int]]]] = [
     ((255, 255, 255), (0, 0, 0), None),
     ((252, 250, 245), (30, 30, 30), None),
     ((248, 246, 238), (50, 45, 40), None),
-    ((255, 248, 240), (20, 20, 20), None),  # warm cream
-    ((245, 242, 235), (35, 35, 35), None),  # aged thermal
-    ((255, 240, 245), (40, 20, 30), (180, 40, 60)),  # pink thermal
-    ((240, 248, 255), (25, 35, 55), None),  # bluish fade
-    ((235, 235, 230), (15, 15, 15), None),  # grey paper
-    ((255, 255, 250), (60, 60, 60), (0, 100, 0)),  # faint green tint ink
-    ((250, 245, 230), (80, 60, 40), None),  # sepia / sun-bleached
+    ((255, 248, 240), (20, 20, 20), None),  # creme
+    ((245, 242, 235), (35, 35, 35), None),  # thermique vieilli
+    ((255, 240, 245), (40, 20, 30), (180, 40, 60)),  # thermique rose
+    ((240, 248, 255), (25, 35, 55), None),  # delave bleute
+    ((235, 235, 230), (15, 15, 15), None),  # papier gris
+    ((255, 255, 250), (60, 60, 60), (0, 100, 0)),  # encre legerement verte
+    ((250, 245, 230), (80, 60, 40), None),  # sepia, brule par le soleil
 ]
 
 _LAYOUT_STYLES = (
@@ -157,11 +65,10 @@ _LAYOUT_STYLES = (
 
 
 def generate_ticket(seed: Optional[int] = None, locale: Optional[str] = None) -> Ticket:
-    """Generate a random :class:`Ticket` with perfect canonical labels.
+    """Fabrique un Ticket au hasard, avec ses labels parfaits.
 
-    ``locale`` selects a :mod:`receipt_vlm.data.locales` pack (default French);
-    it drives the store names + product lexicon so the same renderer emits
-    receipts in any Latin-script locale.
+    La locale choisit le pack d'enseignes et de produits, donc le meme moteur de
+    rendu sort des tickets dans n'importe quelle langue a ecriture latine.
     """
     from receipt_vlm.data.locales import get_locale
 
@@ -193,16 +100,17 @@ def generate_ticket(seed: Optional[int] = None, locale: Optional[str] = None) ->
     )
 
 
-# --- Font pool: drop .ttf/.otf into receipt_vlm/data/fonts/ (or point --fonts-dir at
-# one) to massively widen glyph/typeface diversity — the biggest OCR-diversity lever.
-# Empty pool => fall back to the system fonts below (original behaviour preserved).
+# Pool de polices optionnel : deposer des .ttf/.otf dans receipt_vlm/data/fonts/ elargit
+# la diversite de glyphes, et c'est de loin le levier le plus efficace pour que le modele
+# apprenne a lire autre chose qu'une seule typo. Pool vide : on retombe sur les polices
+# systeme listees plus bas.
 _FONT_DIR = Path(__file__).resolve().parent / "fonts"
 _FONT_EXTS = (".ttf", ".otf", ".ttc")
 _FONT_POOL: list[str] = []
 
 
 def add_fonts_from_dir(directory: str | Path) -> int:
-    """Register every font file under ``directory`` into the render pool. Returns count added."""
+    """Ajoute toutes les polices du dossier au pool de rendu."""
     d = Path(directory)
     if not d.is_dir():
         return 0
@@ -214,7 +122,7 @@ def add_fonts_from_dir(directory: str | Path) -> int:
     return added
 
 
-add_fonts_from_dir(_FONT_DIR)  # auto-load bundled fonts if the dir exists
+add_fonts_from_dir(_FONT_DIR)  # charge les polices embarquees si le dossier existe
 
 
 def _pick_font_path(rng: random.Random, mono: bool) -> Optional[str]:
@@ -250,10 +158,10 @@ def _format_price(value: float, style: str, symbol: str = "€", code: str = "EU
 def _build_lines(
     ticket: Ticket, rng: random.Random, style: str, loc: "LocalePack | None" = None
 ) -> tuple[list[str], dict]:
-    """Return text lines and layout metadata for a given style + locale.
+    """Rend les lignes de texte et la mise en page, pour un style et une locale.
 
-    ``loc`` is a :class:`receipt_vlm.data.locales.LocalePack` (default French); it
-    supplies every printed UI word so the layout logic stays language-neutral.
+    Le pack de locale fournit tous les mots imprimes sur le ticket, ce qui permet a
+    la logique de mise en page de rester neutre linguistiquement.
     """
     from receipt_vlm.data.locales import get_locale
 
@@ -413,7 +321,7 @@ def _build_lines(
                  if style not in ("retail_dashed", "minimal")
                  else rng.choice(L.thankyou_short))
 
-    # Drop accidental empty lines from minimal style
+    # Le style minimal produit des lignes vides accidentelles.
     lines = [ln for ln in lines if ln != "" or style == "minimal"]
     return lines, meta
 
@@ -467,13 +375,13 @@ def _draw_receipt(
 
     paper, ink, accent = rng.choice(_PALETTES)
     if diverse and rng.random() < 0.25:
-        # Extra colour jitter on paper
+        # Un peu de variation de couleur sur le papier
         paper = tuple(max(0, min(255, c + rng.randint(-12, 12))) for c in paper)
 
     img = Image.new("RGB", (width, height), paper)
     draw = ImageDraw.Draw(img)
 
-    # Pre-render: vertical fade (top of thermal roll often lighter/darker)
+    # Avant rendu : degrade vertical (le haut du rouleau thermique est souvent plus pale)
     if diverse and rng.random() < 0.35:
         fade = Image.new("L", (width, height), 255)
         fade_draw = ImageDraw.Draw(fade)
@@ -488,22 +396,22 @@ def _draw_receipt(
 
     for i, line in enumerate(lines):
         y = margin_y + i * line_height
-        # Pre-render: uneven line spacing
+        # Avant rendu : interlignes irreguliers
         if diverse:
             y += rng.randint(-1, 2)
-        # Pre-render: horizontal jitter (worn printer)
+        # Avant rendu : tremblement horizontal, comme une imprimante usee
         x = margin_x + (rng.randint(-2, 3) if diverse else 0)
 
         line_ink = ink
         if diverse and rng.random() < 0.08:
-            # Faded / double-print line
+            # Ligne delavee ou imprimee deux fois
             line_ink = tuple(min(255, c + rng.randint(40, 90)) for c in ink)
         if accent and i == 0 and style == "discount":
             line_ink = accent
 
         draw.text((x, y), line, fill=line_ink, font=font)
 
-        # Pre-render: ghost/smear line
+        # Avant rendu : ligne fantome, bavee
         if diverse and rng.random() < 0.04:
             draw.text((x + 1, y), line, fill=tuple(min(255, c + 60) for c in line_ink), font=font)
 
@@ -539,7 +447,7 @@ def _perspective_warp(img: Image.Image, rng: random.Random) -> Image.Image:
 def _find_perspective_coeffs(
     dst: list[tuple[int, int]], src: list[tuple[int, int]]
 ) -> tuple[float, ...]:
-    """Return PIL perspective transform coefficients (dst → src mapping)."""
+    """Coefficients de la transformation de perspective attendus par PIL."""
     matrix = []
     for (x, y), (u, v) in zip(dst, src):
         matrix.extend([x, y, 1, 0, 0, 0, -u * x, -u * y])
@@ -564,7 +472,7 @@ def _vignette(img: Image.Image, strength: float) -> Image.Image:
 
 
 def _frame_on_background(img: Image.Image, rng: random.Random) -> Image.Image:
-    """Simulate a phone photo: receipt on table + margin + shadow."""
+    """Simule une photo au telephone : le ticket sur une table, avec une ombre."""
     bg_color = rng.choice([
         (45, 42, 38), (60, 58, 55), (28, 32, 40), (75, 70, 65),
         (90, 85, 80), (35, 45, 35), (50, 50, 60),
@@ -583,7 +491,7 @@ def _frame_on_background(img: Image.Image, rng: random.Random) -> Image.Image:
 
 
 def _chromatic_aberration(img: Image.Image, rng: random.Random) -> Image.Image:
-    """Shift the R/B channels a few px — cheap-lens / phone-camera fringing."""
+    """Decale les canaux R et B de quelques pixels : le frangeage d'un objectif bas de gamme."""
     arr = np.asarray(img)
     shift = rng.randint(1, 3)
     out = arr.copy()
@@ -593,7 +501,7 @@ def _chromatic_aberration(img: Image.Image, rng: random.Random) -> Image.Image:
 
 
 def _texture_overlay(img: Image.Image, rng: random.Random) -> Image.Image:
-    """Blend a smoothed random-noise layer at low alpha — paper grain / table texture."""
+    """Melange une couche de bruit doux : le grain du papier, la texture de la table."""
     w, h = img.size
     noise = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
     tex = Image.fromarray(noise).filter(ImageFilter.GaussianBlur(rng.uniform(2, 6)))
@@ -601,7 +509,7 @@ def _texture_overlay(img: Image.Image, rng: random.Random) -> Image.Image:
 
 
 def _stamp_overlay(img: Image.Image, rng: random.Random) -> Image.Image:
-    """Composite a semi-transparent rotated stamp/logo (PAID / store mark simulation)."""
+    """Colle un tampon semi-transparent, comme un cachet de magasin."""
     base = img.convert("RGBA")
     sw, sh = rng.randint(80, 160), rng.randint(48, 90)
     stamp = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
@@ -620,7 +528,7 @@ def _stamp_overlay(img: Image.Image, rng: random.Random) -> Image.Image:
     return base.convert("RGB")
 
 
-# Every toggleable transform name (order = application order in distort_receipt_image).
+# Tous les effets activables. L'ordre ici est l'ordre d'application.
 ALL_VARIATIONS: tuple[str, ...] = (
     "rotate", "warp", "chroma", "brightness", "contrast", "blur", "noise",
     "overlay", "stamp", "jpeg", "vignette", "frame", "crop", "autocontrast",
@@ -634,14 +542,7 @@ def distort_receipt_image(
     intensity: str = "medium",
     variations: "set[str] | None" = None,
 ) -> Image.Image:
-    """Post-render capture noise, as a toggleable graded menu.
-
-    Args:
-        image: clean rendered receipt.
-        seed: RNG seed for reproducibility.
-        intensity: ``light`` | ``medium`` | ``heavy`` — probability/strength scale.
-        variations: subset of :data:`ALL_VARIATIONS` to enable; ``None`` = all.
-    """
+    """Le bruit de prise de vue, applique apres le rendu. Chaque effet est activable."""
     rng = random.Random(seed)
     img = image.convert("RGB")
 
@@ -692,7 +593,7 @@ def distort_receipt_image(
         img = _frame_on_background(img, rng)
 
     if on("crop", 0.25) and intensity in ("medium", "heavy"):
-        # Partial crop (photo zoomed in)
+        # Recadrage partiel, comme une photo prise trop pres
         w, h = img.size
         crop_pct = rng.uniform(0.02, 0.12)
         left = int(w * crop_pct * rng.random())
@@ -720,21 +621,7 @@ def render_receipt_image(
     distort_variations: "set[str] | None" = None,
     return_text: bool = False,
 ):
-    """Render a :class:`Ticket` as a PIL receipt image.
-
-    Args:
-        ticket: canonical ground truth.
-        seed: drives layout, colours, and distortions.
-        width: used only when ``diverse=False`` (legacy fixed width).
-        diverse: enable multi-style layouts, palettes, and pre-render noise.
-        distort: apply post-render capture distortions.
-        distort_intensity: ``light`` | ``medium`` | ``heavy`` when ``distort=True``.
-        locale: language pack for printed UI words (default French).
-        distort_variations: subset of transforms to enable (see
-            :func:`distort_receipt_image`); ``None`` = all.
-        return_text: if True, return ``(image, transcription)`` where transcription is the
-            joined visible text actually drawn (the READ / Stage-A pretraining target).
-    """
+    """Dessine un Ticket sous forme d'image de ticket de caisse."""
     from receipt_vlm.data.locales import get_locale
 
     pack = get_locale(locale)
@@ -745,7 +632,7 @@ def render_receipt_image(
     if diverse:
         img = _draw_receipt(lines, rng, meta, diverse=True)
     else:
-        # Legacy path: keep original behaviour for existing datasets/tests.
+        # L'ancien chemin, garde pour ne pas casser les datasets deja generes.
         meta = {"cols": rng.choice([38, 40, 42]), "style": "thermal_classic", "euro_style": "plain"}
         lines, _ = _build_lines(ticket, rng, "thermal_classic", loc=pack)
         img = Image.new("RGB", (width, 1), (255, 255, 255))
@@ -786,11 +673,7 @@ def save_dataset(
     locale: Optional[str] = None,
     distort_variations: "set[str] | None" = None,
 ) -> list[Path]:
-    """Generate ``n`` (image, label) pairs under ``output_dir``.
-
-    Writes ``receipt_{i:05d}.png`` and matching ``.json`` labels. ``locale`` and
-    ``distort_variations`` are forwarded to the renderer.
-    """
+    """Genere n paires (image, label) dans output_dir."""
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
@@ -815,7 +698,7 @@ def save_dataset(
 
 
 def load_dataset(directory: str | Path) -> list[tuple[Path, Ticket]]:
-    """Load (image_path, Ticket) pairs produced by :func:`save_dataset`."""
+    """Recharge les paires (chemin d'image, Ticket) ecrites par save_dataset."""
     from receipt_vlm.data.schema import ticket_from_dict
 
     directory = Path(directory)

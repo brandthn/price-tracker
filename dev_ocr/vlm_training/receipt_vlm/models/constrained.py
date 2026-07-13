@@ -1,22 +1,20 @@
-"""JSON-constrained decoding — from-scratch token-mask state machine.
+"""Decodage JSON contraint : une machine a etats qui masque les tokens.
 
-Replaces the draft spec's undefined "JSON schema head": a trained head cannot
-*guarantee* valid JSON, whereas this acceptor does, deterministically, with
-zero trainable parameters.
+C'est le point qui rend le modele utilisable. Une tete entrainee a sortir du JSON ne
+peut rien garantir, alors qu'un masque de tokens interdit mecaniquement toute sortie
+invalide, sans un seul parametre entrainable.
 
-A character-level state machine encodes the grammar of the canonical schema:
+La machine encode, caractere par caractere, la grammaire du schema canonique :
 
     {"ticket":{"date":STR,"chaine_supermarche":STR,"adresse":STR,
                "produits":[ {"nom_produit":STR,"prix_unitaire_ou_kg":PRICE,
                              "unites":INT} (,{...})* ]}}
 
-``STR`` is a quoted JSON string (escapes supported), ``PRICE`` is
-``digits.dd`` (exactly two decimals, matching the deterministic serializer in
-:mod:`receipt_vlm.data.schema`) and ``INT`` is a positive integer.
+STR est une chaine JSON entre guillemets (echappements geres), PRICE fait exactement
+deux decimales (comme le serialiseur de data/schema.py) et INT est un entier positif.
 
-At each generation step the decoder probes candidate tokens in descending
-logit order and accepts the first whose decoded text keeps the machine in a
-valid state — a lazy token mask.
+A chaque pas, on essaie les tokens candidats par logit decroissant et on prend le
+premier qui laisse la machine dans un etat valide.
 """
 
 from __future__ import annotations
@@ -24,7 +22,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Optional, Sequence
 
-# --- grammar literals -------------------------------------------------------
 
 _LIT_HEAD = '{"ticket":{"date":'
 _LIT_CHAINE = ',"chaine_supermarche":'
@@ -35,7 +32,7 @@ _LIT_PRIX = ',"prix_unitaire_ou_kg":'
 _LIT_UNITES = ',"unites":'
 _LIT_TAIL = "]}}"
 
-_TOP_LITERALS = (_LIT_HEAD, _LIT_CHAINE, _LIT_ADRESSE)  # each followed by STR
+_TOP_LITERALS = (_LIT_HEAD, _LIT_CHAINE, _LIT_ADRESSE)  # chacun suivi d'un STR
 _PRODUCT_LITERALS = (_LIT_NOM, _LIT_PRIX, _LIT_UNITES)
 
 _ESCAPABLE = set('"\\/bfnrt')
@@ -51,21 +48,12 @@ _MINIMAL_PRODUCT = '{"nom_produit":"?","prix_unitaire_ou_kg":0.00,"unites":1}'
 
 @dataclass(frozen=True)
 class _State:
-    """Snapshot of the acceptor (cheap to copy for non-mutating probes).
+    """Photo de l'automate. Immuable, pour qu'un essai de token ne le modifie pas.
 
-    ``mode`` is one of:
-        lit        — matching the current fixed literal
-        str_open   — expecting the opening quote of a string value
-        str        — inside a string value
-        esc        — after a backslash inside a string
-        esc_hex    — inside a ``\\uXXXX`` escape
-        price_int  — integer part of a price
-        price_frac — decimal part of a price (exactly 2 digits)
-        int        — ``unites`` value (closed by ``}``)
-        prod_open  — expecting ``{`` (first product) or ``]`` (empty list)
-        prod_next  — expecting ``{`` (product after a comma)
-        prod_sep   — after a product: expecting ``,`` or ``]``
-        done       — full document accepted
+    Les modes vont de `lit` (on suit un litteral fixe du schema) aux modes de chaine
+    (`str_open`, `str`, `esc`, `esc_hex`), de nombre (`price_int`, `price_frac`,
+    `int`), de liste de produits (`prod_open`, `prod_next`, `prod_sep`), jusqu'a
+    `done` quand le document est complet.
     """
 
     segment: int = 0
@@ -91,7 +79,7 @@ def _current_literal(state: _State) -> str:
 
 
 def _after_literal(state: _State) -> _State:
-    """The current literal is fully consumed → enter the following value."""
+    """Le litteral courant est fini : on entre dans la valeur qui suit."""
     state = replace(state, literal_pos=0)
     if state.in_product:
         if state.product_field == 0:
@@ -107,7 +95,7 @@ def _after_literal(state: _State) -> _State:
 
 
 def _after_value(state: _State) -> _State:
-    """A STR or PRICE value finished → advance to the next literal."""
+    """Une valeur STR ou PRICE est finie : on passe au litteral suivant."""
     if state.in_product:
         return replace(state, mode="lit", literal_pos=0,
                        product_field=state.product_field + 1,
@@ -117,19 +105,19 @@ def _after_value(state: _State) -> _State:
 
 
 def _enter_tail(state: _State) -> _State:
-    """``]`` consumed → match the remaining ``}}`` of the tail literal."""
+    """Le ] est passe : reste a matcher les }} de fin."""
     return replace(state, mode="lit", segment=len(_TOP_LITERALS) + 1,
                    literal_pos=1, in_product=False, product_field=0)
 
 
 def _enter_product(state: _State) -> _State:
-    """``{`` consumed → match ``_LIT_NOM`` from its second character."""
+    """Le { est passe : on matche _LIT_NOM a partir de son 2e caractere."""
     return replace(state, mode="lit", literal_pos=1,
                    in_product=True, product_field=0)
 
 
 def _step(state: _State, char: str) -> Optional[_State]:
-    """Return the successor state for ``char``, or None if invalid."""
+    """Etat suivant pour ce caractere, ou None si le caractere est interdit."""
     mode = state.mode
 
     if mode == "done":
@@ -259,11 +247,12 @@ class CanonicalJsonStateMachine:
         return True
 
     def forced_continuation(self) -> str:
-        """A minimal valid continuation for the current state.
+        """La plus petite suite valide depuis l'etat courant.
 
-        Fallback when no vocabulary token fits (degenerate logits): the
-        decoder re-encodes this text and continues. Repeatedly applying it
-        always terminates in the ``done`` state.
+        C'est le filet de securite quand aucun token du vocabulaire ne passe (des logits
+        degeneres, par exemple). Le decodeur re-encode ce texte et repart. En l'appliquant
+        en boucle, on finit toujours par terminer le document : c'est ce qui garantit qu'on
+        ne boucle pas indefiniment.
         """
         state = self._state
         mode = state.mode
@@ -299,20 +288,7 @@ def pick_token(
     top_k: int = 64,
     max_scan: int = 4096,
 ) -> tuple[Optional[int], str]:
-    """Pick the highest-logit token whose text keeps the grammar valid.
-
-    Args:
-        logits_row: 1D tensor of next-token logits.
-        machine: grammar state — mutated when a token is accepted.
-        token_texts: precomputed decoded text per vocabulary id.
-        top_k: fast path — probe only the top-k tokens first.
-        max_scan: cap on the slow-path scan over the sorted vocabulary.
-
-    Returns:
-        ``(token_id, accepted_text)``; ``token_id`` is None when no single
-        token fits and the caller must force ``accepted_text`` by re-encoding
-        it (the machine has already consumed it in that case).
-    """
+    """Prend le token au plus haut logit qui laisse la grammaire valide."""
     import torch
 
     k = min(top_k, logits_row.shape[-1])

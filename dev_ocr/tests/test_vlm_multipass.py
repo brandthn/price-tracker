@@ -1,4 +1,4 @@
-"""Tests for multi-pass VLM merge logic."""
+"""La fusion des trois passes du mode multipass."""
 
 from __future__ import annotations
 

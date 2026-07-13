@@ -106,23 +106,18 @@ async def push(
 
         ticket_fields = mapper.map_ticket_fields(
             ocr_result,
-            ticket_id,
-            object_path,
             settings.prt_ocr_engine_label,
             duration_ms,
             confidence=1.0,
         )
         prix_rows = mapper.map_prix_extraits_rows(ocr_result, ticket_id)
 
-        # Résolution EAN via product_aliases (lecture seule). MÊME fonction et
-        # MÊME point que les workers OCR existants (juste après
-        # map_prix_extraits_rows, avant l'écriture) → comportement identique.
+        # Même étage EAN que les autres workers, au même endroit dans le flux.
         match_stats = await alias_lookup.resolve_line_eans(
             pool, ticket_fields.get("enseigne"), prix_rows
         )
 
-        # Écriture ATOMIQUE (delete → insert → bump ocr_attempts) en une seule
-        # transaction : le poll frontend ne voit jamais un état mi-écrit.
+        # Tout dans une transaction : pas d'état mi-écrit visible par le front.
         await pg.persist_result(pool, ticket_id, ticket_fields, model, prix_rows)
 
         logger.info(

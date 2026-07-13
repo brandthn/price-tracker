@@ -1,21 +1,11 @@
-"""Download the datasets listed in ``data/raw/ocr_testing/datasets_to_use_for_testing.txt``.
+"""Télécharge les datasets listés dans data/raw/ocr_testing/datasets_to_use_for_testing.txt.
 
-The source file is a free-form text/script snippet. We extract three
-kinds of references with regex so the helper stays tolerant of comments
-and arbitrary surrounding code:
+Le fichier source est un bout de texte libre, pas un format : on en extrait au regex
+les datasets HuggingFace, les slugs Kaggle et les URL directes, pour rester tolérant
+aux commentaires et au code autour.
 
-* HuggingFace datasets (``hf://datasets/<owner>/<name>/...`` or
-  ``"<owner>/<name>"`` inside ``load_dataset``);
-* Kaggle dataset slugs (``kagglehub.dataset_download("<owner>/<name>")``);
-* Direct HTTP URLs.
-
-Each dataset is downloaded into ``data/raw/<source>/<slug>/`` and the
-script is **idempotent**: if the target directory already exists and is
-non-empty, the dataset is skipped.
-
-Run from the repo root::
-
-    python scripts/download_datasets.py
+Chaque dataset atterrit dans data/raw/<source>/<slug>/, et on saute ce qui est déjà
+là : le script est rejouable.
 """
 
 from __future__ import annotations
@@ -42,7 +32,7 @@ _HTTP_URL = re.compile(r"https?://[^\s\"'<>]+")
 
 
 def parse_dataset_file(path: Path) -> dict[str, set[str]]:
-    """Return a mapping ``source -> set of identifiers`` from ``path``.
+    """Rend un mapping source -> identifiants, extrait du fichier de liste.
 
     ``source`` is one of ``"huggingface"``, ``"kaggle"`` or ``"http"``.
     Missing files yield an empty mapping (the caller can decide whether
@@ -71,7 +61,7 @@ def parse_dataset_file(path: Path) -> dict[str, set[str]]:
 
 
 def _target_dir(source: str, slug_or_url: str, target_root: Path) -> Path:
-    """Compute a deterministic local folder for a given dataset reference."""
+    """Dossier local déterministe pour une référence de dataset."""
     if source == "http":
         parsed = urlparse(slug_or_url)
         safe = Path(parsed.netloc) / Path(parsed.path).name
@@ -116,7 +106,7 @@ def _download_kaggle(slug: str, target: Path) -> None:
     cache_path = Path(kagglehub.dataset_download(slug))
 
     target.mkdir(parents=True, exist_ok=True)
-    # Create a marker so the next run knows we already fetched it,
+    # Un marqueur, pour que le run suivant sache que c'est déjà récupéré,
     # and a pointer to the actual cache location (kagglehub manages
     # its own cache and we don't want to duplicate gigabytes of data).
     (target / "KAGGLEHUB_PATH.txt").write_text(str(cache_path), encoding="utf-8")
@@ -135,7 +125,7 @@ def download_all(
     *,
     force: bool = False,
 ) -> list[Path]:
-    """Download every reference in ``found``. Returns the list of target paths."""
+    """Télécharge tout ce qui a été trouvé, et rend les chemins cibles."""
     written: list[Path] = []
 
     for slug in sorted(found.get("huggingface", set())):
@@ -146,7 +136,7 @@ def download_all(
         try:
             _download_huggingface(slug, target)
             written.append(target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             LOGGER.error("Failed to download HuggingFace dataset %s: %s", slug, exc)
 
     for slug in sorted(found.get("kaggle", set())):
@@ -157,7 +147,7 @@ def download_all(
         try:
             _download_kaggle(slug, target)
             written.append(target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             LOGGER.error("Failed to download Kaggle dataset %s: %s", slug, exc)
 
     for url in sorted(found.get("http", set())):
@@ -168,7 +158,7 @@ def download_all(
         try:
             _download_http(url, target)
             written.append(target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             LOGGER.error("Failed to download %s: %s", url, exc)
 
     return written
@@ -191,12 +181,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Re-download even if a dataset already appears to be present.",
+        help="Retélécharge même si le dataset semble déjà là.",
     )
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Verbose logging.",
+        help="Logs verbeux.",
     )
     return parser
 

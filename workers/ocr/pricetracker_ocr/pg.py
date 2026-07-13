@@ -1,4 +1,4 @@
-"""Cloud SQL access for tickets and prix_extraits.
+"""Accès Cloud SQL : tickets et prix_extraits.
 
 Noms de colonnes utilisés = schéma prod (migration 0001 + 0002) :
   tickets  : date_ticket, total_eur, ocr_error, ocr_engine, ocr_duration_ms

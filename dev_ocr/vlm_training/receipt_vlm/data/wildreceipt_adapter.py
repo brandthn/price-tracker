@@ -1,22 +1,13 @@
-"""WildReceipt adapter — real English receipts with transcribed text + KIE field labels.
+"""Adaptateur WildReceipt : de vrais tickets anglais, transcrits et classes.
 
-WildReceipt (SDMGR paper, distributed via OpenMMLab) annotates every text box on a
-receipt with its transcription AND a field class (see ``class_list.txt``: Store_name_value,
-Store_addr_value, Date_value, Time_value, Prod_item_value, Prod_price_value, …). That's real
-ground truth — no pseudo-labelling — so we map the field classes straight to the canonical
-:class:`Ticket`, pairing each product-item box with its price box on the same row.
+WildReceipt annote chaque boite de texte avec sa transcription ET sa classe de champ
+(Store_name_value, Date_value, Prod_item_value, Prod_price_value...). C'est de la
+vraie verite terrain, donc aucun pseudo-labelling : on mappe les classes directement
+vers le Ticket canonique, en appariant chaque boite produit avec la boite prix qui se
+trouve sur la meme ligne.
 
-Expected local layout (extract of ``wildreceipt.tar`` from
-``https://download.openmmlab.com/mmocr/data/wildreceipt.tar``)::
-
-    wildreceipt_dir/
-        class_list.txt
-        train.txt              # line-delimited JSON, one receipt per line
-        test.txt
-        image_files/Image_XX/.../<hash>.jpeg
-
-Each ``train/test.txt`` line: ``{"file_name", "height", "width", "annotations":[{"box":[8 pts],
-"text", "label": int}, ...]}``. Licence: research use (SDMGR / MMOCR).
+Disposition attendue : l'extraction de wildreceipt.tar (class_list.txt, train.txt et
+test.txt en JSON ligne a ligne, et les images).
 """
 
 from __future__ import annotations
@@ -30,7 +21,8 @@ from typing import Iterator, Optional
 from receipt_vlm.data.dataset import ReceiptSample
 from receipt_vlm.data.schema import DATE_FORMAT, Product, Ticket
 
-# class_list.txt indices we consume (value classes only; *_key and Others ignored).
+# Les indices de class_list.txt qu'on exploite. Seulement les classes de valeur :
+# les *_key et Others ne nous servent a rien.
 STORE_NAME, STORE_ADDR, DATE, TIME = 1, 3, 7, 9
 PROD_ITEM, PROD_QTY, PROD_PRICE = 11, 13, 15
 
@@ -63,9 +55,9 @@ def _parse_price(text: str) -> Optional[float]:
 
 
 def _parse_datetime(date_text: str, time_text: str) -> str:
-    """WildReceipt Date_value (+ optional Time_value) → canonical ``yyyyMMdd HH:mm``.
+    """Date (et heure si elle existe) de WildReceipt vers le format canonique.
 
-    Empty when the date can't be parsed (kept clean rather than storing garbage).
+    Vide si la date est illisible : mieux vaut rien que du n'importe quoi.
     """
     cleaned = re.sub(r"\s+", " ", (date_text or "").strip())
     moment = None
@@ -85,7 +77,7 @@ def _parse_datetime(date_text: str, time_text: str) -> str:
 
 
 def ticket_from_wildreceipt_record(record: dict) -> Ticket:
-    """Map one WildReceipt annotation record to a canonical :class:`Ticket`."""
+    """Convertit une annotation WildReceipt en Ticket canonique."""
     by_label: dict[int, list[dict]] = {}
     for ann in record.get("annotations", []):
         by_label.setdefault(int(ann.get("label", -1)), []).append(ann)

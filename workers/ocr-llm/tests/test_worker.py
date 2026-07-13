@@ -96,7 +96,7 @@ def test_run_ocr_parses_and_maps(monkeypatch: pytest.MonkeyPatch) -> None:
     assert rows[0]["line_total"] == 2.50  # montant payé de la ligne
     assert rows[0]["needs_validation"] is True
 
-    fields = mapper.map_ticket_fields(result, "t-1", "obj", "gemini", 10, 1.0)
+    fields = mapper.map_ticket_fields(result, "gemini", 10, 1.0)
     assert fields["total_amount"] == 2.50  # total = Σ montants payés
 
 

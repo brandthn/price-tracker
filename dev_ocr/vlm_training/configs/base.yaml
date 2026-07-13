@@ -1,0 +1,36 @@
+# Valeurs par defaut, surchargees par le fichier de phase.
+checkpoint_dir: checkpoints
+batch_size: 4
+num_workers: 0
+max_length: 896
+weight_decay: 0.01
+
+# Les metriques de validation passent par une generation, qui est sequentielle et
+# lente. On plafonne le nombre d'echantillons generes par epoch.
+max_gen_samples: 16
+
+model:
+  lora_rank: 16
+  lora_alpha: 32.0
+  lora_dropout: 0.05
+
+data:
+  synthetic_dir: data/synthetic
+  cord_limit: 800
+  real_images_dir: ../data/raw/images_tickets_caisse
+  real_labels_dir: data/real_labels
+  synthetic_val_fraction: 0.05
+
+  # SROIE n'est pas dans le repo. Tant que ce chemin est nul, la source `sroie`
+  # est ignoree, meme si une phase la liste dans ses `sources`.
+  sroie_dir: null
+
+  # A false, on lit des PNG deja generes dans synthetic_dir. A true, on dessine les
+  # tickets a la volee : pas de PNG sur le disque, et une mise en page differente a
+  # chaque epoch.
+  synthetic_on_the_fly: false
+  synthetic_count: 2000
+  synthetic_diverse: false
+  synthetic_distort: false
+  synthetic_distort_intensity: medium
+  synthetic_extra_dir: null

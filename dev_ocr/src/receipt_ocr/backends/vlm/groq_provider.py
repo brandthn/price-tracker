@@ -1,4 +1,4 @@
-"""Groq cloud vision provider (Llama 4 Scout) for receipt JSON extraction."""
+"""Groq (Llama 4 Scout) en cloud : extraction JSON du ticket."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from receipt_ocr.constants import (
     VlmModelName,
     VlmMode,
 )
+from receipt_ocr.env import env_float, env_int
 from receipt_ocr.exceptions import OcrBackendError
 from receipt_ocr.vlm_image_prep import (
     VlmImageConfig,
@@ -32,28 +33,8 @@ from receipt_ocr.vlm_image_prep import (
 )
 
 
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return float(raw.strip())
-    except ValueError:
-        return default
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return int(raw.strip())
-    except ValueError:
-        return default
-
-
 def resolve_groq_api_key() -> str:
-    """Return Groq API key from ``GROQ_API_KEY`` or legacy ``groq_key``."""
+    # groq_key : ancien nom, encore présent dans de vieux .env.
     for name in (ENV_GROQ_API_KEY, ENV_GROQ_API_KEY_LEGACY):
         raw = os.environ.get(name)
         if raw and raw.strip():
@@ -104,8 +85,8 @@ class GroqProvider(VlmProvider):
             model or os.environ.get(ENV_GROQ_MODEL) or DEFAULT_GROQ_MODEL
         ).strip()
         self._image_config = image_config or load_vlm_image_config_from_env()
-        self._temperature = _env_float(ENV_VLM_TEMPERATURE, DEFAULT_VLM_TEMPERATURE)
-        self._max_tokens = _env_int(ENV_VLM_MAX_TOKENS, DEFAULT_GROQ_MAX_TOKENS)
+        self._temperature = env_float(ENV_VLM_TEMPERATURE, DEFAULT_VLM_TEMPERATURE)
+        self._max_tokens = env_int(ENV_VLM_MAX_TOKENS, DEFAULT_GROQ_MAX_TOKENS)
         self._client: object | None = None
 
     @property

@@ -1,0 +1,19 @@
+# Phase 2 en local, apres phase1_local.
+phase: 2
+lr: 1.0e-4
+epochs: 5
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 8
+log_every: 50
+
+model:
+  gradient_checkpointing: true
+
+data:
+  synthetic_on_the_fly: true
+  synthetic_count: 1500
+  synthetic_diverse: true
+  synthetic_distort: true
+  synthetic_distort_intensity: medium
+  synthetic_val_fraction: 0.05

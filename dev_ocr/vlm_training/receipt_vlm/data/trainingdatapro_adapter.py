@@ -1,21 +1,13 @@
-"""TrainingDataPro "OCR Receipts Text Detection" adapter — real English receipts.
+"""Adaptateur TrainingDataPro : de vrais tickets anglais, deja transcrits.
 
-HF dataset ``TrainingDataPro/ocr-receipts-text-detection``: 20 US grocery/retail
-receipts with CVAT-XML box annotations carrying a ``text`` attribute per box
-(labels: ``shop``, ``item``, ``date_time``, ``total``). Unlike CORD/SROIE this
-gives real transcribed text directly — no pseudo-labelling needed.
+Une vingtaine de tickets US avec des annotations CVAT-XML qui portent le texte de
+chaque boite (shop, item, date_time, total). Contrairement a CORD ou SROIE, le texte
+reel est donne : aucun pseudo-labelling a faire.
 
-Expected local layout (after extracting the HF ``data/images.tar.gz`` next to
-``data/annotations.xml``, see ``scripts/fetch_validation_data.py::fetch_trainingdatapro``)::
+Disposition attendue en local : annotations.xml a cote des images numerotees.
 
-    trainingdatapro_dir/
-        annotations.xml
-        0.jpg
-        1.jpg
-        ...
-
-Licence: CC-BY-NC-ND-4.0 (non-commercial, no derivatives) — stricter than the
-other sources here; keep to non-commercial academic evaluation use.
+Licence CC-BY-NC-ND-4.0, donc usage academique non commercial uniquement. C'est plus
+strict que les autres sources ici.
 """
 
 from __future__ import annotations
@@ -33,7 +25,7 @@ _DATE_PATTERNS = ("%m/%d/%y %H:%M:%S", "%m/%d/%Y %H:%M:%S", "%m/%d/%y", "%m/%d/%
 
 
 def _last_price(text: str) -> Optional[float]:
-    """The item's price is the LAST 2-decimal number in the OCR line.
+    """Le prix, c'est le dernier nombre a deux decimales de la ligne.
 
     POS export lines like "BANANAS 000000004011KF 0.41 lb @ 1 lb /0.49 0.20 N"
     mix a PLU/barcode, a weight, and a unit price before the final extended
@@ -50,8 +42,10 @@ def _last_price(text: str) -> Optional[float]:
 
 
 def _item_name(text: str) -> str:
-    """Leading run of alphabetic tokens, stopping at the first digit-bearing
-    token (PLU/barcode/price) — e.g. "FRAP 001200010451 F 5.48 N" -> "FRAP".
+    """Le nom du produit : les premiers mots alphabetiques, jusqu'au premier qui porte
+    un chiffre (code PLU, code-barres, prix).
+
+    "FRAP 001200010451 F 5.48 N" donne donc "FRAP".
     """
     words: list[str] = []
     for token in (text or "").split():
@@ -96,7 +90,7 @@ def ticket_from_trainingdatapro_image(image_el: ET.Element) -> Ticket:
             if not name or price is None:
                 continue
             produits.append(Product(name[:80], price, 1))
-        # "total" is not part of the canonical Ticket schema — ignored.
+        # Le "total" ne fait pas partie du schema canonique : on l'ignore.
 
     return Ticket(
         date=_parse_date(date_time),

@@ -85,25 +85,17 @@ async def persist_tier2_result(
     model: str,
     rows: list[dict[str, Any]],
 ) -> None:
-    """Persiste le résultat tier-2 de façon ATOMIQUE.
+    """Écrit le résultat tier-2 : delete des lignes, insert des nouvelles, puis
+    update du ticket avec le bump d'`ocr_attempts` en dernier — le tout dans une
+    seule transaction.
 
-    Tout dans UNE transaction, sur UNE connexion, dans cet ordre :
-      1. DELETE des anciennes lignes (clean slate : la tier-2 peut en renvoyer
-         un nombre différent).
-      2. INSERT des nouvelles lignes.
-      3. UPDATE tickets : champs + ocr_model + bump `ocr_attempts` (EN DERNIER).
+    L'ordre et l'atomicité comptent : le front poll `ocr_attempts > baseline`
+    pour savoir que la ré-analyse est finie. Si le bump tombait avant la
+    ré-insertion des lignes, le poll pouvait afficher un ticket vide. Et si
+    l'écriture casse en cours de route, le rollback laisse le résultat tier-1
+    en place plutôt qu'un ticket à zéro ligne.
 
-    Pourquoi atomique + bump en dernier :
-    - Le frontend poll `ocr_attempts > baseline` pour détecter la fin de la
-      ré-analyse. Avec 3 auto-commits séparés (ancien code), le poll pouvait
-      rafraîchir pile entre l'incrément d'`ocr_attempts` et la ré-insertion des
-      lignes → ticket affiché sans ligne. Ici, l'observateur externe ne voit
-      jamais d'état partiel : soit l'ancien résultat complet, soit le nouveau.
-    - En cas d'échec d'une étape, la transaction rollback : le résultat tier-1
-      reste INTACT (avant, un échec après le DELETE laissait le ticket à 0 ligne
-      avec `ocr_attempts` déjà bumpé = perte de données).
-
-    Le statut n'est pas touché (le ticket était déjà `ocr_done`).
+    Le statut n'est pas touché : le ticket était déjà `ocr_done`.
     """
     insert_records = [
         (

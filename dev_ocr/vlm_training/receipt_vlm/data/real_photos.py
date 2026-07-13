@@ -1,16 +1,11 @@
-"""Loader for the project's real French receipt photos + pseudo-labels.
+"""Chargeur des vraies photos de tickets du projet, et de leurs labels.
 
-Images live in ``dev_ocr/data/raw/images_tickets_caisse/``; labels are
-produced by ``scripts/pseudo_label.py`` (Groq pseudo-labelling + manual
-review) as one canonical JSON file per image in a labels directory, plus a
-``splits.json`` freezing the train/val/test partition::
+Les images sont dans dev_ocr/data/raw/images_tickets_caisse/. Les labels sont un JSON
+canonique par image, plus un splits.json qui fige la partition train/val/test et un
+review_status.json.
 
-    labels_dir/
-        IMG_001.json          # canonical {"ticket": {...}}
-        splits.json           # {"train": ["IMG_001.jpg", ...], "val": [...], "test": [...]}
-        review_status.json    # {"IMG_001.jpg": {"reviewed": true}, ...}
-
-The test split must contain only hand-reviewed labels (enforced here).
+Le split de test ne contient que des labels relus a la main, et c'est verifie ici : un
+pseudo-label non relu n'a rien a faire dans ce qui sert a mesurer.
 """
 
 from __future__ import annotations
@@ -46,15 +41,7 @@ def load_real_samples(
     split: Optional[str] = None,
     require_reviewed: Optional[bool] = None,
 ) -> list[ReceiptSample]:
-    """Pair images with their canonical labels.
-
-    Args:
-        images_dir: directory of receipt photos.
-        labels_dir: directory of ``<stem>.json`` canonical labels.
-        split: optionally restrict to a split from ``splits.json``.
-        require_reviewed: filter on review status; defaults to True for the
-            ``test`` split (hand-verified only) and no filter otherwise.
-    """
+    """Apparie les images avec leurs labels canoniques."""
     labels = Path(labels_dir)
     images = {p.name: p for p in list_receipt_images(images_dir)}
 
@@ -96,9 +83,9 @@ def freeze_splits(
     val_fraction: float = 0.15,
     seed: int = 1234,
 ) -> dict[str, list[str]]:
-    """Create and persist a deterministic train/val/test split.
+    """Fige une partition train/val/test, et l'ecrit sur disque.
 
-    Refuses to overwrite an existing ``splits.json`` — the held-out set must
+    Refuse d'ecraser un splits.json existant : le jeu de test doit rester fige,
     stay frozen once created.
     """
     import random

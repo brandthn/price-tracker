@@ -1,4 +1,4 @@
-"""Tests for :mod:`receipt_ocr.vlm_image_prep`."""
+"""Préparation de l'image avant le VLM : crop et resize."""
 
 from __future__ import annotations
 

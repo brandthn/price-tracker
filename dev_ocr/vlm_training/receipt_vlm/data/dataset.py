@@ -1,8 +1,8 @@
-"""ReceiptDataset — torch Dataset over (image, canonical Ticket) pairs.
+"""Dataset torch sur des paires (image, Ticket canonique).
 
-Each item is tokenized as ``prompt + canonical JSON + EOS``; labels mask the
-prompt with ``-100`` so the loss only covers the JSON target. The 32-token
-visual prefix is masked inside :meth:`ReceiptVLM.forward`, not here.
+Chaque item est tokenise en prompt + JSON canonique + EOS, avec le prompt masque a
+-100 : la loss ne porte que sur le JSON. Le prefixe visuel de 32 tokens est masque
+dans ReceiptVLM.forward, pas ici.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ ImageSource = Union[str, Path, Image.Image, Callable[[], Image.Image]]
 
 @dataclass
 class ReceiptSample:
-    """One training example: an image source and its canonical ground truth.
+    """Un exemple : une source d'image, et sa verite terrain canonique.
 
     ``image`` may be a path, PIL image, or a zero-arg callable returning PIL
     (used for on-the-fly synthetic rendering with layout/distortion variety).
@@ -42,16 +42,7 @@ def _load_image(source: ImageSource) -> Image.Image:
 
 
 class ReceiptDataset(Dataset):
-    """Wraps heterogeneous receipt sources behind a single tensor interface.
-
-    Args:
-        samples: the (image, ticket) pairs.
-        tokenizer: the SmolLM2 tokenizer (``pad_token`` must be set).
-        transform: albumentations pipeline (train or eval variant).
-        prompt: fixed instruction prepended to every target (must match the
-            prompt used at inference by ``ReceiptVLM.generate``).
-        max_length: hard cap on tokenized sequence length.
-    """
+    """Cache des sources heterogenes derriere une seule interface de tenseurs."""
 
     def __init__(
         self,
@@ -99,7 +90,7 @@ class ReceiptDataset(Dataset):
 
 
 def collate_receipts(batch: list[dict], pad_token_id: int) -> dict[str, torch.Tensor]:
-    """Pad a batch to its longest sequence (right padding)."""
+    """Pade le batch a sa plus longue sequence, par la droite."""
     max_len = max(item["input_ids"].shape[0] for item in batch)
 
     input_ids, labels, attention = [], [], []

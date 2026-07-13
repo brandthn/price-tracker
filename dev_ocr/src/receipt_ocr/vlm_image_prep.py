@@ -1,8 +1,8 @@
-"""Image preparation pipeline for VLM backends (crop + resize)."""
+"""Préparation de l'image avant un VLM : crop du ticket, puis resize."""
 
 from __future__ import annotations
 
-import os
+import logging
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,12 +17,13 @@ from receipt_ocr.constants import (
     ENV_VLM_MAX_IMAGE_SIDE,
     VlmCropMode,
 )
+from receipt_ocr.env import env_float, env_int, env_str
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class VlmImageConfig:
-    """Parameters for :func:`prepare_vlm_image`."""
-
     max_image_side: int = DEFAULT_VLM_MAX_IMAGE_SIDE
     crop_mode: str = VlmCropMode.AUTO.value
     crop_margin: float = DEFAULT_VLM_CROP_MARGIN
@@ -30,12 +31,11 @@ class VlmImageConfig:
 
 
 def load_vlm_image_config_from_env() -> VlmImageConfig:
-    """Build config from ``RECEIPT_VLM_*`` environment variables."""
     return VlmImageConfig(
-        max_image_side=_env_int(ENV_VLM_MAX_IMAGE_SIDE, DEFAULT_VLM_MAX_IMAGE_SIDE),
-        crop_mode=_env_str(ENV_VLM_CROP, VlmCropMode.AUTO.value).lower(),
-        crop_margin=_env_float(ENV_VLM_CROP_MARGIN, DEFAULT_VLM_CROP_MARGIN),
-        jpeg_quality=_env_int(ENV_VLM_JPEG_QUALITY, DEFAULT_VLM_JPEG_QUALITY),
+        max_image_side=env_int(ENV_VLM_MAX_IMAGE_SIDE, DEFAULT_VLM_MAX_IMAGE_SIDE),
+        crop_mode=env_str(ENV_VLM_CROP, VlmCropMode.AUTO.value).lower(),
+        crop_margin=env_float(ENV_VLM_CROP_MARGIN, DEFAULT_VLM_CROP_MARGIN),
+        jpeg_quality=env_int(ENV_VLM_JPEG_QUALITY, DEFAULT_VLM_JPEG_QUALITY),
     )
 
 
@@ -45,10 +45,7 @@ def prepare_vlm_image(
     *,
     crop_mode_override: str | None = None,
 ) -> tuple[str, list[Path]]:
-    """Crop and resize ``path`` for VLM inference.
-
-    Returns ``(path_for_inference, temp_files_to_delete)``.
-    """
+    """Rend (chemin à envoyer au VLM, fichiers temporaires à supprimer)."""
     cfg = config or load_vlm_image_config_from_env()
     crop_mode = (crop_mode_override or cfg.crop_mode).lower()
     temp_files: list[Path] = []
@@ -77,7 +74,9 @@ def prepare_vlm_image(
                 resized_path = _save_temp_image(resized, cfg.jpeg_quality)
                 temp_files.append(resized_path)
                 return str(resized_path), temp_files
-    except Exception:
+    except OSError as exc:
+        # Image illisible par PIL : on tente quand même le VLM sur l'original.
+        logger.warning("prep image impossible sur %s (%s)", path, exc)
         return str(path), temp_files
 
 
@@ -90,7 +89,10 @@ def _apply_crop(img: object, crop_mode: str, margin: float) -> object:
 
 
 def _auto_crop_receipt(img: object, margin: float) -> object:
-    """Estimate receipt bounding box from background contrast (Pillow-only)."""
+    """Devine la boîte du ticket au contraste, sans OpenCV.
+
+    Fragile sur un fond chargé, mais suffisant et sans dépendance en plus.
+    """
     gray = img.convert("L")
     width, height = gray.size
     if width < 32 or height < 32:
@@ -174,30 +176,3 @@ def _save_temp_image(img: object, quality: int) -> Path:
 def cleanup_temp_files(paths: list[Path]) -> None:
     for temp_path in paths:
         temp_path.unlink(missing_ok=True)
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return int(raw.strip())
-    except ValueError:
-        return default
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        return float(raw.strip())
-    except ValueError:
-        return default
-
-
-def _env_str(name: str, default: str) -> str:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    return raw.strip()

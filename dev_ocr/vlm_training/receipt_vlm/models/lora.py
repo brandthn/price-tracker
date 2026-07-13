@@ -1,8 +1,7 @@
-"""Hand-rolled LoRA adapters — no ``peft`` dependency.
+"""LoRA ecrit a la main, sans dependre de peft.
 
-Implements Low-Rank Adaptation (Hu et al., 2021) from scratch:
-``W*x`` becomes ``W*x + (B @ A)*x * (alpha/rank)`` where ``A`` and ``B`` are
-small trainable matrices and ``W`` stays frozen.
+W*x devient W*x + (B @ A)*x * (alpha/rank), avec A et B deux petites matrices
+entrainables et W gele (Hu et al., 2021).
 """
 
 from __future__ import annotations
@@ -12,15 +11,9 @@ import torch.nn as nn
 
 
 class LoRALinear(nn.Module):
-    """Low-Rank Adaptation wrapper around a frozen ``nn.Linear``.
+    """Enveloppe LoRA autour d'un nn.Linear gele.
 
     Replaces ``W*x`` with ``W*x + (B @ A)*x * (alpha/rank)``.
-
-    Args:
-        original: the pretrained linear layer to adapt (frozen in place).
-        rank: bottleneck dimension of the low-rank decomposition.
-        alpha: scaling numerator; effective scale is ``alpha / rank``.
-        dropout: dropout applied to the LoRA branch input.
     """
 
     def __init__(
@@ -44,7 +37,7 @@ class LoRALinear(nn.Module):
         self.lora_B = nn.Linear(rank, d_out, bias=False)
         self.dropout = nn.Dropout(dropout)
 
-        # A ~ N(0, 0.02), B = 0 → the adapter starts as an exact identity delta.
+        # A tire au hasard, B a zero : au depart l'adaptateur ne change donc rien.
         nn.init.normal_(self.lora_A.weight, std=0.02)
         nn.init.zeros_(self.lora_B.weight)
 
@@ -63,7 +56,7 @@ class LoRALinear(nn.Module):
 
     @torch.no_grad()
     def merge_weights(self) -> nn.Linear:
-        """Fold the LoRA delta into the base weights for zero-overhead inference."""
+        """Replie le delta LoRA dans les poids de base : plus aucun surcout a l'inference."""
         merged = nn.Linear(
             self.original.in_features,
             self.original.out_features,
@@ -85,9 +78,9 @@ def inject_lora(
     dropout: float = 0.05,
     target_modules: tuple[str, ...] = ("q_proj", "v_proj"),
 ) -> nn.Module:
-    """Recursively replace target ``nn.Linear`` layers with :class:`LoRALinear`.
+    """Remplace recursivement les nn.Linear vises par des LoRALinear.
 
-    Mutates ``model`` in place and returns it for chaining.
+    Modifie le modele en place, et le rend pour pouvoir chainer.
     """
     for name, module in model.named_children():
         if isinstance(module, nn.Linear) and name in target_modules:
@@ -103,10 +96,10 @@ def inject_lora(
 
 
 def merge_lora(model: nn.Module) -> nn.Module:
-    """Recursively replace every :class:`LoRALinear` with its merged ``nn.Linear``.
+    """Refond chaque LoRALinear dans un nn.Linear classique, pour l'inference.
 
-    Inverse of :func:`inject_lora`; used by the checkpoint export script so the
-    runtime provider loads a plain (adapter-free) model.
+    L'inverse d'inject_lora. Sert a l'export, pour que l'inference charge un modele
+    ordinaire, sans adaptateur.
     """
     for name, module in model.named_children():
         if isinstance(module, LoRALinear):

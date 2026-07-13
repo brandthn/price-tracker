@@ -1,9 +1,10 @@
-"""From-scratch OCR vision encoder — CNN stem + multi-head transformer (no CLIP).
+"""Encodeur vision de l'OCR-VLM : un stem CNN puis du transformer.
 
-A small CNN stem downsamples the receipt image by 16x (cheap way to reach a text-legible
-resolution on a T4), then a few multi-head self-attention layers give each spatial token global
-context. Output is a flat ``(B, N, D)`` sequence of visual tokens the decoder cross-attends to.
-Everything is a hand-rolled ``torch.nn`` module — no pretrained weights.
+Le stem CNN reduit l'image d'un facteur 16, ce qui est la facon la moins chere
+d'atteindre une resolution ou le texte reste lisible sur un T4. Ensuite quelques
+couches de self-attention donnent un contexte global a chaque token spatial. En
+sortie, une sequence plate de tokens visuels sur laquelle le decodeur va
+cross-attentionner.
 """
 
 from __future__ import annotations

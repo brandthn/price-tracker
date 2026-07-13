@@ -1,18 +1,7 @@
-"""Tests for :class:`receipt_ocr.backends.paddle_backend.PaddleOcrBackend`.
+"""Tests de PaddleOcrBackend, avec paddleocr patché dans sys.modules.
 
-PaddleOCR is heavy and may not be installed in CI, so we patch the
-``paddleocr`` entry in ``sys.modules`` at instantiation time.
-
-Because ``PaddleOcrBackend`` imports ``paddleocr`` lazily *inside*
-``__init__``, patching ``sys.modules`` before calling the constructor is
-sufficient — no module-level reimport is needed.
-
-Three scenarios are exercised:
-
-* PaddleOCR not installed → instantiation raises :class:`ImportError`.
-* PaddleOCR installed → ``extract_text`` flattens the v3 output format
-  (``OCRResult``-like dict with ``rec_texts`` / ``rec_scores``).
-* Engine / inference failures are wrapped in :class:`OcrBackendError`.
+PaddleOCR est lourd et pas forcément installé. Comme le backend l'importe dans son
+__init__ et pas en tête de module, patcher sys.modules avant d'instancier suffit.
 """
 
 from __future__ import annotations
@@ -30,7 +19,7 @@ def _make_ocr_result(
     texts: list[str],
     scores: list[float] | None = None,
 ) -> dict:
-    """Build a minimal ``OCRResult``-like dict matching PaddleOCR 3.x output."""
+    """Un dict minimal qui imite la sortie de PaddleOCR 3.x."""
     return {
         "rec_texts": texts,
         "rec_scores": scores if scores is not None else [1.0] * len(texts),
@@ -38,10 +27,10 @@ def _make_ocr_result(
 
 
 def _install_fake_paddleocr(monkeypatch, *, engine_factory) -> MagicMock:
-    """Replace (or create) the ``paddleocr`` module with a thin fake.
+    """Remplace le module paddleocr par un faux.
 
-    ``engine_factory`` is called for every ``PaddleOCR(...)`` call so that
-    each test can control what the engine returns.
+    engine_factory est rappelee a chaque PaddleOCR(...), pour que chaque test controle ce
+    que le moteur rend.
     """
     fake_module = types.ModuleType("paddleocr")
     fake_module.PaddleOCR = MagicMock(  # type: ignore[attr-defined]

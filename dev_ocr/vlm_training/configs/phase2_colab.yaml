@@ -1,0 +1,10 @@
+# Phase 2 sur Colab. Demande phase1_best.pt.
+phase: 2
+lr: 1.0e-4
+epochs: 10
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 16
+
+data:
+  synthetic_count: 4000

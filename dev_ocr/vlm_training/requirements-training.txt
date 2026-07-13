@@ -1,0 +1,17 @@
+# Uniquement pour l'entrainement. Rien de tout ca ne part dans receipt_ocr, qui doit
+# rester leger a l'inference.
+
+torch>=2.2.0
+torchvision>=0.17.0
+transformers>=4.40.0
+tokenizers>=0.19.0
+
+Pillow>=10.0.0
+opencv-python-headless>=4.9.0
+albumentations>=1.4.0
+
+datasets>=2.18.0
+numpy>=1.26.0
+pyyaml>=6.0.1
+
+pytest>=8.0.0

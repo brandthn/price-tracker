@@ -1,4 +1,4 @@
-"""Parse Pub/Sub push envelopes (GCS object notifications)."""
+"""Décodage des enveloppes push Pub/Sub (notifications d'objet GCS)."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import json
 import re
 from pathlib import PurePosixPath
 
-# Accepts both formats:
-# - 36-char UUID with hyphens: 550e8400-e29b-41d4-a716-446655440000
-# - 32-char hex without hyphens: 550e8400e29b41d4a716446655440000 (legacy backend bug)
+# On accepte les deux formats :
+# - UUID 36 car. avec tirets : 550e8400-e29b-41d4-a716-446655440000
+# - hex 32 car. sans tirets : 550e8400e29b41d4a716446655440000 (vieux bug backend)
 _TICKET_PATH_RE = re.compile(
     r"^tickets/raw/[^/]+/([0-9a-fA-F]{32}|[0-9a-fA-F-]{36})\.[a-zA-Z0-9]+$",
 )
@@ -48,11 +48,11 @@ def parse_pubsub_envelope(body: bytes) -> tuple[str, str]:
 
 
 def extract_ticket_id(gcs_object_path: str) -> str:
-    """Return ticket UUID from ``tickets/raw/{user_id}/{uuid}.ext``.
+    """L'UUID du ticket, extrait du chemin GCS.
 
-    Normalises 32-char hex (no hyphens) to standard UUID format so downstream
-    PostgreSQL queries and logs are consistent regardless of which backend
-    version generated the GCS path.
+    Les vieux chemins portent un hex de 32 caractères sans tirets. On le
+    normalise en UUID standard, sinon les requêtes SQL et les logs ne
+    concordent plus d'un backend à l'autre.
     """
     normalized = PurePosixPath(gcs_object_path).as_posix()
     match = _TICKET_PATH_RE.match(normalized)
@@ -68,7 +68,7 @@ def extract_ticket_id(gcs_object_path: str) -> str:
 
 
 def extract_user_id(gcs_object_path: str) -> str:
-    """Return user_id segment from ``tickets/raw/{user_id}/{uuid}.ext``."""
+    """Le user_id, extrait du chemin GCS."""
     parts = PurePosixPath(gcs_object_path).parts
     if len(parts) < 4 or parts[0] != "tickets" or parts[1] != "raw":
         raise ValueError(f"Cannot extract user_id from path: {gcs_object_path!r}")

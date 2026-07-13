@@ -12,7 +12,7 @@
 #             gs://price-tracker-prod-01-models/vlm/ocr-vlm-scratch/v1/
 #
 # Puis bumper worker_ocr_vlm_scratch_image_tag dans
-# infra/envs/prod/variables_ocr_backends.tf et `terraform apply`.
+# infra/envs/prod/variables.tf et `terraform apply`.
 
 steps:
   - id: build

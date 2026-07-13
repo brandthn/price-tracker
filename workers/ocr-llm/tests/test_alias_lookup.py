@@ -1,11 +1,8 @@
-"""Integration tests — tier-2 EAN resolution parity (testcontainers).
+"""Parité de la résolution EAN entre le tier-2 et le tier-1 (testcontainers).
 
-The tier-2 worker calls the SAME shared matcher
-(`pricetracker_matching.alias_lookup.resolve_line_eans`) at the SAME hook as tier-1
-(after map_prix_extraits_rows, before persist). These tests assert:
-  1. identical resolution outcomes (hit / miss / source priority / enseigne),
-  2. the tier-2 ATOMIC write path (`pg.persist_tier2_result`) carries the
-     filled ean/match_method/needs_validation fields untouched.
+Le tier-2 appelle le même matcher au même endroit du flux. On vérifie que les
+résolutions sont identiques, et que l'écriture atomique du tier-2 reporte bien les
+champs remplis sans les abîmer.
 """
 
 from __future__ import annotations
@@ -138,7 +135,7 @@ class _RaisingPool:
 
 
 async def test_read_failure_is_best_effort_no_raise():
-    # Parity with tier-1: a read failure never blocks tier-2 persistence either.
+    # Comme au tier-1 : une panne de lecture ne doit pas bloquer l'ecriture.
     rows = [_line(0, "PAIN COMPLET", "t"), _line(1, "lait uht", "t")]
     stats = await alias_lookup.resolve_line_eans(_RaisingPool(), "CARREFOUR MARKET", rows)
     for row in rows:

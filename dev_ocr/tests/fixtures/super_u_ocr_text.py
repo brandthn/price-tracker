@@ -1,4 +1,4 @@
-"""Raw OCR text from ``image_2.jpg`` (ex-``4PQOWWaPoa.jpg``, Super U) for parser tests."""
+"""Texte OCR brut de image_2.jpg (un Super U), pour les tests du parser."""
 
 SUPER_U_OCR = """\
 SUPER(U

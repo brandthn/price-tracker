@@ -1,4 +1,4 @@
-"""Pytest fixtures — env isolation and settings cache reset."""
+"""Fixtures : env isolé, cache de settings vidé (le modèle n'est jamais chargé)."""
 
 from __future__ import annotations
 

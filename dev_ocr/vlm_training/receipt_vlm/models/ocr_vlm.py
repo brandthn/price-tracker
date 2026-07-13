@@ -1,8 +1,7 @@
-"""OcrVLM — the from-scratch OCR-free receipt VLM (encoder + decoder).
+"""L'OCR-VLM : encodeur + decodeur, sans CLIP ni LLM pre-entraine.
 
-Image -> :class:`OcrEncoder` -> visual tokens -> :class:`OcrDecoder` -> linearized-schema token
-sequence -> :func:`receipt_vlm.data.lin_schema.linear_to_ticket` -> canonical :class:`Ticket`.
-No CLIP, no SmolLM2: both halves are hand-rolled ``torch.nn`` modules trained from scratch.
+Image -> OcrEncoder -> tokens visuels -> OcrDecoder -> sequence du schema linearise
+-> linear_to_ticket -> Ticket canonique.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ from receipt_vlm.models.ocr_encoder import OcrEncoder
 class OcrVLM(nn.Module):
     def __init__(
         self,
-        tokenizer: Any,                 # CharTokenizer (kept as attribute, not a submodule)
+        tokenizer: Any,                 # CharTokenizer, garde en attribut et pas en sous-module
         embed_dim: int = 256,
         enc_depth: int = 4,
         dec_depth: int = 4,
@@ -49,8 +48,6 @@ class OcrVLM(nn.Module):
         self.decoder = OcrDecoder(
             tokenizer.vocab_size, embed_dim, dec_depth, num_heads, max_len, self.pad_id, dropout
         )
-
-    # ------------------------------------------------------------------
 
     def forward(
         self, pixel_values: torch.Tensor, target_ids: torch.Tensor
@@ -90,8 +87,6 @@ class OcrVLM(nn.Module):
         if return_text:
             return texts
         return [linear_to_ticket(t) for t in texts]
-
-    # ------------------------------------------------------------------
 
     def save(self, path: str) -> None:
         torch.save({"model_state": self.state_dict(), "config": self.config}, path)

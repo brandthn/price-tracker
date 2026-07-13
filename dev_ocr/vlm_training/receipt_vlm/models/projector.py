@@ -1,8 +1,8 @@
-"""Multimodal projector — the core from-scratch contribution.
+"""Le projecteur multimodal : la piece qu'on entraine vraiment.
 
-Maps frozen CLIP patch embeddings into the SmolLM2 token embedding space using
-cross-attention with learned query tokens (Q-Former-lite) plus a residual MLP
-summary. No pretrained weights.
+Il envoie les patchs de CLIP (gele) dans l'espace d'embedding de SmolLM2 (gele), par
+cross-attention avec des query tokens appris, plus un resume MLP residuel. C'est
+l'unique passerelle entre les deux moities du modele.
 """
 
 from __future__ import annotations
@@ -12,16 +12,7 @@ import torch.nn as nn
 
 
 class MultimodalProjector(nn.Module):
-    """Project CLIP patch embeddings into the language model embedding space.
-
-    Args:
-        vision_dim: CLIP output dim (768 for ViT-B/16).
-        lang_dim: LM hidden dim (960 for SmolLM2-360M).
-        num_patches: number of visual tokens (197 for ViT-B/16 @ 224px + CLS).
-        num_queries: number of learned summary tokens emitted to the LM.
-        num_heads: attention heads in the cross-attention.
-        dropout: dropout rate.
-    """
+    """Envoie les patchs de CLIP dans l'espace d'embedding du modele de langue."""
 
     def __init__(
         self,
@@ -77,14 +68,7 @@ class MultimodalProjector(nn.Module):
                     nn.init.zeros_(module.bias)
 
     def forward(self, vision_features: torch.Tensor) -> torch.Tensor:
-        """Project patch embeddings to LM space.
-
-        Args:
-            vision_features: ``(B, num_patches, vision_dim)`` from CLIP.
-
-        Returns:
-            ``(B, num_queries, lang_dim)`` visual tokens in LM embedding space.
-        """
+        """Project patch embeddings to LM space."""
         batch = vision_features.shape[0]
 
         vision_features = vision_features + self.pos_embedding

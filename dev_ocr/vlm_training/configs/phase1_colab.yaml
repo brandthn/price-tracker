@@ -1,0 +1,10 @@
+# Phase 1 sur Colab.
+phase: 1
+lr: 3.0e-4
+epochs: 5
+trainable: [projector]
+sources: [cord, synthetic]
+max_gen_samples: 0
+
+data:
+  synthetic_count: 3000

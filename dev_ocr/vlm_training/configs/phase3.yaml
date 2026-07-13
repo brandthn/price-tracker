@@ -1,0 +1,8 @@
+# Phase 3 : alignement sur le JSON, a faible LR. C'est la phase qui n'a jamais
+# tourne pour le checkpoint hybride qu'on a fini par mesurer.
+phase: 3
+lr: 5.0e-5
+epochs: 5
+trainable: [projector, lora_]
+sources: [synthetic, real]
+max_gen_samples: 32

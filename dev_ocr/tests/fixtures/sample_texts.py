@@ -1,9 +1,7 @@
-"""In-memory OCR text fixtures used by the unit tests.
+"""Textes OCR en dur pour les tests du parser.
 
-Keeping fixtures in Python (rather than image files) lets the unit
-tests run with no third-party dependency, no network and no real
-photo, while still exercising every parsing edge case described in
-``project_guidelines.md``.
+Des fixtures Python plutôt que des images : les tests tournent sans
+PaddleOCR, sans réseau et sans photo, tout en couvrant les cas tordus.
 """
 
 from __future__ import annotations

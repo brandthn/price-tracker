@@ -1,10 +1,7 @@
-"""Full model assembly: frozen CLIP + from-scratch projector + SmolLM2 + LoRA.
+"""L'assemblage : CLIP gele, le projecteur, SmolLM2 gele, et les LoRA.
 
-~457M parameters total:
-    CLIP ViT-B/16 (frozen)            ~86M
-    MultimodalProjector (scratch)      ~7M
-    SmolLM2-360M-Instruct (frozen)   ~360M
-    LoRA adapters q_proj/v_proj        ~4M
+Environ 457M de parametres, dont seulement une dizaine de millions sont entraines (le
+projecteur et les LoRA) : CLIP ViT-B/16 pese 86M, SmolLM2-360M en pese 360.
 """
 
 from __future__ import annotations
@@ -34,14 +31,7 @@ SYSTEM_PROMPT = (
 
 
 class ReceiptVLM(nn.Module):
-    """LLaVA-style VLM for French receipt parsing.
-
-    Args:
-        lora_rank: rank of the LoRA adapters; ``0`` skips injection entirely
-            (used when loading a merged checkpoint for inference).
-        lora_alpha: LoRA scaling numerator.
-        lora_dropout: dropout on the LoRA branch.
-    """
+    """LLaVA-style VLM for French receipt parsing."""
 
     def __init__(
         self,
@@ -56,12 +46,10 @@ class ReceiptVLM(nn.Module):
         self.lora_rank = lora_rank
         self.lora_alpha = lora_alpha
 
-        # --- Vision encoder: CLIP (frozen) ---
         self.vision_encoder = CLIPVisionModel.from_pretrained(CLIP_MODEL)
         for param in self.vision_encoder.parameters():
             param.requires_grad = False
 
-        # --- Multimodal projector (from scratch, trainable) ---
         self.projector = MultimodalProjector(
             vision_dim=VISION_DIM,
             lang_dim=LANG_DIM,
@@ -69,7 +57,6 @@ class ReceiptVLM(nn.Module):
             num_queries=NUM_VISUAL_TOKENS,
         )
 
-        # --- Language decoder: SmolLM2 (frozen) + hand-rolled LoRA ---
         self.tokenizer = AutoTokenizer.from_pretrained(LM_MODEL)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -90,9 +77,7 @@ class ReceiptVLM(nn.Module):
         self.system_prompt = SYSTEM_PROMPT
         self._token_texts: Optional[list[str]] = None
 
-    # ------------------------------------------------------------------
     # Training forward
-    # ------------------------------------------------------------------
 
     def encode_image(self, pixel_values: torch.Tensor) -> torch.Tensor:
         """CLIP-normalized pixels ``(B, 3, 224, 224)`` → ``(B, 32, 960)``."""
@@ -106,20 +91,7 @@ class ReceiptVLM(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         labels: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
-        """Teacher-forced forward pass.
-
-        Args:
-            pixel_values: ``(B, 3, 224, 224)`` CLIP-normalized images.
-            input_ids: ``(B, T)`` prompt + target token ids.
-            attention_mask: ``(B, T)`` mask over ``input_ids`` (1 = keep).
-            labels: ``(B, T)`` aligned to ``input_ids``; ``-100`` is ignored.
-                The 32-token visual prefix is masked internally — callers must
-                NOT pre-shift or pre-pad labels for the visual tokens.
-
-        Returns:
-            ``(logits, loss)`` where logits cover the full ``32 + T`` sequence
-            and loss is None when no labels are given.
-        """
+        """Teacher-forced forward pass."""
         visual_tokens = self.encode_image(pixel_values)  # (B, 32, 960)
         text_embeds = self.lm.get_input_embeddings()(input_ids)
         combined = torch.cat([visual_tokens, text_embeds], dim=1)
@@ -147,9 +119,7 @@ class ReceiptVLM(nn.Module):
             )
         return logits, loss
 
-    # ------------------------------------------------------------------
     # Inference
-    # ------------------------------------------------------------------
 
     def _vocab_texts(self) -> list[str]:
         if self._token_texts is None:
@@ -174,11 +144,12 @@ class ReceiptVLM(nn.Module):
         constrained: bool = True,
         top_k: int = 64,
     ) -> list[str]:
-        """Generate canonical JSON for a batch of receipt images.
+        """Genere le JSON canonique pour un batch d'images.
 
-        With ``constrained=True`` (default) every output is guaranteed to be
-        valid canonical JSON via the token-mask state machine; constrained
-        decoding runs per-sample (batch handled sequentially).
+        Avec le decodage contraint (par defaut), la sortie est valide par construction :
+        le masque de tokens interdit mecaniquement tout ce qui casserait la grammaire. En
+        contrepartie il tourne echantillon par echantillon, donc le batch est traite en
+        sequentiel.
         """
         if not constrained:
             return self._generate_free(pixel_values, max_new_tokens)
@@ -227,7 +198,7 @@ class ReceiptVLM(nn.Module):
             if token_id is not None:
                 next_ids = torch.tensor([[token_id]], device=device)
             else:
-                # Forced continuation: re-encode the text and replay it.
+                # Continuation forcee : on re-encode le texte et on le rejoue.
                 forced = self.tokenizer(
                     text, return_tensors="pt", add_special_tokens=False
                 ).input_ids.to(device)
@@ -238,19 +209,17 @@ class ReceiptVLM(nn.Module):
             steps += next_ids.shape[1]
 
         if not machine.is_complete():
-            # Budget exhausted: close the document deterministically.
+            # Budget epuise : on ferme le document proprement.
             while not machine.is_complete():
                 forced = machine.forced_continuation()
                 machine.feed_text(forced)
                 pieces.append(forced)
         return "".join(pieces)
 
-    # ------------------------------------------------------------------
     # Checkpointing
-    # ------------------------------------------------------------------
 
     def export_merged_state(self) -> dict[str, Any]:
-        """Fold LoRA into the base weights and return an inference checkpoint.
+        """Refond les LoRA dans les poids de base, et rend un checkpoint d'inference.
 
         Note: this mutates the model (adapters are merged away).
         """

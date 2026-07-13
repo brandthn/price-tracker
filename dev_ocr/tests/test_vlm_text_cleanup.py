@@ -1,4 +1,4 @@
-"""Tests for :mod:`receipt_ocr.vlm_text_cleanup`."""
+"""Nettoyage de la transcription : lignes bavardes, fences markdown."""
 
 from __future__ import annotations
 

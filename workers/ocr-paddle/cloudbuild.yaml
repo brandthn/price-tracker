@@ -5,7 +5,7 @@
 #     --project=price-tracker-prod-01
 #
 # Puis bumper worker_ocr_paddle_image_tag dans
-# infra/envs/prod/variables_ocr_backends.tf et `terraform apply`.
+# infra/envs/prod/variables.tf et `terraform apply`.
 
 steps:
   - id: build

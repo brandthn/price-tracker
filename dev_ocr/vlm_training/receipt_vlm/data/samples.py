@@ -1,4 +1,4 @@
-"""Build training sample lists from config (shared by train.py)."""
+"""Construction des listes d'echantillons d'entrainement a partir de la config."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def _live_render_factory(
     distort: bool,
     distort_intensity: str,
 ):
-    """Return a zero-arg callable that renders ``ticket`` with capture noise."""
+    """Rend un callable sans argument, qui dessine le ticket avec son bruit."""
 
     def render() -> "Image.Image":
         from receipt_vlm.data.synthetic import render_receipt_image
@@ -42,7 +42,8 @@ def build_live_synthetic_samples(
     distort: bool = True,
     distort_intensity: str = "medium",
 ) -> list[ReceiptSample]:
-    """On-the-fly synthetic samples — no PNGs on disk, infinite layout variety."""
+    """Synthetique genere a la volee : aucun PNG sur le disque, et une mise en page
+    differente a chaque epoch."""
     from receipt_vlm.data.synthetic import generate_ticket
 
     samples: list[ReceiptSample] = []
@@ -72,7 +73,7 @@ def load_disk_synthetic_samples(
     distort: bool = False,
     distort_intensity: str = "medium",
 ) -> list[ReceiptSample]:
-    """Load saved PNG+JSON pairs; optionally re-render with diversity on each epoch."""
+    """Charge les paires PNG+JSON deja ecrites sur le disque."""
     from receipt_vlm.data.synthetic import load_dataset as load_synthetic
 
     pairs = load_synthetic(directory)
@@ -103,7 +104,7 @@ def load_disk_synthetic_samples(
 
 
 def build_samples(config: dict[str, Any]) -> tuple[list[ReceiptSample], list[ReceiptSample]]:
-    """Assemble train/val sample lists from the configured sources."""
+    """Assemble les listes train/val depuis les sources configurees."""
     data_cfg = config["data"]
     sources = config["sources"]
     train: list[ReceiptSample] = []

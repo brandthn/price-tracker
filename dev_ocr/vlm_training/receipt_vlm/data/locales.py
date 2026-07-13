@@ -1,13 +1,12 @@
-"""Locale packs for the synthetic receipt generator — content + UI strings per language.
+"""Packs de locale pour le generateur de tickets synthetiques.
 
-The renderer/distortion pipeline is language-neutral; only the *content* (store names,
-product lexicon) and the *printed UI words* (TOTAL, tax label, thank-you, payment, date
-prefix, …) vary by locale. Each :class:`LocalePack` supplies both, so `--languages` can
-emit receipts in any Latin-script locale here. French (`fr`) reproduces the original
-hardcoded behaviour, so the default path is unchanged.
+Le rendu et les distorsions sont neutres linguistiquement. Seuls varient le contenu
+(enseignes, lexique produit) et les mots imprimes sur le ticket (TOTAL, TVA, merci,
+moyen de paiement...). Ajouter une locale, c'est copier un pack et traduire la
+quinzaine de champs.
 
-Add a locale by copying one pack and translating the ~15 fields + the store/product lists.
-Scripts (excluded): Arabic, CJK, Cyrillic, Greek, Hebrew, Thai — Latin-script only by design.
+Ecritures non latines exclues (arabe, CJK, cyrillique, grec, hebreu, thai) : le
+modele ne les voit jamais a l'entrainement.
 """
 
 from __future__ import annotations
@@ -18,17 +17,13 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class LocalePack:
     code: str
-    # --- content ---
     stores: tuple[tuple[str, str], ...]              # (name, address)
     products: tuple[tuple[str, float], ...]          # (name, base_price)
-    # --- currency ---
     currency_symbol: str = "€"
     currency_code: str = "EUR"
-    # --- date ---
     date_order: str = "dmy"                          # "dmy" or "mdy"
     date_default: str = "Le {d} a {t}"               # {d}=formatted date, {t}=time
     date_retail: str = "DATE {d}  HEURE {t}"
-    # --- UI words ---
     subtitle: str = "TICKET DE CAISSE"
     register_default: str = "Caisse {n}  Ticket {num}"
     register_discount: str = "CAISSE {nn}  No {num}"
@@ -217,7 +212,7 @@ DEFAULT_LOCALE = "fr"
 
 
 def get_locale(code: str | None) -> LocalePack:
-    """Return the pack for ``code`` (default French). Unknown codes raise KeyError."""
+    """Rend le pack de la locale demandee. Un code inconnu leve KeyError."""
     if not code:
         return LOCALES[DEFAULT_LOCALE]
     return LOCALES[code.strip().lower()]

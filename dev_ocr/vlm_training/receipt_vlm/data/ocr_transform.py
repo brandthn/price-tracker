@@ -1,9 +1,11 @@
-"""Image preprocessing for the from-scratch OCR-VLM.
+"""Preparation d'image pour l'OCR-VLM.
 
-Own normalization (NOT CLIP's) and a receipt-shaped canvas: receipts are tall/narrow, so the
-default is portrait (H > W). Aspect ratio is preserved by letterbox-padding onto a white canvas
-before resizing, so text isn't squashed. Height/width are multiples of 16 (the CNN stem's total
-stride) so the feature grid is exact.
+Normalisation maison, et une toile au format d'un ticket : c'est haut et etroit, donc
+le defaut est en portrait. On preserve le ratio en padant sur une toile blanche avant
+de redimensionner, sinon le texte est ecrase et devient illisible.
+
+Hauteur et largeur sont des multiples de 16, le stride total du CNN, pour que la
+grille de features tombe juste.
 """
 
 from __future__ import annotations
@@ -11,11 +13,12 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image
 
-# Default input canvas (H, W). Portrait for tall receipts; both divisible by 16.
+# La toile par defaut. En portrait, parce qu'un ticket est haut et etroit, et
+# divisible par 16 (le stride du CNN).
 IMG_H = 384
 IMG_W = 256
 
-# Simple symmetric normalization -> roughly [-1, 1]; the encoder learns the rest.
+# Normalisation symetrique, en gros [-1, 1]. L'encodeur apprend le reste.
 OCR_MEAN = 0.5
 OCR_STD = 0.5
 
@@ -23,7 +26,7 @@ OCR_STD = 0.5
 def prepare_ocr_pixels(
     image: Image.Image, height: int = IMG_H, width: int = IMG_W
 ) -> "np.ndarray":
-    """PIL image -> CHW float32, aspect-preserving letterbox onto (height, width)."""
+    """Image PIL vers CHW float32, en letterbox pour ne pas ecraser le texte."""
     img = image.convert("RGB")
     w, h = img.size
     scale = min(width / w, height / h)
