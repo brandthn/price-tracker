@@ -61,3 +61,6 @@ gcp-key*.json
 vertex-sa.json
 *-sa.json
 vertex-*.json
+
+dev_ocr/data/
+dev_ocr/vlm_training/
