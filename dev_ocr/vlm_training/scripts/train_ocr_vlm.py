@@ -182,7 +182,7 @@ def _eval_schema(model, samples, device, max_len, limit) -> dict:
 
 @torch.no_grad()
 def _eval_transcription(model, samples, device, max_len, limit) -> dict:
-    """READ eval: generate text, compare to the gold visible transcription (CER / WER)."""
+    """Eval de lecture : on genere le texte, on le compare a la transcription attendue."""
     model.eval()
     imgs, golds = [], []
     for s in samples[:limit]:

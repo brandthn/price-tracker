@@ -135,7 +135,7 @@ class _RaisingPool:
 
 
 async def test_read_failure_is_best_effort_no_raise():
-    # Parity with tier-1: a read failure never blocks tier-2 persistence either.
+    # Comme au tier-1 : une panne de lecture ne doit pas bloquer l'ecriture.
     rows = [_line(0, "PAIN COMPLET", "t"), _line(1, "lait uht", "t")]
     stats = await alias_lookup.resolve_line_eans(_RaisingPool(), "CARREFOUR MARKET", rows)
     for row in rows:

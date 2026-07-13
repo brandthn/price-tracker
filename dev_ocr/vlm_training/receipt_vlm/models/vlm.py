@@ -146,9 +146,10 @@ class ReceiptVLM(nn.Module):
     ) -> list[str]:
         """Genere le JSON canonique pour un batch d'images.
 
-        With ``constrained=True`` (default) every output is guaranteed to be
-        valid canonical JSON via the token-mask state machine; constrained
-        decoding runs per-sample (batch handled sequentially).
+        Avec le decodage contraint (par defaut), la sortie est valide par construction :
+        le masque de tokens interdit mecaniquement tout ce qui casserait la grammaire. En
+        contrepartie il tourne echantillon par echantillon, donc le batch est traite en
+        sequentiel.
         """
         if not constrained:
             return self._generate_free(pixel_values, max_new_tokens)

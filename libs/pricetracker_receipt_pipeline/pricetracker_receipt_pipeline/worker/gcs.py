@@ -45,5 +45,5 @@ def _download_sync(bucket_name: str, object_path: str) -> bytes:
 
 
 async def download_image(bucket: str, object_path: str) -> bytes:
-    """Download object bytes from GCS (ADC). Raises :class:`ImageTooLargeError`."""
+    """Télécharge l'objet depuis GCS. Lève ImageTooLargeError si l'image dépasse."""
     return await asyncio.to_thread(_download_sync, bucket, object_path)

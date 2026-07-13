@@ -37,14 +37,11 @@ def _epoch_ckpts(checkpoint_dir: Path, phase: int) -> list[Path]:
 def resolve_resume(
     checkpoint_dir: str | Path, phase: int, explicit: str | None
 ) -> tuple[str | None, int]:
-    """Pick the checkpoint to resume from and the epoch to continue at.
+    """Choisit le checkpoint dont on repart, et l'epoch ou reprendre.
 
-    Precedence:
-      1. **Mid-phase recovery** — the latest ``phase{p}_epoch*.pt`` for *this* phase;
-         training continues right after that epoch.
-      2. An explicit ``--resume`` path (back-compat with the other notebooks).
-      3. **Start of phase** — the *last* checkpoint of the previous phase (its highest
-         epoch snapshot, else its legacy ``phase{p-1}_best.pt``); training starts at epoch 0.
+    Dans l'ordre : une snapshot de la phase en cours si elle existe (on a ete coupe en
+    plein milieu, on reprend juste apres), sinon le --resume donne explicitement, sinon
+    le dernier checkpoint de la phase precedente (on demarre alors la phase a zero).
     """
     checkpoint_dir = Path(checkpoint_dir)
     same_phase = _epoch_ckpts(checkpoint_dir, phase)

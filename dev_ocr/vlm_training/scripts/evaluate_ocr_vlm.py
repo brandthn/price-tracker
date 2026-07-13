@@ -36,17 +36,23 @@ from receipt_vlm.utils.metrics import evaluate_tickets, levenshtein  # noqa: E40
 
 
 def _read_text(t: Ticket) -> str:
-    """All readable text of a ticket (store + product names, in order), normalized to lowercase
-    alphanumerics. Drops spaces/punctuation/currency so it survives WildReceipt's space-stripped
-    gold and cross-currency prices — a pure 'did the glyphs get read' signal."""
+    """Tout le texte lisible d'un ticket (enseigne puis noms de produits), normalise en
+    alphanumerique minuscule.
+
+    On jette les espaces, la ponctuation et les devises : c'est ce qui permet de survivre
+    au texte de reference de WildReceipt, qui est sans espaces, et aux prix dans une autre
+    monnaie.
+    """
     parts = [t.chaine_supermarche] + [p.nom_produit for p in t.produits]
     return re.sub(r"[^a-z0-9]", "", " ".join(parts).lower())
 
 
 def _read_accuracy(preds: list[Ticket], golds: list[Ticket]) -> float:
-    """Mean char-level read accuracy = 1 - CER over the concatenated readable text (order-preserving,
-    field-segmentation-agnostic). Complements field_f1/product_recall, which exact-match-penalize a
-    near-correct read to 0."""
+    """Precision de lecture : 1 - CER sur le texte lisible concatene.
+
+    Elle complete le F1 et le rappel produit, qui penalisent a zero une lecture presque
+    juste. Elle repond a une seule question : est-ce que les caracteres ont ete lus.
+    """
     scores = []
     for pred, gold in zip(preds, golds):
         g = _read_text(gold)
@@ -57,21 +63,24 @@ def _read_accuracy(preds: list[Ticket], golds: list[Ticket]) -> float:
 
 
 def score(preds: list[Ticket], golds: list[Ticket]) -> dict:
-    """evaluate_tickets + the read-accuracy column."""
+    """Les metriques habituelles, plus la colonne de precision de lecture."""
     m = evaluate_tickets(preds, golds)
     m["read_acc"] = _read_accuracy(preds, golds)
     return m
 
-# Real datasets with the {splits,review_status}.json convention, under a base holding
-# raw/<name> + labels/<name>. Default base is dev_ocr/data (parents[2] == dev_ocr); override with
-# --data-dir (e.g. an attached Kaggle Dataset). SRD is unreviewed → only with --include-unreviewed.
+# Les datasets reels, avec leur convention splits.json / review_status.json. La base par
+# defaut est dev_ocr/data, et se surcharge avec --data-dir. SRD n'est pas relu : ce sont des
+# pseudo-labels, donc il n'entre qu'avec --include-unreviewed.
 _DATA = Path(__file__).resolve().parents[2] / "data"
 DATASET_NAMES = ("cord_v2", "wildreceipt", "trainingdatapro", "expressexpense_srd")
 
 
 def _resolve_data_base(data_dir: Optional[str]) -> Path:
-    """Find the dir actually holding raw/ + labels/. Handles a --data-dir that points a level above
-    (Kaggle nests inputs under /kaggle/input/datasets/<slug>/...) via a recursive search."""
+    """Trouve le dossier qui contient vraiment raw/ et labels/.
+
+    Kaggle imbrique ses entrees d'un ou deux niveaux, donc on cherche recursivement plutot
+    que d'exiger le chemin exact.
+    """
     base = Path(data_dir) if data_dir else _DATA
     if (base / "raw").is_dir() and (base / "labels").is_dir():
         return base

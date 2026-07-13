@@ -89,7 +89,10 @@ def _apply_crop(img: object, crop_mode: str, margin: float) -> object:
 
 
 def _auto_crop_receipt(img: object, margin: float) -> object:
-    """Estimate receipt bounding box from background contrast (Pillow-only)."""
+    """Devine la boîte du ticket au contraste, sans OpenCV.
+
+    Fragile sur un fond chargé, mais suffisant et sans dépendance en plus.
+    """
     gray = img.convert("L")
     width, height = gray.size
     if width < 32 or height < 32:

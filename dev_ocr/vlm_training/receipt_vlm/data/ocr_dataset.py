@@ -46,7 +46,7 @@ class OcrDataset(Dataset):
         sample = self.samples[idx]
         if self.target_mode == "transcription":
             # sample.image is a callable rendering (image, transcription) together, so the
-            # target matches the exact pixels (Stage-A READ: image -> all visible text).
+            # La cible correspond exactement aux pixels : le modele apprend a LIRE, pas a deviner.
             image, target = sample.image()
         else:  # schema (Stage-B / M0): image -> linearized canonical schema
             image = _load_image(sample.image)

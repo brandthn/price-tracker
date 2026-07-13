@@ -56,7 +56,7 @@ class LoRALinear(nn.Module):
 
     @torch.no_grad()
     def merge_weights(self) -> nn.Linear:
-        """Fold the LoRA delta into the base weights for zero-overhead inference."""
+        """Replie le delta LoRA dans les poids de base : plus aucun surcout a l'inference."""
         merged = nn.Linear(
             self.original.in_features,
             self.original.out_features,

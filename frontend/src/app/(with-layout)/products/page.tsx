@@ -84,7 +84,7 @@ export default async function ProductsPage({
                           {p.name ?? <em>(sans nom)</em>}
                         </div>
                         <div className="text-xs text-dark-6">
-                          {p.brand ?? "—"}
+                          {p.brand ?? "-"}
                           {p.category_l3 && (
                             <span className="ml-2 opacity-70">· {p.category_l3}</span>
                           )}

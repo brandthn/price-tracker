@@ -1,23 +1,15 @@
-"""Custom exceptions for the :mod:`pricetracker_receipt_pipeline` package.
-
-Keeping a dedicated hierarchy lets callers catch package errors broadly
-(``except ReceiptOcrError``) or precisely (``except OcrBackendError``).
-"""
+"""Exceptions du package."""
 
 from __future__ import annotations
 
 
 class ReceiptOcrError(Exception):
-    """Base class for every error raised by :mod:`pricetracker_receipt_pipeline`."""
+    pass
 
 
 class OcrBackendError(ReceiptOcrError):
-    """Raised when an OCR backend fails to extract text from an image.
-
-    Wraps any third-party exception so that callers never have to know
-    which backend was used.
-    """
+    """Le moteur OCR a échoué. Emballe l'exception tierce d'origine."""
 
 
 class ReceiptParseError(ReceiptOcrError):
-    """Raised when raw OCR text cannot be parsed into a structured receipt."""
+    """Texte OCR illisible : rien de structuré à en tirer."""

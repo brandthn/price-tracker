@@ -149,8 +149,7 @@ export function Sidebar() {
                                 : "/" +
                                   item.title.toLowerCase().split(" ").join("-");
 
-                            // Actif aussi sur les sous-pages (/products/123,
-                            // /tickets/abc) — match par préfixe sauf racine.
+                            // actif aussi sur les sous-pages: match par préfixe, sauf la racine
                             const isActive =
                               href === "/"
                                 ? pathname === "/"

@@ -3,14 +3,8 @@ import type { RankingItem } from "@/lib/api/types";
 import { DeltaPill } from "@/components/ui/delta-pill";
 import { formatEuro } from "@/lib/format-fr";
 
-// Liste de variations de prix (hausses ou baisses). Server component :
-// les valeurs sont visibles en clair (prix avant → après + delta signé),
-// la couleur n'est qu'un renfort.
-//
-// Nom du produit résolu contre Cloud SQL `products`. Un EAN hors catalogue
-// (`in_catalog=false`) n'est jamais affiché nu : on le montre ACCOMPAGNÉ de
-// son prix, de son code et d'une mention « Non référencé ». Le clic aboutit
-// toujours — la fiche « prix seulement » absorbe les EAN sans fiche.
+// un EAN hors catalogue n'est jamais affiché nu: prix + code + mention
+// non référencé. le clic marche quand meme, la fiche absorbe ces EAN.
 export function MoversList({
   items,
   emptyMessage,

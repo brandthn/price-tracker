@@ -1,4 +1,4 @@
-"""Abstract interface for Vision-Language Model providers."""
+"""L'interface que doit remplir un provider VLM."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ from abc import ABC, abstractmethod
 
 
 class VlmProvider(ABC):
-    """Strategy interface for multimodal models used by :class:`VlmBackend`."""
+    """Un modèle multimodal, vu par VlmBackend."""
 
     @property
     @abstractmethod
     def model_id(self) -> str:
-        """Stable identifier (e.g. ``moondream-0.5b``)."""
+        """Identifiant stable du modèle."""
 
     @abstractmethod
     def analyze(self, image_path: str, prompt: str) -> str:
-        """Run the model on ``image_path`` with ``prompt`` and return raw text."""
+        """Fait tourner le modèle sur l'image, et rend le texte brut."""

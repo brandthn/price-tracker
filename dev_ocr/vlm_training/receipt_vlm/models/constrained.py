@@ -247,11 +247,12 @@ class CanonicalJsonStateMachine:
         return True
 
     def forced_continuation(self) -> str:
-        """La plus petite suite valide depuis l'etat courant. Garantit qu'on termine.
+        """La plus petite suite valide depuis l'etat courant.
 
-        Fallback when no vocabulary token fits (degenerate logits): the
-        decoder re-encodes this text and continues. Repeatedly applying it
-        always terminates in the ``done`` state.
+        C'est le filet de securite quand aucun token du vocabulaire ne passe (des logits
+        degeneres, par exemple). Le decodeur re-encode ce texte et repart. En l'appliquant
+        en boucle, on finit toujours par terminer le document : c'est ce qui garantit qu'on
+        ne boucle pas indefiniment.
         """
         state = self._state
         mode = state.mode

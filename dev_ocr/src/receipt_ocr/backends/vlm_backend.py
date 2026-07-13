@@ -1,4 +1,4 @@
-"""Vision-Language-Model backend — delegates to a :class:`VlmProvider`."""
+"""Le backend VLM : il délègue tout à un provider."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class VlmBackend(OcrBackend):
         return load_vlm_mode()
 
     def extract_text(self, image_path: str) -> str:
-        """Run the VLM extraction pipeline and return text for :class:`ReceiptParser`."""
+        """Lance l'extraction VLM, et rend le texte que ReceiptParser va manger."""
         try:
             return run_vlm_extraction(self._provider, image_path)
         except (OcrBackendError, ReceiptParseError):

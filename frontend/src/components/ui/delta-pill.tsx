@@ -1,8 +1,7 @@
 import { cn } from "@/lib/utils";
 import { formatPct } from "@/lib/format-fr";
 
-// Pilule de variation de prix. Sémantique produit : hausse = rouge,
-// baisse = vert — et le signe +/− est TOUJOURS affiché (jamais la couleur seule).
+// le signe est toujours affiché, jamais la couleur seule (daltonisme)
 export function DeltaPill({
   pct,
   className,

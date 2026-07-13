@@ -1,10 +1,6 @@
 "use client";
 
-// Courbe de tendance (série unique) — SVG maison, sans lib.
-// Specs dataviz : ligne 2px arrondie, nappe ~8-10% d'opacité, point terminal
-// ≥8px avec anneau surface 2px, grilles hairline recessives, crosshair +
-// tooltip au survol, label direct sur le dernier point uniquement.
-// Série unique → pas de légende (le titre de la section nomme la série).
+// svg à la main, pas de lib de charts
 
 import { useMemo, useRef, useState } from "react";
 import { formatDateShort, formatEuro } from "@/lib/format-fr";
@@ -15,17 +11,14 @@ export type TrendPoint = {
   sampleSize?: number | null;
 };
 
-// Le format est un descripteur sérialisable, PAS une fonction : ce composant
-// est un client component appelé depuis des server components, et React ne
-// peut pas sérialiser une fonction à travers la frontière RSC.
+// descripteur et pas une fonction: une fonction ne passe pas la frontière RSC
 export type TrendUnit = "index" | "eur";
 
 type Props = {
   points: TrendPoint[];
   unit: TrendUnit;
-  // Ligne de référence horizontale (ex : base 100 d'un indice).
   baseline?: number;
-  sampleLabel?: string; // ex : "relevés" — affiché dans le tooltip
+  sampleLabel?: string; // affiché dans le tooltip, ex "relevés"
   height?: number;
   ariaLabel: string;
 };
@@ -80,7 +73,6 @@ export function TrendChart({
       `L${x(points.length - 1).toFixed(1)},${(H - PAD.bottom).toFixed(1)}` +
       `L${x(0).toFixed(1)},${(H - PAD.bottom).toFixed(1)}Z`;
 
-    // 3 ticks Y "propres" dans le domaine.
     const ticks: number[] = [];
     const step = niceStep((max - min) / 3);
     for (let t = Math.ceil(min / step) * step; t <= max; t += step) {
@@ -116,7 +108,6 @@ export function TrendChart({
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
       >
-        {/* grilles hairline */}
         {geom.ticks.map((t) => (
           <g key={t}>
             <line
@@ -140,7 +131,6 @@ export function TrendChart({
           </g>
         ))}
 
-        {/* baseline (ex : base 100) */}
         {baseline != null && (
           <line
             x1={PAD.left}
@@ -152,7 +142,6 @@ export function TrendChart({
           />
         )}
 
-        {/* nappe + ligne */}
         <path d={geom.area} fill="var(--viz-area)" />
         <path
           d={geom.line}
@@ -163,7 +152,6 @@ export function TrendChart({
           strokeLinejoin="round"
         />
 
-        {/* crosshair au survol */}
         {hovered && hover != null && (
           <g>
             <line
@@ -185,7 +173,6 @@ export function TrendChart({
           </g>
         )}
 
-        {/* point terminal + label direct (le seul labellisé) */}
         <circle
           cx={geom.x(points.length - 1)}
           cy={geom.y(last.value)}
@@ -205,7 +192,6 @@ export function TrendChart({
           {formatValue(last.value, unit)}
         </text>
 
-        {/* ticks X : premier / milieu / dernier */}
         {[0, Math.floor((points.length - 1) / 2), points.length - 1]
           .filter((v, i, a) => a.indexOf(v) === i)
           .map((i) => (
@@ -222,7 +208,7 @@ export function TrendChart({
           ))}
       </svg>
 
-      {/* tooltip HTML positionné en % (suit le responsive du SVG) */}
+      {/* en % pour suivre le svg responsive */}
       {hovered && hover != null && (
         <div
           className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg bg-dark px-3 py-2 text-xs text-white shadow-lg dark:bg-white dark:text-dark"
@@ -242,7 +228,7 @@ export function TrendChart({
         </div>
       )}
 
-      {/* Vue table (accessibilité) */}
+      {/* équivalent table pour les lecteurs d'écran */}
       <table className="sr-only">
         <caption>{ariaLabel}</caption>
         <thead>

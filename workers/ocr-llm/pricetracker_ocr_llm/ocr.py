@@ -19,7 +19,7 @@ from .prompts import CORRECTIVE_TEMPLATE, RECEIPT_EXTRACTION_PROMPT
 
 
 class OcrProcessingError(Exception):
-    """Wraps failures from the OCR provider / JSON parsing."""
+    """Emballe les erreurs du provider OCR et du parsing JSON."""
 
 
 def build_previous_extraction_json(

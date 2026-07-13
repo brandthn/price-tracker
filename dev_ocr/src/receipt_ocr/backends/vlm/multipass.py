@@ -1,4 +1,8 @@
-"""Multi-pass VLM extraction — smaller focused prompts merged into one ticket."""
+"""Extraction en plusieurs passes : des prompts courts, puis on fusionne.
+
+Un petit modèle répond bien mieux à trois questions étroites qu'à une seule question
+large, d'où ce découpage en-tête / date / produits.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ from receipt_ocr.vlm_parse import merge_partial_tickets, try_parse_vlm_json
 
 
 def run_multipass_extraction(provider: VlmProvider, image_path: str) -> str:
-    """Run header / date / products passes and return merged JSON string."""
+    """Enchaîne les trois passes, et rend le JSON fusionné."""
     prompts = (
         MULTIPASS_HEADER_PROMPT,
         MULTIPASS_DATE_PROMPT,

@@ -1,4 +1,4 @@
-"""Vision-Language-Model backend — delegates to a :class:`VlmProvider`.
+"""Le backend VLM : il délègue tout à un provider.
 
 Adapté de ``dev_ocr`` : le provider est un argument OBLIGATOIRE du
 constructeur (pas de registre/factory — chaque worker câble le sien).
@@ -16,7 +16,7 @@ from pricetracker_receipt_pipeline.exceptions import OcrBackendError, ReceiptPar
 
 
 class VlmBackend(OcrBackend):
-    """Backend that extracts receipt data via an injected VLM provider.
+    """Extrait un ticket via le provider VLM qu'on lui passe.
 
     Modes (``RECEIPT_VLM_MODE``): ``transcribe`` | ``json`` | ``multipass``.
     """
@@ -37,7 +37,7 @@ class VlmBackend(OcrBackend):
         return load_vlm_mode()
 
     def extract_text(self, image_path: str) -> str:
-        """Run the VLM extraction pipeline and return text for :class:`ReceiptParser`."""
+        """Lance l'extraction VLM, et rend le texte que ReceiptParser va manger."""
         try:
             return run_vlm_extraction(self._provider, image_path)
         except (OcrBackendError, ReceiptParseError):

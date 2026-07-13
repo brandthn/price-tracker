@@ -1,8 +1,5 @@
-// Barre de cherté relative, centrée sur 100 (le niveau médian des enseignes).
-// Segment vers la DROITE en rouge si > 100 (plus chère), vers la GAUCHE en vert
-// si < 100 (moins chère) — même sémantique prix que DeltaPill. Server component,
-// aucune interactivité. L'échelle est fixe (±SPAN autour de 100) et le marqueur
-// est clampé aux bords ; le chiffre exact reste porté par le libellé voisin.
+// centrée sur 100 = médiane des enseignes. échelle fixe (SPAN), marqueur clampé
+// aux bords, le chiffre exact est dans le libellé à coté
 
 const SPAN = 20; // demi-amplitude visuelle : [80 … 120]
 
@@ -27,10 +24,8 @@ export function CherteBar({ index }: { index: number }) {
             : `${Math.round(100 - index)} % en dessous de la médiane`
       }
     >
-      {/* repère central : la médiane (100) */}
       <span className="absolute left-1/2 top-1/2 h-3.5 w-px -translate-x-1/2 -translate-y-1/2 bg-dark-5/40 dark:bg-dark-6/50" />
 
-      {/* segment coloré entre le centre et la valeur */}
       {!flat && (
         <span
           className="absolute top-0 h-2 rounded-full"
@@ -42,7 +37,6 @@ export function CherteBar({ index }: { index: number }) {
         />
       )}
 
-      {/* marqueur de position */}
       <span
         className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white dark:border-gray-dark"
         style={{

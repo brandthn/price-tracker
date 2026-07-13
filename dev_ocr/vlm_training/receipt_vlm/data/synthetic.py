@@ -673,11 +673,7 @@ def save_dataset(
     locale: Optional[str] = None,
     distort_variations: "set[str] | None" = None,
 ) -> list[Path]:
-    """Genere n paires (image, label) dans output_dir.
-
-    Writes ``receipt_{i:05d}.png`` and matching ``.json`` labels. ``locale`` and
-    ``distort_variations`` are forwarded to the renderer.
-    """
+    """Genere n paires (image, label) dans output_dir."""
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []

@@ -154,12 +154,13 @@ def fetch_sroie(out_root: Path, limit: int | None) -> int:
 
 
 def fetch_trainingdatapro(out_root: Path, limit: int | None) -> int:
-    """TrainingDataPro OCR Receipts Text Detection (HF) -> canonical labels.
+    """TrainingDataPro : une vingtaine de vrais tickets US, deja transcrits.
 
-    Only 20 US receipts, but real box-level TRANSCRIBED TEXT (shop/item/date_time),
-    not just boxes -- downloaded via raw file access (hf_hub_download), bypassing the
-    dataset's broken/deprecated loading script. Licence: CC-BY-NC-ND-4.0 (non-commercial,
-    no derivatives) -- stricter than the other sources; keep to non-commercial eval use.
+    Peu de tickets, mais le TEXTE est donne boite par boite, pas seulement les boites. Donc
+    aucun pseudo-labelling. On telecharge les fichiers bruts directement, parce que le script
+    de chargement du dataset est casse.
+
+    Licence CC-BY-NC-ND : usage academique non commercial uniquement.
     """
     import tarfile
 
@@ -200,14 +201,11 @@ def fetch_trainingdatapro(out_root: Path, limit: int | None) -> int:
 
 
 def fetch_srd_images(out_root: Path, limit: int | None) -> int:
-    """ExpressExpense SRD (200 English receipts, MIT) -- IMAGES ONLY, no ground truth.
+    """ExpressExpense SRD : 200 tickets anglais, mais des IMAGES SEULES.
 
-    No pseudo-label step runs here (that means live Groq API calls, which shouldn't
-    fire silently on every fetch re-run). After this, label them explicitly:
-
-        python scripts/pseudo_label.py --images ../data/raw/expressexpense_srd \
-            --output ../data/labels/expressexpense_srd
-        python scripts/review_labels.py --list test   # then mark-reviewed
+    Aucune verite terrain. On ne lance PAS le pseudo-labelling ici : ca taperait l'API Groq,
+    et il n'y a aucune raison que ca parte tout seul a chaque re-telechargement. Il faut
+    appeler pseudo_label.py puis review_labels.py explicitement.
     """
     import urllib.request
     import zipfile
@@ -239,12 +237,10 @@ def fetch_srd_images(out_root: Path, limit: int | None) -> int:
 
 
 def fetch_wildreceipt(out_root: Path, limit: int | None) -> int:
-    """WildReceipt (OpenMMLab) -> canonical labels. Real transcribed text + KIE classes.
+    """WildReceipt : de vrais tickets, avec leur texte transcrit et la classe de chaque champ.
 
-    Direct public download (no account); ~1.7k English receipts with per-box text + field
-    class, mapped straight to Ticket by receipt_vlm.data.wildreceipt_adapter (no Groq).
-    Images stay in their nested image_files/ tree under raw/wildreceipt (load_real_samples
-    rglobs, matching by basename). Licence: research use (SDMGR / MMOCR).
+    C'est ce qui a permis de passer le millier de tickets sans depenser un seul appel Groq :
+    le texte est deja la, il n'y a qu'a mapper les classes vers le Ticket canonique.
     """
     import tarfile
     import urllib.request

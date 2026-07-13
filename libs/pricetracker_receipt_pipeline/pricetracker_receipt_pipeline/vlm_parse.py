@@ -28,7 +28,7 @@ _WHITESPACE = re.compile(r"\s+")
 
 
 def extract_json_candidate(text: str) -> str:
-    """Return the best JSON substring chosen by :func:`_loads_json`."""
+    """Le meilleur bout de JSON trouvé dans la sortie du modèle."""
     payload = _loads_json(text)
     if payload is None:
         return strip_markdown_json_fence(text.strip())

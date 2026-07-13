@@ -5,7 +5,7 @@ et décodeur autorégressif écrits à la main (`torch.nn`), sans CLIP ni LLM
 pré-entraîné. Le modèle décode directement une séquence de schéma linéarisé,
 convertie en ticket canonique.
 
-Un des 5 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
+Un des 4 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
 commun vit dans [`libs/pricetracker_receipt_pipeline`](../../libs/pricetracker_receipt_pipeline).
 Contrairement aux autres backends VLM, il n'existait **aucun provider** dans
 `receipt_ocr` pour ce modèle (il n'était appelé que par les scripts d'éval) :

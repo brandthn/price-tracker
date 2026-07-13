@@ -221,7 +221,7 @@ async def test_stats_counters(pool):
     assert stats.n_resolved_user == 2
     assert stats.n_resolved_catalogue == 2
     assert stats.n_resolved_total == 4
-    # user hits (2) clear needs_validation ; the other 5 lines still need it.
+    # Les 2 lignes validees par l'utilisateur sortent de la file ; les 5 autres y restent.
     assert stats.n_needs_validation == 5
 
 

@@ -144,7 +144,7 @@ class MoondreamProvider(VlmProvider):
             cleanup_temp_files(temp_files)
 
     def analyze_queries(self, image_path: str, prompts: list[str]) -> list[str]:
-        """Encode the image once, then run several prompts (multi-pass mode)."""
+        """Encode l'image une fois, puis enchaîne les prompts (mode multipass)."""
         path = OcrBackend._validate_image_path(image_path)
         inference_path, temp_files = prepare_vlm_image(path, self._image_config)
         try:

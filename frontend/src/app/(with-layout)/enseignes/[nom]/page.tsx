@@ -14,12 +14,10 @@ export async function generateMetadata({
   params: Promise<{ nom: string }>;
 }): Promise<Metadata> {
   const { nom } = await params;
-  return { title: `${decodeEnseigne(nom)} — Enseignes` };
+  return { title: `${decodeEnseigne(nom)} · Enseignes` };
 }
 
-// Les params de route arrivent URL-encodés (« Intermarch%C3%A9 ») : on décode une
-// fois avant tout usage. Défensif : no-op si déjà décodé, ne casse pas sur une
-// séquence % invalide.
+// params encodés (Intermarch%C3%A9). no-op si déjà décodé, throw pas sur % invalide
 function decodeEnseigne(raw: string): string {
   try {
     return decodeURIComponent(raw);
@@ -28,10 +26,7 @@ function decodeEnseigne(raw: string): string {
   }
 }
 
-// Fiche enseigne : positionnement prix (indice de cherté) + les produits sur
-// lesquels l'enseigne est la moins / plus chère que la médiane inter-enseignes.
-// Enseigne inconnue → écran « non suivie » (le backend renvoie 200 tracked=false,
-// jamais un 404).
+// enseigne inconnue: le backend renvoie 200 tracked=false, jamais un 404
 export default async function EnseigneDetailPage({
   params,
 }: {
@@ -72,7 +67,6 @@ export default async function EnseigneDetailPage({
         {data.enseigne}
       </h1>
 
-      {/* ── Positionnement prix ─────────────────────────────────────── */}
       <section className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
         <h2 className="text-lg font-bold text-dark dark:text-white">
           Positionnement prix
@@ -112,7 +106,6 @@ export default async function EnseigneDetailPage({
         )}
       </section>
 
-      {/* ── Moins chère ─────────────────────────────────────────────── */}
       <section className="mt-6 rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
         <h2 className="text-lg font-bold text-dark dark:text-white">
           Là où {data.enseigne} est la moins chère
@@ -126,7 +119,6 @@ export default async function EnseigneDetailPage({
         />
       </section>
 
-      {/* ── Plus chère ──────────────────────────────────────────────── */}
       <section className="mt-6 rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
         <h2 className="text-lg font-bold text-dark dark:text-white">
           Là où {data.enseigne} est la plus chère
@@ -143,8 +135,7 @@ export default async function EnseigneDetailPage({
   );
 }
 
-// Prédicat complet (préposition incluse) pour une phrase correcte dans les 3 cas :
-// « au niveau médian de… », « X % moins chère que… », « X % plus chère que… ».
+// renvoie le prédicat avec sa préposition, sinon la phrase est bancale selon le cas
 function positioningSentence(index: number): string {
   const delta = index - 100;
   if (Math.abs(delta) < 0.5) return "au niveau médian de l'ensemble des enseignes";

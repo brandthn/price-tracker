@@ -1,9 +1,6 @@
 "use client";
 
-// Error boundary des pages authentifiées (App Router). Sans ce fichier, toute
-// erreur levée dans un Server Component (ex: re-fetch d'un ticket qui rate
-// pendant un `router.refresh()`, ou token Firebase expiré → 401) faisait tomber
-// l'app en PAGE BLANCHE. Ici on dégrade proprement avec un bouton « Réessayer ».
+// sans ce fichier une erreur RSC (401 token expiré, refetch raté) = page blanche
 
 import { startTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -18,13 +15,10 @@ export default function WithLayoutError({
   const router = useRouter();
 
   useEffect(() => {
-    // Visible dans la console navigateur + remonté côté Cloud Run via le digest.
     console.error("[ui-error]", error);
   }, [error]);
 
-  // `reset()` seul ne re-render que l'arbre client : sans `router.refresh()`
-  // les Server Components ne sont pas re-fetchés et l'erreur revient à
-  // l'identique. Les deux doivent partir dans la même transition.
+  // reset() seul ne refetch pas les RSC -> l'erreur revient. les 2 dans la meme transition
   const retry = () => {
     startTransition(() => {
       router.refresh();
@@ -40,7 +34,7 @@ export default function WithLayoutError({
         </h1>
         <p className="mb-6 max-w-md text-sm text-dark-6">
           La page n&apos;a pas pu se recharger correctement. Vos données ne sont
-          pas perdues — réessayez, ou revenez à l&apos;accueil.
+          pas perdues. Réessayez, ou revenez à l&apos;accueil.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
@@ -50,10 +44,8 @@ export default function WithLayoutError({
           >
             Réessayer
           </button>
-          {/* <a> volontaire (pas <Link>) : quand l'erreur touche `/` lui-même,
-              une navigation client vers la même route est un no-op et resert
-              le payload en erreur depuis le cache du router. Le rechargement
-              complet est la porte de sortie garantie. */}
+          {/* <a> et pas <Link>: si l'erreur est sur / la nav client est un no-op
+              et ressert le payload en erreur depuis le cache router */}
           <a
             href="/"
             className="rounded-lg border border-stroke px-5 py-2.5 text-sm font-medium text-dark hover:bg-gray-1 dark:border-dark-3 dark:text-white dark:hover:bg-dark-2"

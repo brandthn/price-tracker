@@ -27,10 +27,10 @@ def _make_ocr_result(
 
 
 def _install_fake_paddleocr(monkeypatch, *, engine_factory) -> MagicMock:
-    """Replace (or create) the ``paddleocr`` module with a thin fake.
+    """Remplace le module paddleocr par un faux.
 
-    ``engine_factory`` is called for every ``PaddleOCR(...)`` call so that
-    each test can control what the engine returns.
+    engine_factory est rappelee a chaque PaddleOCR(...), pour que chaque test controle ce
+    que le moteur rend.
     """
     fake_module = types.ModuleType("paddleocr")
     fake_module.PaddleOCR = MagicMock(  # type: ignore[attr-defined]

@@ -34,7 +34,6 @@ export function getTicket(id: string): Promise<TicketDetail> {
   return apiFetch<TicketDetail>(`/tickets/${id}`, { authenticated: true });
 }
 
-// Signed URL de lecture (GET) de l'image du ticket, pour l'afficher côté UI.
 export function getTicketImageURL(
   id: string,
 ): Promise<TicketImageURLResponse> {
@@ -54,7 +53,7 @@ export function patchTicketItems(
   });
 }
 
-// Boucle de feedback : 👍/👎 sur l'output OCR. Un 👎 déclenche un re-OCR tier-2.
+// un rating negatif relance un OCR tier-2 côté backend
 export function submitFeedback(
   id: string,
   rating: FeedbackRating,
@@ -66,7 +65,7 @@ export function submitFeedback(
   });
 }
 
-// Upload direct GCS via Signed URL V4. Doit matcher `Content-Type` exactement.
+// signed url v4: le Content-Type doit matcher celui signé, sinon 403
 export async function uploadToSignedURL(
   signedUrl: string,
   file: File,
@@ -79,7 +78,7 @@ export async function uploadToSignedURL(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Upload GCS échoué (HTTP ${res.status}) — ${text}`);
+    throw new Error(`Upload GCS échoué (HTTP ${res.status}): ${text}`);
   }
 }
 

@@ -1,7 +1,5 @@
 import { type PropsWithChildren } from "react";
 
-// Layout des pages d'auth (login / register / forgot-password) : pas de sidebar,
-// carte centrée. Le route group `(auth)` les sort du groupe `(with-layout)`.
 export default function AuthLayout({ children }: PropsWithChildren) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-2 p-4 dark:bg-[#020d1a]">

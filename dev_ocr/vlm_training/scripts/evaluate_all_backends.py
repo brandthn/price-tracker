@@ -79,8 +79,8 @@ def run_hybrid(samples, cfg):
     from receipt_vlm.data.augmentation import clip_normalize_pil
     from receipt_vlm.models.vlm import ReceiptVLM
 
-    # Force a single dtype: the merged checkpoint mixes float32 (CLIP) and bf16 (SmolLM2), which
-    # otherwise throws "mat1/mat2 dtype mismatch" against float32 pixels. fp32 fits a T4 (~1.8 GB).
+    # On force un seul dtype. Le checkpoint fusionne melange du float32 (CLIP) et du bf16
+    # (SmolLM2), et torch leve un "dtype mismatch" pile a la frontiere du projecteur.
     model = ReceiptVLM.from_merged_checkpoint(ckpt, device=cfg["device"]).float()
 
     def infer(s):
@@ -105,7 +105,7 @@ def _run_vlm_provider(samples, provider, name):
 def run_groq(samples, cfg):
     import os
 
-    os.environ["RECEIPT_VLM_MODE"] = "json"  # GroqProvider.__init__ validates this — set BEFORE ctor
+    os.environ["RECEIPT_VLM_MODE"] = "json"  # GroqProvider valide ca dans son __init__ : a poser AVANT de le construire
     from receipt_ocr.env import load_project_env
 
     load_project_env()  # GROQ_API_KEY / groq_key from dev_ocr/.env (or Kaggle Secret in env)
@@ -127,7 +127,7 @@ def run_moondream(samples, cfg):
     try:
         from receipt_ocr.backends.vlm.moondream_provider import MoondreamProvider
 
-        provider = MoondreamProvider()  # needs the `moondream` pkg + local .mf int8 weights
+        provider = MoondreamProvider()  # demande le paquet moondream et les poids .mf en local
     except Exception as e:
         raise SkipBackend(f"Moondream unavailable (need moondream pkg + .mf weights): {e}")
     return _run_vlm_provider(samples, provider, "moondream")

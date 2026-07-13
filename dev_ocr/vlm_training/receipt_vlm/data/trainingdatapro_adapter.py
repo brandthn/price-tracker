@@ -42,8 +42,10 @@ def _last_price(text: str) -> Optional[float]:
 
 
 def _item_name(text: str) -> str:
-    """Leading run of alphabetic tokens, stopping at the first digit-bearing
-    token (PLU/barcode/price) — e.g. "FRAP 001200010451 F 5.48 N" -> "FRAP".
+    """Le nom du produit : les premiers mots alphabetiques, jusqu'au premier qui porte
+    un chiffre (code PLU, code-barres, prix).
+
+    "FRAP 001200010451 F 5.48 N" donne donc "FRAP".
     """
     words: list[str] = []
     for token in (text or "").split():

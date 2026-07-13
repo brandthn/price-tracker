@@ -1,19 +1,8 @@
 "use client";
 
-// Contexte d'authentification Firebase (client).
-//
-// Rôle :
-//  - exposer l'utilisateur courant + helpers (signIn / signUp / signOut / reset).
-//  - synchroniser l'ID token dans un cookie `pt_id_token` à chaque changement
-//    (`onIdTokenChanged` : login, logout, refresh auto ~1h). Ce cookie permet
-//    aux Server Components (pages tickets, home) de forwarder le Bearer au
-//    backend FastAPI — sans firebase-admin ni credential côté frontend.
-//
-// Compromis sécurité assumé (projet étudiant / démo) : le cookie n'est PAS
-// httpOnly (il doit être lisible/écrivable côté client pour suivre les refresh
-// du SDK web). Exposition XSS limitée par la TTL courte du token (1h) et le fait
-// que le backend reste l'unique source de vérité (vérif JWT). Durcissement
-// possible plus tard : session cookie httpOnly via une route handler + WIF.
+// onIdTokenChanged sync le token dans pt_id_token, les RSC lisent ce cookie
+// cookie pas httpOnly (le sdk web doit pouvoir l'écrire au refresh) - ok vu
+// la TTL 1h + verif JWT backend
 
 import {
   createUserWithEmailAndPassword,
@@ -38,7 +27,7 @@ export const ID_TOKEN_COOKIE = "pt_id_token";
 
 function setTokenCookie(token: string) {
   const secure = typeof window !== "undefined" && window.location.protocol === "https:";
-  // max-age = 1h (TTL d'un ID token Firebase). onIdTokenChanged le rafraîchira.
+  // 1h = TTL du id token
   document.cookie = `${ID_TOKEN_COOKIE}=${token}; Path=/; Max-Age=3600; SameSite=Lax${
     secure ? "; Secure" : ""
   }`;
@@ -84,8 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(() => {
-    // Garde : appelé seulement quand l'UI a vérifié `configured`. Lève une erreur
-    // explicite si jamais une action auth est tentée sans config Firebase.
     const requireAuth = () => {
       if (!firebaseAuth) {
         throw new Error("Firebase non configuré (NEXT_PUBLIC_FIREBASE_* absents).");
@@ -136,7 +123,6 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
-// Traduit les codes d'erreur Firebase en messages FR pour l'UI.
 export function authErrorMessage(err: unknown): string {
   const code = (err as { code?: string })?.code ?? "";
   switch (code) {
