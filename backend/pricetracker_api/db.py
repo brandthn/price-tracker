@@ -21,12 +21,8 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 def init_engine() -> None:
-    """Crée le moteur SQLAlchemy au démarrage de l'app (lifespan).
-
-    `pool_pre_ping=True` : asyncpg ne reconnecte pas auto après un timeout
-    Cloud SQL (idle 10 min). Le ping ajoute un coût négligeable (1ms) mais
-    évite les `InterfaceError` lors du premier query après scale-from-zero.
-    """
+    # pool_pre_ping : asyncpg ne reconnecte pas apres un idle timeout Cloud SQL ;
+    # evite les InterfaceError au 1er query apres scale-from-zero
     global _engine, _session_factory
     settings = get_settings()
     _engine = create_async_engine(
@@ -57,12 +53,7 @@ async def dispose_engine() -> None:
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """Dependency FastAPI : yield une AsyncSession scoped à la requête.
-
-    Rollback automatique sur exception. Le commit doit être explicite dans
-    le router (ou en service) — pas de commit auto à la fin pour éviter de
-    masquer des erreurs de logique métier.
-    """
+    # rollback auto sur exception ; commit explicite dans le router (pas d'auto-commit)
     if _session_factory is None:
         raise RuntimeError("Session factory not initialized — call init_engine() first.")
     async with _session_factory() as session:

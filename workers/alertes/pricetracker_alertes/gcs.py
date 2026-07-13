@@ -1,4 +1,4 @@
-"""Upload du rapport JSON dans le bucket GCS bronze sous `alerts/`."""
+
 
 from __future__ import annotations
 
@@ -19,8 +19,7 @@ def upload_report(
     run_date: str,
     payload: dict[str, Any],
 ) -> str:
-    """Upload `payload` en JSON sur `gs://{bucket}/{prefix}/date={run_date}/report.json`.
-    Retourne l'URI GCS."""
+
     client = storage.Client()
     blob_path = f"{prefix}/date={run_date}/report.json"
     blob = client.bucket(bucket).blob(blob_path)

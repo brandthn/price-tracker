@@ -1,13 +1,4 @@
-"""Lecture BQ Gold pour le worker alertes.
 
-On extrait :
-- Top N hausses depuis `rankings_produits` (filtre pct_change >= seuil).
-- Top N anomalies depuis `anomalies_detected` (déjà filtrées |z| >= 3 par le
-  worker indices ; on garde les plus extrêmes en valeur absolue).
-
-Toutes les requêtes filtrent sur une fenêtre récente (`lookback_weeks`) pour
-éviter de remonter des signaux périmés en cas de retard du run.
-"""
 
 from __future__ import annotations
 
@@ -41,7 +32,7 @@ def _client(project: str, location: str) -> bigquery.Client:
 def fetch_top_rankings(
     cfg: AlertesConfig, run_date: str
 ) -> list[dict[str, Any]]:
-    """Top N hausses récentes, filtrées par seuil minimum de variation."""
+
     client = _client(cfg.project_id, cfg.location)
     sql = f"""
     SELECT
@@ -72,7 +63,7 @@ def fetch_top_rankings(
 def fetch_top_anomalies(
     cfg: AlertesConfig, run_date: str
 ) -> list[dict[str, Any]]:
-    """Top N anomalies récentes, classées par |z-score| décroissant."""
+
     client = _client(cfg.project_id, cfg.location)
     sql = f"""
     SELECT
@@ -101,7 +92,7 @@ def fetch_top_anomalies(
 
 
 def _row_to_dict(row: bigquery.Row) -> dict[str, Any]:
-    """Convertit une Row BQ en dict JSON-serializable (dates → ISO strings)."""
+
     out: dict[str, Any] = {}
     for key, value in row.items():
         if value is None:

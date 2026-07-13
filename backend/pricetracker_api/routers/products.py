@@ -1,18 +1,9 @@
-"""Router products — détail + recherche + substituts sur Cloud SQL `products`,
-prix sur BQ Silver `open_prices_clean`.
+"""Router products — detail + recherche + substituts sur Cloud SQL products,
+prix sur BQ Silver open_prices_clean.
 
-Source de vérité du catalogue : Cloud SQL `products` (~14k EANs, 12k enrichis
-via OFF bulk + worker quotidien) — beaucoup plus complet que le miroir BQ
-`catalogue_produits`, qui ne sert plus ici qu'aux joins d'affichage des
-requêtes analytiques (observatoire/stats).
-
-On distingue 3 états par EAN :
-  1. EAN absent de la table : renvoie 404.
-  2. EAN présent avec `off_found=false` : renvoie 200 avec champs OFF NULL.
-     Le frontend doit afficher "Données enrichies en cours" plutôt qu'un
-     placeholder vide. C'est intentionnel : on garde la trace de l'EAN même
-     si OFF ne l'a pas (évite de retenter à chaque run).
-  3. EAN enrichi : 200 avec tous les champs.
+Catalogue = source de verite Cloud SQL products (plus complet que le miroir BQ
+catalogue_produits). 3 etats par EAN : absent -> 404 ; present off_found=false ->
+200 champs OFF NULL (on garde la trace, evite de retenter) ; enrichi -> 200 complet.
 """
 
 from __future__ import annotations
@@ -43,8 +34,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 def _row_to_product(row: dict) -> ProductOut:
-    """Convertit une row BQ catalogue_produits en ProductOut. NULL-tolerant
-    sur les colonnes OFF (worker OFF rate-limité)."""
+    # NULL-tolerant sur les colonnes OFF
     return ProductOut(
         ean=row["ean"],
         name=row.get("name"),
@@ -61,8 +51,7 @@ def _row_to_product(row: dict) -> ProductOut:
     )
 
 
-# Ordre déclaratif important : `/search` doit être enregistré AVANT
-# `/{ean}` sinon FastAPI résout `/products/search` comme ean="search".
+# /search doit etre declare AVANT /{ean} sinon "search" est capture comme ean
 
 
 @router.get("/search", response_model=ProductSearchResult)
@@ -71,12 +60,8 @@ async def search_products(
     limit: int = Query(default=20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
 ) -> ProductSearchResult:
-    """Recherche par nom, marque ou début d'EAN sur Cloud SQL `products`.
-
-    Filtre `off_found = TRUE` : les EAN non enrichis ont name/brand NULL,
-    inutilisables en résultat de recherche. L'ILIKE échappe %/_ pour que la
-    saisie utilisateur soit traitée littéralement.
-    """
+    """Recherche par nom, marque ou debut d'EAN."""
+    # filtre off_found=TRUE (non enrichis = name/brand NULL) ; escape %/_ pour ILIKE litteral
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     sql = text(
         """
@@ -125,11 +110,8 @@ async def get_product(
             source=row.source,
         )
 
-    # Hors catalogue : un EAN peut n'exister que par ses relevés Silver (codes
-    # magasin d'Open Prices, produits jamais enrichis). Plutôt qu'un 404 qui
-    # casse le clic depuis l'observatoire, on renvoie une fiche « prix seulement »
-    # (200, catalog=false) dès qu'au moins un prix existe. 404 seulement si
-    # l'EAN n'est nulle part.
+    # hors catalogue : EAN connu par ses seuls prix Silver -> fiche prix seulement
+    # (200, catalog=false) pour ne pas casser le clic observatoire ; 404 si nulle part
     settings = get_settings()
     src = bq.qualified(settings.prt_bq_dataset_silver, "open_prices_clean")
     exists = await asyncio.to_thread(
@@ -145,19 +127,10 @@ async def get_product(
 
 @router.get("/{ean}/prices", response_model=ProductPricesOut)
 async def get_product_prices(ean: str) -> ProductPricesOut:
-    """Historique de prix + comparateur enseignes pour un EAN.
-
-    Source : Silver `open_prices_clean` (relevés Open Prices géolocalisés).
-    - `series` : médiane hebdo tous points de vente confondus (toute la
-      profondeur disponible — la fenêtre Open Prices est encore courte).
-    - `by_store` : médiane par enseigne sur les 8 dernières semaines DE CE
-      PRODUIT (ancrées sur son MAX(week), pas CURRENT_DATE : robuste aux
-      retards d'ingestion), triée du moins cher au plus cher.
-
-    Un EAN jamais relevé renvoie un payload vide (200) : le produit peut
-    exister au catalogue sans avoir de prix publics — état à afficher
-    honnêtement côté frontend.
-    """
+    """Historique de prix + comparateur enseignes pour un EAN."""
+    # series = mediane hebdo tous PDV ; by_store = mediane par enseigne sur les 8
+    # dernieres semaines DU PRODUIT (ancre sur son MAX(week), pas CURRENT_DATE :
+    # robuste aux retards d'ingestion). EAN jamais releve -> payload vide (200).
     settings = get_settings()
     src = bq.qualified(settings.prt_bq_dataset_silver, "open_prices_clean")
     ean_param = [bigquery.ScalarQueryParameter("ean", "STRING", ean)]
@@ -240,16 +213,9 @@ async def get_substitutes(
     k: int = Query(default=5, ge=1, le=20),
     session: AsyncSession = Depends(get_session),
 ) -> list[SubstituteOut]:
-    """Top-K substituts via pgvector cosine similarity.
-
-    Lit l'embedding de l'EAN cible depuis Cloud SQL `products.embedding`,
-    cherche les K plus proches (excluant l'EAN lui-même) qui partagent la
-    même `category_l3` (sécurité : pas de substitut shampoing → yaourt).
-
-    Edge cases :
-    - EAN target absent / embedding NULL → 404 (substituts pas calculables).
-    - Moins de K voisins dans la catégorie → renvoie ce qu'on a (peut être []).
-    """
+    """Top-K substituts via pgvector cosine similarity."""
+    # K plus proches (hors EAN cible) partageant category_l3 (pas de shampoing -> yaourt).
+    # embedding target NULL -> 404 ; moins de K voisins -> renvoie ce qu'on a
     sql = text(
         """
         WITH target AS (
@@ -272,12 +238,8 @@ async def get_substitutes(
     result = await session.execute(sql, {"ean": ean, "k": k})
     rows = result.mappings().all()
     if not rows:
-        # Soit l'EAN cible n'a pas d'embedding (worker OFF pas passé sur lui),
-        # soit aucun voisin dans la même catégorie. Distinguer via une query
-        # supplémentaire ajouterait du coût et peu de valeur ; on renvoie 404
-        # dans les deux cas. Le frontend peut afficher "Pas de substituts dispo".
-        # Vérifie si l'EAN existe au moins pour différencier "produit inconnu"
-        # vs "pas de voisins" :
+        # pas d'embedding ou pas de voisin : verifie l'existence pour distinguer
+        # 404 produit inconnu vs [] pas de voisins
         exists = await session.execute(
             text("SELECT 1 FROM products WHERE ean = :ean"), {"ean": ean}
         )

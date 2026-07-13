@@ -8,10 +8,8 @@ from pydantic import BaseModel, Field
 
 
 class ProductOut(BaseModel):
-    """Détail produit. Tous les champs OFF sont NULL-tolerant : le worker OFF
-    est rate-limité (15 req/min) et certains EAN sont absents de OFF — la
-    ligne existe quand même en SQL/BQ avec `off_found=false`.
-    """
+    """Detail produit. Champs OFF nullables : worker OFF rate-limite et certains
+    EAN absents de OFF (ligne quand meme presente, off_found=false)."""
 
     ean: str
     name: str | None = None
@@ -61,9 +59,8 @@ class StorePrice(BaseModel):
 
 
 class ProductPricesOut(BaseModel):
-    """Historique + comparateur enseignes d'un produit. `series` et `by_store`
-    peuvent être vides (EAN jamais relevé dans Open Prices) : le frontend
-    affiche alors « pas encore de relevés » plutôt qu'un graphe vide."""
+    """Historique + comparateur enseignes. series/by_store vides si EAN jamais
+    releve dans Open Prices."""
 
     ean: str
     series: list[PricePoint] = Field(default_factory=list)

@@ -1,16 +1,10 @@
-"""Signed URLs V4 PUT pour l'upload de tickets, SANS clé JSON.
+"""Signed URLs V4 pour tickets, sans cle JSON.
 
-Org policy `iam.disableServiceAccountKeyCreation` interdit la création de
-clés JSON pour les SAs. `Blob.generate_signed_url()` du SDK GCS exige par
-défaut une clé pour signer ; le contournement officiel est de déléguer la
-signature à l'API IAM Credentials (`signBlob`) en passant :
-  - `service_account_email` : la SA qui signe (la backend-sa elle-même)
-  - `access_token` : l'access token courant de l'ADC
-
-Le SA doit avoir `roles/iam.serviceAccountTokenCreator` sur lui-même.
-Cette binding est ajoutée par `infra/envs/prod/iam_backend.tf`.
-
-Référence : https://cloud.google.com/storage/docs/access-control/signed-urls#impersonation
+org policy iam.disableServiceAccountKeyCreation -> pas de cle pour signer. On
+delegue la signature a IAM Credentials (signBlob) via service_account_email +
+access_token ADC. La SA a besoin de roles/iam.serviceAccountTokenCreator sur
+elle-meme (iam_backend.tf).
+https://cloud.google.com/storage/docs/access-control/signed-urls#impersonation
 """
 
 from __future__ import annotations
@@ -56,16 +50,8 @@ def generate_ticket_upload_url(
     content_type: str = "image/jpeg",
     ticket_uuid: str | None = None,
 ) -> TicketUploadURL:
-    """Génère une Signed URL V4 PUT pour `tickets/raw/{user_id}/{uuid}.jpg`.
-
-    Le `content_type` est fixé dans la signature : le client DOIT envoyer
-    exactement le même `Content-Type` dans son PUT, sinon GCS refuse (403).
-    On contraint à `image/jpeg` ou `image/png` pour éviter d'archiver autre
-    chose (PDF, ZIP) — validation côté serveur.
-
-    Retourne aussi le `gcs_path` (gs://...) pour le persister dans la table
-    `tickets.gcs_path`.
-    """
+    # content_type fige dans la signature : le PUT client doit envoyer le meme,
+    # sinon 403. Restreint a jpeg/png pour ne pas archiver n'importe quoi.
     if content_type not in {"image/jpeg", "image/png"}:
         raise ValueError(f"Unsupported content_type: {content_type!r}")
 
@@ -73,14 +59,11 @@ def generate_ticket_upload_url(
     if not settings.prt_gcs_bucket_bronze:
         raise RuntimeError("PRT_GCS_BUCKET_BRONZE not configured.")
 
-    # ADC refresh — indispensable pour récupérer un access_token valide à
-    # passer à `generate_signed_url`. Sans ce refresh, `credentials.token`
-    # est `None` côté Cloud Run au premier appel.
+    # refresh sinon credentials.token est None au 1er appel Cloud Run
     credentials, _project = adc_default()
     credentials.refresh(GoogleAuthRequest())
 
-    # `service_account_email` n'est pas dispo sur toutes les classes
-    # `Credentials` (ex: UserCredentials en local). Fallback explicite.
+    # service_account_email absent sur certaines Credentials (UserCredentials local)
     sa_email = getattr(credentials, "service_account_email", None)
     if not sa_email:
         raise RuntimeError(
@@ -129,7 +112,6 @@ class TicketReadURL:
 
 
 def _object_name_from_gcs_path(gcs_path: str) -> str:
-    """Extrait le nom d'objet (chemin relatif au bucket) d'un `gs://bucket/obj`."""
     settings = get_settings()
     prefix = f"gs://{settings.prt_gcs_bucket_bronze}/"
     if not gcs_path.startswith(prefix):
@@ -138,12 +120,8 @@ def _object_name_from_gcs_path(gcs_path: str) -> str:
 
 
 def generate_ticket_read_url(*, gcs_path: str) -> TicketReadURL:
-    """Génère une Signed URL V4 GET pour afficher l'image d'un ticket.
-
-    Même mécanisme d'impersonation IAM `signBlob` que l'upload (org policy
-    interdit les clés JSON). L'appelant doit avoir vérifié que le ticket
-    appartient bien à l'utilisateur avant d'exposer l'URL.
-    """
+    # meme impersonation signBlob que l'upload. l'appelant doit deja avoir
+    # verifie que le ticket appartient a l'utilisateur.
     settings = get_settings()
     if not settings.prt_gcs_bucket_bronze:
         raise RuntimeError("PRT_GCS_BUCKET_BRONZE not configured.")

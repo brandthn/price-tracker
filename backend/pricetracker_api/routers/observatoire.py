@@ -1,24 +1,11 @@
 """Router observatoire public — rankings, hall of shame, carte.
 
-Schémas RÉELS (cf. workers/indices/pricetracker_indices/bq.py) :
-- Gold `rankings_produits` : (reference_week, product_code, prev_median,
-  curr_median, pct_change RATIO) — top hausses uniquement, sans nom/marque.
-- Silver `open_prices_clean` : prix unitaires (postcode, enseigne, semaine).
-
-Résolution des noms : les libellés/marques sont résolus contre **Cloud SQL
-`products`** (le catalogue de référence, ~14,5k EAN), PAS contre le mini-miroir
-BQ `catalogue_produits`. BigQuery ne peut pas joindre Cloud SQL → on procède en
-deux temps : BQ renvoie les EAN + prix, puis un batch SQL sur `products` complète
-nom/marque/image en Python. Un EAN connu uniquement par ses prix Silver (absent
-du catalogue) reste affiché mais ACCOMPAGNÉ (prix, enseigne) et marqué
-`in_catalog=false` côté contrat — jamais un EAN nu.
-
-Granularité : `week` (défaut) agrège par semaine, `month` par mois
-(`DATE_TRUNC(..., MONTH)`) — une seule variable pilote toute la page côté UI.
-
-Si les tables ne sont pas peuplées, on renvoie un payload vide (200,
-items=[]) plutôt que 500 : le frontend affiche un état « observatoire en
-construction ».
+Schemas reels (workers/indices/.../bq.py) : Gold rankings_produits
+(reference_week, product_code, prev/curr_median, pct_change RATIO ; hausses only,
+sans nom) ; Silver open_prices_clean (prix unitaires postcode/enseigne/semaine).
+Noms resolus contre Cloud SQL products (BQ renvoie EAN+prix, batch SQL complete
+nom/marque/image) ; EAN hors catalogue -> in_catalog=false. Granularite week/month.
+Tables vides -> 200 items=[], pas 500.
 """
 
 from __future__ import annotations
@@ -52,7 +39,7 @@ _MIN_OBS = 3
 
 
 def _period_expr(granularity: Granularity) -> str:
-    """Expression SQL de bucket temporel appliquée à `week_start_date`."""
+    # bucket temporel sur week_start_date
     return (
         "week_start_date"
         if granularity == "week"
@@ -87,9 +74,8 @@ def _build_rankings(rows: list[dict], resolved: dict[str, dict]) -> list[Ranking
 
 
 def _silver_changes_cte(granularity: Granularity) -> str:
-    """CTE partagée : dernière variation (médiane) par produit sur la fenêtre
-    rankings, calculée depuis Silver au grain demandé. Expose (product_code,
-    pct_change en %, curr_median, prev_median, n, reference_period)."""
+    # CTE : derniere variation mediane par produit sur la fenetre, depuis Silver.
+    # expose (product_code, pct_change %, curr/prev_median, n, reference_period)
     period = _period_expr(granularity)
     window = _RANKINGS_WINDOW_WEEKS[granularity]
     return f"""
@@ -172,8 +158,7 @@ async def get_rankings(
     settings = get_settings()
 
     rows: list[dict] = []
-    # Gold `rankings_produits` n'existe qu'au grain semaine (reference_week) et
-    # ne stocke que les hausses → on ne l'utilise qu'en week/up. Sinon Silver.
+    # Gold rankings_produits : grain semaine + hausses only -> week/up seulement, sinon Silver
     if direction == "up" and granularity == "week":
         gold_sql = f"""
         SELECT
@@ -209,12 +194,9 @@ async def get_hall_of_shame(
     granularity: Granularity = Query(default="week"),
     session: AsyncSession = Depends(get_session),
 ) -> RankingsOut:
-    """Hausses les plus « visibles » : variation pondérée par la popularité.
-
-    Aucun `shame_score` n'est matérialisé côté Gold — on le calcule ici :
-    pct_change × LN(1 + observations), les observations servant de proxy
-    de popularité (plus un produit est relevé, plus il est acheté/suivi).
-    """
+    """Hausses ponderees par la popularite."""
+    # shame_score calcule ici (pas en Gold) : pct_change * LN(1 + observations),
+    # observations = proxy popularite
     sql = f"""
     WITH {_silver_changes_cte(granularity)}
     SELECT
@@ -239,14 +221,10 @@ async def get_hall_of_shame(
 
 @router.get("/map", response_model=MapOut)
 async def get_map(granularity: Granularity = Query(default="week")) -> MapOut:
-    """Choroplèthe : variation de prix par département FR.
-
-    Silver est la seule source géolocalisée (postcode → département).
-    Méthode « produits appariés » pour limiter l'effet de composition :
-    par (département, produit), médiane des N dernières semaines vs les N
-    précédentes (N = 4 en hebdo, 8 en mensuel), puis moyenne des variations
-    pondérée par le nombre d'observations.
-    """
+    """Choropleth : variation de prix par departement FR."""
+    # Silver = seule source geolocalisee (postcode -> dept). Produits apparies
+    # (limite l'effet de composition) : par (dept, produit) mediane N dernieres
+    # semaines vs N precedentes, moyenne ponderee par les observations
     half = _MAP_HALF_WINDOW_WEEKS[granularity]
     sql = f"""
     WITH prices AS (

@@ -32,23 +32,21 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # 1) tickets — nouvelles colonnes OCR
     op.add_column("tickets", sa.Column("ocr_engine", sa.Text(), nullable=True))
     op.add_column("tickets", sa.Column("ocr_duration_ms", sa.Integer(), nullable=True))
 
-    # 2) prix_extraits — DEFAULT sur id pour que le worker insère sans fournir l'UUID
+    # DEFAULT sur id : le worker insere sans fournir l'UUID
     op.execute(
         "ALTER TABLE prix_extraits ALTER COLUMN id SET DEFAULT gen_random_uuid()"
     )
 
-    # 3) prix_extraits — contrainte UNIQUE pour ON CONFLICT (ticket_id, line_index)
+    # UNIQUE pour ON CONFLICT (ticket_id, line_index), idempotence replay Pub/Sub
     op.create_unique_constraint(
         "uq_prix_extraits_ticket_line",
         "prix_extraits",
         ["ticket_id", "line_index"],
     )
 
-    # 4) prix_extraits — colonnes OCR worker
     op.add_column("prix_extraits", sa.Column("unit_price", sa.Numeric(10, 2), nullable=True))
     op.add_column("prix_extraits", sa.Column("line_total", sa.Numeric(10, 2), nullable=True))
     op.add_column(

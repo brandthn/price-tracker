@@ -4,21 +4,10 @@ Revision ID: 0001_bootstrap_init
 Revises:
 Create Date: 2026-05-25
 
-Notes :
-- `CREATE EXTENSION IF NOT EXISTS vector` requiert un superuser ou un user
-  avec l'attribut `superuser`. Sur Cloud SQL, le user `postgres` (créé à
-  l'init de l'instance) l'a. Notre user applicatif `pt_app` ne l'a PAS —
-  pour la première migration, l'utiliser via cloud-sql-proxy avec un user
-  qui peut. Alternativement : créer l'extension à la main une fois via la
-  console Cloud SQL, puis re-tenter la migration (la commande
-  IF NOT EXISTS rend l'opération idempotente).
-
-- `products` est créée par le worker OFF en bootstrap (DDL embarqué dans
-  `workers/off/pricetracker_off/pg.py`). On la (re)crée ici avec un
-  `IF NOT EXISTS` brut via op.execute pour ne pas planter si la table
-  existe déjà avec des données (la table contient ~554 rows en prod au
-  2026-05-25). Le DDL doit rester strictement aligné avec le worker —
-  toute modification doit être coordonnée avec une migration explicite.
+CREATE EXTENSION vector demande un superuser : pt_app ne l'a pas, creer
+l'extension a la main via la console Cloud SQL si la migration echoue (IF NOT
+EXISTS = idempotent). products est cree par le worker OFF au bootstrap, on la
+(re)cree ici en IF NOT EXISTS ; DDL a garder aligne avec pg.py.
 """
 
 from __future__ import annotations
@@ -36,12 +25,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # 1) Extension pgvector — idempotent.
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # 2) products — table partagée avec le worker OFF. CREATE IF NOT EXISTS
-    #    car la table peut déjà exister (peuplée par worker-off). Le DDL doit
-    #    matcher exactement workers/off/pricetracker_off/pg.py.
+    # products : partagee avec le worker OFF, IF NOT EXISTS car deja peuplee.
+    # DDL a matcher workers/off/pricetracker_off/pg.py
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS products (
@@ -62,15 +49,12 @@ def upgrade() -> None:
         )
         """
     )
-    # Index utiles pour la recherche / lookup.
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_products_category_l3 ON products (category_l3)"
     )
     op.execute("CREATE INDEX IF NOT EXISTS ix_products_off_found ON products (off_found)")
-    # Index ANN pgvector : ivfflat sur cosine. Lists=100 = compromis qualité/latence
-    # pour ~10k-100k rows. À monter avec la volumétrie. Reste optionnel — la
-    # création peut être longue (>1min sur dataset chargé) ; on la fait via op.execute
-    # IF NOT EXISTS pour ne pas planter si déjà créé manuellement.
+    # ivfflat cosine, lists=100 = compromis qualite/latence pour ~10k-100k rows ;
+    # creation potentiellement longue, IF NOT EXISTS
     op.execute(
         """
         CREATE INDEX IF NOT EXISTS ix_products_embedding_cosine
@@ -78,7 +62,6 @@ def upgrade() -> None:
         """
     )
 
-    # 3) users
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -91,7 +74,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_users_firebase_uid", "users", ["firebase_uid"])
 
-    # 4) tickets
     op.create_table(
         "tickets",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -114,7 +96,6 @@ def upgrade() -> None:
     op.create_index("ix_tickets_user_id", "tickets", ["user_id"])
     op.create_index("ix_tickets_status", "tickets", ["status"])
 
-    # 5) prix_extraits
     op.create_table(
         "prix_extraits",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -149,7 +130,6 @@ def upgrade() -> None:
         ["validated_by_user"],
     )
 
-    # 6) product_aliases
     op.create_table(
         "product_aliases",
         sa.Column("raw_text", sa.String(300), nullable=False),
@@ -171,7 +151,6 @@ def upgrade() -> None:
         ["validated_by_user"],
     )
 
-    # 7) user_basket_history
     op.create_table(
         "user_basket_history",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -193,7 +172,6 @@ def upgrade() -> None:
     op.create_index("ix_user_basket_history_user_id", "user_basket_history", ["user_id"])
     op.create_index("ix_user_basket_history_ean", "user_basket_history", ["ean"])
 
-    # 8) notification_prefs
     op.create_table(
         "notification_prefs",
         sa.Column(
@@ -234,5 +212,4 @@ def downgrade() -> None:
     op.drop_table("tickets")
     op.drop_index("ix_users_firebase_uid", table_name="users")
     op.drop_table("users")
-    # On NE drop PAS `products` au downgrade : table partagée avec le
-    # worker OFF, son cycle de vie est indépendant.
+    # products pas droppe : table partagee avec le worker OFF (cycle de vie independant)

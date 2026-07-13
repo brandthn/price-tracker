@@ -39,12 +39,7 @@ router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 
 def _line_paid_amount(item: PrixExtrait) -> float | None:
-    """Montant effectivement payé pour une ligne (source de vérité du total).
-
-    Priorité : correction utilisateur (`price_eur`) > total ligne OCR
-    (`line_total`) > prix unitaire × quantité. Une ligne sans aucun montant
-    n'entre pas dans le total.
-    """
+    # priorite : price_eur (correction user) > line_total (OCR) > unit_price*qty
     if item.price_eur is not None:
         return float(item.price_eur)
     if item.line_total is not None:
@@ -70,15 +65,9 @@ async def request_upload_url(
     user: AuthenticatedUser = Depends(verify_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> TicketUploadURLResponse:
-    """Génère une Signed URL V4 PUT pour l'upload d'un ticket.
-
-    1. (lazy) crée la ligne `users` si premier appel.
-    2. Pré-réserve un UUID de ticket pour le nommage GCS.
-    3. Signe l'URL (TTL configurable, défaut 15 min).
-    4. Insère la ligne `tickets` en statut `pending` + `gcs_path` reflétant
-       l'URL signée. La transition `pending → uploaded` est faite par le
-       worker OCR lors du déclencheur Pub/Sub `OBJECT_FINALIZE`.
-    """
+    """Signed URL V4 PUT pour l'upload d'un ticket."""
+    # UUID reserve pour le nommage GCS ; ligne tickets en pending, transition
+    # pending -> uploaded faite par le worker OCR (trigger OBJECT_FINALIZE)
     db_user = await get_or_create_user(session, user)
     ticket_id = uuid.uuid4()
 
@@ -153,8 +142,7 @@ async def get_ticket(
     db_user = await get_or_create_user(session, user)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.user_id != db_user.id:
-        # Mêmes 404 pour "non trouvé" et "appartient à un autre user" pour
-        # éviter de leaker l'existence d'IDs d'autres comptes.
+        # 404 identique not-found / autre-user : pas de leak d'IDs
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ticket not found.")
 
     items = (
@@ -176,11 +164,7 @@ async def get_ticket_image_url(
     user: AuthenticatedUser = Depends(verify_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> TicketImageURLResponse:
-    """Signed URL de lecture (GET) de l'image du ticket, pour l'afficher côté UI.
-
-    404 identique pour "non trouvé" et "appartient à un autre user" (pas de leak).
-    404 aussi si le ticket n'a pas encore d'objet GCS (upload jamais finalisé).
-    """
+    """Signed URL GET de l'image du ticket."""
     db_user = await get_or_create_user(session, user)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.user_id != db_user.id:
@@ -207,19 +191,14 @@ async def patch_ticket_items(
     user: AuthenticatedUser = Depends(verify_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> TicketDetailOut:
-    """Validation/correction des items OCR par l'utilisateur.
-
-    Chaque item patché passe à `validated_by_user=True`. Si un `ean` ou
-    `produit_nom` est fourni, on enrichit `product_aliases` avec la paire
-    (raw_text, enseigne) → ean pour améliorer le matching futur (boucle de
-    feedback).
-    """
+    """Validation/correction des items OCR par l'utilisateur."""
+    # item patche -> validated_by_user=True ; ean/produit_nom fourni enrichit
+    # product_aliases (raw_text, enseigne) -> ean pour le matching futur
     db_user = await get_or_create_user(session, user)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.user_id != db_user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ticket not found.")
 
-    # Charge tous les items concernés en une requête.
     item_ids = [p.id for p in body.items]
     rows = (
         await session.execute(
@@ -248,9 +227,7 @@ async def patch_ticket_items(
         item.needs_validation = False
         item.validated_by_user = True
 
-        # Feedback loop : insert/update product_aliases pour réutilisation OCR future.
-        # Enseigne="" si NULL côté ticket : la PK composite (raw_text, enseigne, source)
-        # n'accepte pas de NULL.
+        # enseigne="" si NULL : la PK composite (raw_text, enseigne, source) refuse NULL
         if patch.ean:
             enseigne = ticket.enseigne or ""
             produit_nom = patch.produit_nom or item.produit_nom
@@ -277,9 +254,8 @@ async def patch_ticket_items(
             )
             await session.execute(stmt)
 
-    # Recalcule le total du ticket sur TOUTES ses lignes (le select flush les
-    # corrections en attente) : sans ça, `total_eur` reste figé à la valeur OCR
-    # et ne reflète jamais les corrections humaines.
+    # recalcul total sur toutes les lignes (le select flush les corrections) ;
+    # sinon total_eur reste fige a la valeur OCR
     items = (
         await session.execute(
             select(PrixExtrait)
@@ -317,19 +293,14 @@ async def submit_feedback(
     user: AuthenticatedUser = Depends(verify_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> FeedbackResponse:
-    """Avis 👍/👎 de l'utilisateur sur l'output OCR.
-
-    Le ticket est déjà "pris en compte" dès l'OCR — ce feedback ne valide rien,
-    il alimente l'historique d'analyse (`ocr_feedback`) et, si 👎, déclenche un
-    re-OCR par un second LLM (tier-2) tant que le plafond `prt_max_ocr_attempts`
-    n'est pas atteint (garde-fou anti-boucle).
-    """
+    """Avis up/down sur l'output OCR."""
+    # le ticket est deja compte ; ce feedback historise (ocr_feedback) et, si down,
+    # relance un re-OCR tier-2 tant que ocr_attempts < prt_max_ocr_attempts
     db_user = await get_or_create_user(session, user)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.user_id != db_user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ticket not found.")
 
-    # Historise l'avis (une ligne par avis, jamais d'upsert).
     session.add(
         OcrFeedback(
             ticket_id=ticket.id,
@@ -342,10 +313,8 @@ async def submit_feedback(
     ticket.last_feedback = body.rating
 
     settings = get_settings()
-    # Escalade routée par le moteur du dernier OCR : scratch → ocr-llm (pass 1)
-    # → ocr-llm (pass 2 correctif). Les deux passes ocr-llm partagent le label
-    # `gemini` et re-bouclent sur le même topic ; c'est `prt_max_ocr_attempts`
-    # (=4 : scratch + 2 passes) qui borne la chaîne. Un engine hors map n'escalade pas.
+    # escalade routee par le moteur du dernier OCR ; chaine bornee par
+    # prt_max_ocr_attempts, engine hors map n'escalade pas
     next_topic: str | None = None
     if body.rating == "down" and ticket.ocr_attempts < settings.prt_max_ocr_attempts:
         next_topic = settings.ocr_escalation_by_engine.get(ticket.ocr_engine or "")
@@ -354,8 +323,8 @@ async def submit_feedback(
     await session.commit()
     await session.refresh(ticket)
 
-    # Publication APRÈS commit : on ne relance un re-OCR que si l'avis est bien
-    # persisté. Échec de publication → 502 explicite (le feedback reste sauvé).
+    # publication apres commit : re-OCR seulement si l'avis est persiste.
+    # echec publish -> 502, le feedback reste sauve
     if next_topic is not None:
         try:
             await asyncio.to_thread(pubsub.publish_to_topic, next_topic, str(ticket.id))

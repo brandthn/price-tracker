@@ -1,4 +1,3 @@
-"""Tests des enrichissements Silver : enseigne, ville, EAN, discount, IQR."""
 
 from __future__ import annotations
 
@@ -13,9 +12,7 @@ from pricetracker_ingestion.enrichments import (
 )
 
 
-# ---------------------------------------------------------------------------
-# normalize_store_brand
-# ---------------------------------------------------------------------------
+
 
 
 @pytest.mark.parametrize(
@@ -33,7 +30,7 @@ from pricetracker_ingestion.enrichments import (
         ("Lidl", "Lidl"),
         ("Monop' Daily, Paris", "Monoprix"),
         ("Géant Casino, Toulouse", "Géant Casino"),
-        ("Bio C'Bon, Paris", "Bio C'Bon"),  # inconnu → fallback premier segment
+        ("Bio C'Bon, Paris", "Bio C'Bon"),
         (None, None),
         ("", None),
     ],
@@ -42,9 +39,7 @@ def test_normalize_store_brand(raw: str | None, expected: str | None) -> None:
     assert normalize_store_brand(raw) == expected
 
 
-# ---------------------------------------------------------------------------
-# standardize_city
-# ---------------------------------------------------------------------------
+
 
 
 @pytest.mark.parametrize(
@@ -66,21 +61,19 @@ def test_standardize_city(raw: str | None, expected: str | None) -> None:
     assert standardize_city(raw) == expected
 
 
-# ---------------------------------------------------------------------------
-# validate_ean
-# ---------------------------------------------------------------------------
+
 
 
 @pytest.mark.parametrize(
     "code,ok",
     [
-        ("3017620422003", True),  # Nutella, checksum valide
-        ("8076809513753", True),  # Barilla, checksum valide
-        ("9999999999999", False),  # 13 chiffres mais checksum incorrect
-        ("3017620422004", False),  # off by one
-        ("12345678", False),  # 8 chiffres mais checksum incorrect
-        ("123456", False),  # mauvaise longueur
-        ("3017620422003X", False),  # caractère non numérique
+        ("3017620422003", True),
+        ("8076809513753", True),
+        ("9999999999999", False),
+        ("3017620422004", False),
+        ("12345678", False),
+        ("123456", False),
+        ("3017620422003X", False),
         ("", False),
         (None, False),
     ],
@@ -92,9 +85,7 @@ def test_validate_ean(code: str | None, ok: bool) -> None:
         assert details is not None
 
 
-# ---------------------------------------------------------------------------
-# check_discount_coherence
-# ---------------------------------------------------------------------------
+
 
 
 def test_discount_not_marked_is_coherent() -> None:
@@ -115,7 +106,7 @@ def test_discount_inverted_is_rejected() -> None:
 
 
 def test_discount_too_large_is_rejected() -> None:
-    """Une remise > 95% est considérée comme une erreur de saisie."""
+
     row = {"price_eur": 0.05, "price_without_discount_eur": 5.0, "price_is_discounted": True}
     ok, _ = check_discount_coherence(row)
     assert ok is False
@@ -126,9 +117,7 @@ def test_discount_reasonable_passes() -> None:
     assert check_discount_coherence(row) == (True, None)
 
 
-# ---------------------------------------------------------------------------
-# flag_iqr_outliers
-# ---------------------------------------------------------------------------
+
 
 
 def test_iqr_no_outliers_in_uniform_prices() -> None:
@@ -138,7 +127,7 @@ def test_iqr_no_outliers_in_uniform_prices() -> None:
 
 
 def test_iqr_flags_obvious_outlier() -> None:
-    prices = [2.0, 2.1, 2.0, 1.9, 2.05, 2.1, 999.0]  # 999 = aberrant
+    prices = [2.0, 2.1, 2.0, 1.9, 2.05, 2.1, 999.0]
     rows = [{"product_code": "EAN1", "price_eur": p} for p in prices]
     flag_iqr_outliers(rows)
     outliers = [r["iqr_outlier"] for r in rows]
@@ -147,7 +136,7 @@ def test_iqr_flags_obvious_outlier() -> None:
 
 
 def test_iqr_skips_low_volume_eans() -> None:
-    """< 5 observations → pas de flag (impossible de calculer un quartile fiable)."""
+
     rows = [{"product_code": "EAN1", "price_eur": p} for p in [2.0, 2.0, 999.0]]
     flag_iqr_outliers(rows)
     assert all(r["iqr_outlier"] is False for r in rows)
@@ -159,7 +148,7 @@ def test_iqr_independent_per_product() -> None:
         + [{"product_code": "EAN2", "price_eur": p} for p in [100.0] * 10]
     )
     flag_iqr_outliers(rows)
-    # Aucun outlier (uniformes) malgré la différence de prix entre les 2 EAN.
+
     assert all(r["iqr_outlier"] is False for r in rows)
 
 

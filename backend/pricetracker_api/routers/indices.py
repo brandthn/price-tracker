@@ -1,20 +1,11 @@
-"""Router indices — perso, national, régional.
+"""Router indices — perso, national, regional.
 
-Schémas RÉELS des tables (cf. workers/indices/pricetracker_indices/bq.py) :
-- Gold `indices_inflation` : (week_start_date, store_brand_normalized,
-  country_code, observations, median_price_eur, base_price, index_value).
-  Une série base-100 PAR enseigne — pas de scope national pré-calculé.
-- Silver `open_prices_clean` : prix unitaires géolocalisés (postcode) —
-  seule source pour la dimension départementale.
-
-L'indice national est donc dérivé ici : moyenne des `index_value` par
-enseigne pondérée par `observations`, semaine par semaine. L'indice
-régional est recalculé depuis Silver (médiane hebdo du département,
-base 100 sur la première semaine de la fenêtre).
-
-Tant que les tables sont vides, on renvoie `series=[]` avec `current=None`
-plutôt que de planter — contrat utile pour le frontend (état "en
-construction").
+Schemas reels (workers/indices/.../bq.py) : Gold indices_inflation = serie
+base-100 PAR enseigne (pas de national pre-calcule) ; Silver open_prices_clean =
+prix geolocalises (postcode), seule source departementale.
+National derive ici : moyenne des index_value ponderee par observations, par
+semaine. Regional recalcule depuis Silver (mediane hebdo dept, base 100 sur la
+1ere semaine). Tables vides -> series=[], current=None.
 """
 
 from __future__ import annotations
@@ -35,8 +26,7 @@ router = APIRouter(prefix="/indices", tags=["indices"])
 _INDICES_TABLE = "indices_inflation"
 _SILVER_PRICES_TABLE = "open_prices_clean"
 
-# Fenêtre régionale ancrée sur MAX(week_start_date) (et pas CURRENT_DATE) :
-# robuste si l'ingestion a du retard — la série reste affichable.
+# fenetre ancree sur MAX(week_start_date), pas CURRENT_DATE : robuste au retard d'ingestion
 _REGIONAL_WINDOW_WEEKS = 26
 _REGIONAL_MIN_OBS = 3
 
@@ -66,9 +56,8 @@ async def get_national(
     granularity: Literal["week", "month"] = Query(default="week"),
 ) -> InflationIndexOut:
     settings = get_settings()
-    # Grain temporel : semaine (défaut) ou mois. Les `index_value` étant déjà
-    # base-100 par enseigne/semaine, agréger par mois reste une moyenne
-    # pondérée base-100 — pas de rebase à refaire.
+    # index_value deja base-100 par enseigne/semaine : agreger par mois reste une
+    # moyenne ponderee base-100, pas de rebase
     period = (
         "week_start_date"
         if granularity == "week"
@@ -145,10 +134,9 @@ async def get_regional(departement: str) -> InflationIndexOut:
 async def get_personal(
     user: AuthenticatedUser = Depends(verify_bearer),
 ) -> InflationIndexOut:
-    """Indice personnel : non matérialisé à ce jour (le worker indices ne
-    calcule pas de scope 'personal'). On garde le contrat — `series=[]` —
-    et le frontend s'appuie sur `/me/basket` (Cloud SQL) pour la vue
-    « Mon budget ». À réévaluer quand le worker matérialisera l'indice.
+    """Indice personnel : non materialise (le worker ne calcule pas ce scope).
+
+    Contrat garde (series=[]) ; la vue budget passe par /me/basket (Cloud SQL).
     """
-    del user  # auth requise, pas de donnée à ce jour
+    del user  # auth requise, pas de donnee a ce jour
     return _build_index("personal", [])

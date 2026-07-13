@@ -7,10 +7,8 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Labels moteur écrits par les workers dans `tickets.ocr_engine` (= la var
-# PRT_OCR_ENGINE_LABEL côté Cloud Run). Ils identifient quel OCR a traité le
-# ticket en dernier, ce qui permet de router le 👎 vers le tier suivant
-# (cf. Settings.ocr_escalation_by_engine). ocr-llm écrit "gemini".
+# labels moteur ecrits par les workers dans tickets.ocr_engine (PRT_OCR_ENGINE_LABEL).
+# route l'escalade re-OCR vers le tier suivant. ocr-llm ecrit "gemini".
 OCR_ENGINE_SCRATCH = "ocr-vlm-scratch"
 OCR_ENGINE_MOONDREAM = "moondream-0.5b"
 OCR_ENGINE_GEMINI = "gemini"
@@ -63,10 +61,9 @@ class Settings(BaseSettings):
         description="DEV ONLY : bypass Firebase Auth, retourne un user fake.",
     )
 
-    # --- Feedback loop / escalade re-OCR ---------------------------------
-    # Escalade sur 👎 : tier-1 scratch → ocr-llm (pass 1) → ocr-llm (pass 2).
-    # Le tier-1 est dispatché par la notification GCS (topic `ticket-uploaded`),
-    # pas par le backend ; le backend ne pilote que l'escalade.
+    # --- Feedback loop / escalade re-OCR ---
+    # escalade sur retour negatif : scratch -> ocr-llm p1 -> ocr-llm p2.
+    # tier-1 dispatche par la notif GCS (ticket-uploaded), pas le backend.
     prt_ocr_moondream_topic: str = Field(
         default="ocr-vlm-moondream",
         description="Topic Pub/Sub moondream — worker déployé mais HORS chaîne "
@@ -85,10 +82,7 @@ class Settings(BaseSettings):
     )
 
     def _topic_path(self, topic: str) -> str:
-        """`projects/<proj>/topics/<topic>` attendu par PublisherClient.
-
-        Accepte un nom court (préfixé avec le projet) ou un chemin déjà complet.
-        """
+        # projects/<proj>/topics/<topic> ; accepte nom court ou chemin complet
         if topic.startswith("projects/"):
             return topic
         return f"projects/{self.google_cloud_project}/topics/{topic}"
@@ -99,14 +93,9 @@ class Settings(BaseSettings):
 
     @property
     def ocr_escalation_by_engine(self) -> dict[str, str]:
-        """`ocr_engine` du dernier OCR → chemin du topic du tier suivant.
-
-        Chaîne : scratch → ocr-llm (pass 1) → ocr-llm (pass 2 correctif). Les deux
-        passes ocr-llm partagent le label `gemini` et re-bouclent donc sur le même
-        topic `ocr-retry` ; la terminaison n'est PAS portée par cette map mais par
-        `prt_max_ocr_attempts` (cf. submit_feedback). Tout engine absent de la map
-        (ex. moondream, hors chaîne) n'escalade pas.
-        """
+        # dernier ocr_engine -> topic du tier suivant. scratch et gemini re-bouclent
+        # sur ocr-retry ; terminaison par prt_max_ocr_attempts (submit_feedback), pas
+        # ici. engine absent (moondream) = pas d'escalade.
         return {
             OCR_ENGINE_SCRATCH: self.ocr_retry_topic_path,
             OCR_ENGINE_GEMINI: self.ocr_retry_topic_path,

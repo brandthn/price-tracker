@@ -1,4 +1,3 @@
-"""Tests unitaires du cleaner : validation devise/pays/proof/prix/date."""
 
 from __future__ import annotations
 
@@ -52,7 +51,7 @@ def test_clean_happy_path(config: CleanerConfig) -> None:
     assert clean["price_eur"] == 3.49
     assert clean["price_eur_decimal"] == "3.49"
     assert clean["price_date"] == date(2026, 5, 10)
-    assert clean["week_start_date"] == date(2026, 5, 4)  # lundi de la semaine du 10/05
+    assert clean["week_start_date"] == date(2026, 5, 4)
 
 
 def test_clean_rejects_missing_required(config: CleanerConfig) -> None:
@@ -80,7 +79,7 @@ def test_clean_rejects_non_fr_country(config: CleanerConfig) -> None:
 
 
 def test_clean_accepts_dom_tom(config: CleanerConfig) -> None:
-    # DOM-TOM par défaut dans CleanerConfig.
+
     for code in ("GP", "MQ", "GF", "RE", "YT"):
         clean, _ = clean_price_record(
             _valid_row(location_osm_address_country_code=code), config
@@ -90,7 +89,7 @@ def test_clean_accepts_dom_tom(config: CleanerConfig) -> None:
 
 
 def test_clean_normalizes_pricetag_proof_type(config: CleanerConfig) -> None:
-    """Le cleaner accepte PRICETAG mais canonicalise en PRICE_TAG."""
+
     clean, _ = clean_price_record(_valid_row(proof_type="PRICETAG"), config)
     assert clean is not None
     assert clean["proof_type"] == "PRICE_TAG"
@@ -140,9 +139,7 @@ def test_clean_extracts_store_brand_from_display_name(config: CleanerConfig) -> 
     assert clean["store_brand"].startswith("Lidl")
 
 
-# ---------------------------------------------------------------------------
-# Parsers utilitaires (couverture des cas limites)
-# ---------------------------------------------------------------------------
+
 
 
 @pytest.mark.parametrize(
@@ -155,8 +152,8 @@ def test_clean_extracts_store_brand_from_display_name(config: CleanerConfig) -> 
         (None, None),
         ("not a price", None),
         (float("nan"), None),
-        ("1.2.3", None),  # double point
-        (True, None),  # bool → reject
+        ("1.2.3", None),
+        (True, None),
     ],
 )
 def test_parse_decimal_price(raw: object, expected: Decimal | None) -> None:
@@ -181,7 +178,5 @@ def test_parse_date(raw: object, expected: date | None) -> None:
 
 
 def test_iso_week_start() -> None:
-    # 2026-05-17 = dimanche → lundi 2026-05-11.
     assert iso_week_start(date(2026, 5, 17)) == date(2026, 5, 11)
-    # Lundi → lui-même.
     assert iso_week_start(date(2026, 5, 11)) == date(2026, 5, 11)

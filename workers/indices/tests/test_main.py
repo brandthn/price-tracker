@@ -1,4 +1,3 @@
-"""Smoke tests app FastAPI worker indices."""
 
 from __future__ import annotations
 
@@ -22,7 +21,7 @@ def test_healthz(client: TestClient) -> None:
 def test_run_invokes_refresh(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Le endpoint /run appelle refresh_gold_tables et renvoie les counts."""
+
     from pricetracker_indices import main as main_mod
 
     fake_counts = {
@@ -48,7 +47,7 @@ def test_run_invokes_refresh(
 def test_run_default_run_date(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Sans param `run_date`, le worker utilise la date UTC du jour."""
+
     from pricetracker_indices import main as main_mod
 
     captured: dict[str, object] = {}
@@ -61,6 +60,6 @@ def test_run_default_run_date(
 
     r = client.post("/run")
     assert r.status_code == 200
-    # Date UTC du jour au format ISO
+
     assert isinstance(captured["run_date"], str)
-    assert len(captured["run_date"]) == 10  # YYYY-MM-DD
+    assert len(captured["run_date"]) == 10

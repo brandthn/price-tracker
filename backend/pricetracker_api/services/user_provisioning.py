@@ -1,8 +1,7 @@
-"""Get-or-create user à partir du JWT Firebase.
+"""Get-or-create user depuis le JWT Firebase.
 
-Au premier appel authentifié d'un user, on crée la ligne `users` à la volée.
-Cela évite un endpoint séparé `POST /users` et garantit qu'un user existant
-dans Firebase Auth aura toujours une ligne SQL pour accrocher ses tickets.
+Ligne users creee a la volee au 1er appel authentifie : evite un POST /users et
+garantit une ligne SQL pour accrocher les tickets.
 """
 
 from __future__ import annotations

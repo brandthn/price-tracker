@@ -16,18 +16,12 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 @router.get("/brand/{brand}", response_model=BrandStatsOut)
 async def get_brand_stats(brand: str) -> BrandStatsOut:
-    """Stats agrégées par marque : nombre de produits, prix moyen, médiane
-    de variation, top hausses. Source : `catalogue_produits` (Silver) +
-    `aggregats_enseignes` / `rankings_produits` (Gold).
-
-    Tolère les tables Gold absentes (worker indices pas livré) : la partie
-    `median_pct_change` + `top_increases` sera vide, mais `product_count`
-    et `avg_price_eur` peuvent être renseignés depuis Silver + Open Prices.
-    """
+    """Stats par marque : nb produits, prix moyen, mediane de variation, top hausses."""
+    # Gold absent (worker pas livre) -> median_pct_change/top_increases vides,
+    # product_count/avg_price_eur restent depuis Silver
     settings = get_settings()
 
-    # 1) Aggrégat Silver — nombre de produits enrichis + prix moyen.
-    # Le prix moyen vient d'`open_prices_clean` joint au catalogue.
+    # nb produits + prix moyen (open_prices_clean joint au catalogue)
     silver_sql = f"""
     SELECT
       COUNT(DISTINCT c.ean) AS product_count,
@@ -50,9 +44,7 @@ async def get_brand_stats(brand: str) -> BrandStatsOut:
             status.HTTP_404_NOT_FOUND, detail=f"Brand {brand!r} not in catalog."
         )
 
-    # 2) Médiane variation — Gold `rankings_produits` n'a pas de colonne
-    # brand (schéma réel : reference_week, product_code, prev/curr_median,
-    # pct_change RATIO) → join catalogue par EAN + conversion en %.
+    # rankings_produits n'a pas de colonne brand -> join catalogue par EAN + conversion %
     rankings_fq = bq.qualified(settings.prt_bq_dataset_gold, "rankings_produits")
     catalogue_fq = bq.qualified(
         settings.prt_bq_dataset_silver, settings.prt_bq_table_catalogue
@@ -72,7 +64,6 @@ async def get_brand_stats(brand: str) -> BrandStatsOut:
     )
     median_pct_change = gold_rows[0].get("median_pct_change") if gold_rows else None
 
-    # 3) Top hausses pour cette marque.
     top_sql = f"""
     SELECT
       r.product_code AS ean,

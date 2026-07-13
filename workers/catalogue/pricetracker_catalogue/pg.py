@@ -1,11 +1,4 @@
-"""Accès Cloud SQL (PostgreSQL) — même pattern que workers/off/pg.py.
 
-Gère :
-- Pool de connexions via psycopg2
-- Schéma (idempotent)
-- Upserts des produits matchés
-- Table de progression pour reprise sur interruption
-"""
 from __future__ import annotations
 
 import os
@@ -68,9 +61,7 @@ def get_conn(settings: Settings):
         _pool.putconn(conn)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SCHÉMA
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS catalogue_products (
@@ -121,9 +112,7 @@ def ensure_schema(settings: Settings) -> None:
     logger.info("pg_schema_ready")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PROGRESSION
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def get_processed_ids(settings: Settings) -> set[int]:
     with get_conn(settings) as conn:
@@ -148,9 +137,7 @@ def mark_processed(settings: Settings, proof_id: int, statut: str, detail: str =
             )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# INSERTIONS
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def upsert_receipt(
     settings: Settings,
@@ -188,17 +175,12 @@ def upsert_receipt(
 
 
 def upsert_matches(settings: Settings, matches: list[dict]) -> None:
-    """
-    Insère les produits matchés.
-    Chaque dict : ean, nom_canonique, libelle_original, libelle_normalise,
-                  enseigne, prix, proof_id.
-    """
     if not matches:
         return
 
     with get_conn(settings) as conn:
         with conn.cursor() as cur:
-            # 1. products
+
             execute_values(
                 cur,
                 """
@@ -210,7 +192,7 @@ def upsert_matches(settings: Settings, matches: list[dict]) -> None:
                 """,
                 [(m["ean"], m.get("nom_canonique", "")) for m in matches],
             )
-            # 2. labels
+
             execute_values(
                 cur,
                 """

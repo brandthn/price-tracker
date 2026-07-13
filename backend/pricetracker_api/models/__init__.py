@@ -1,9 +1,7 @@
 """SQLAlchemy ORM models.
 
-Toutes les tables sont déclarées sur la même `Base` pour qu'Alembic
-autogenerate les détecte. Le DDL de `products` est aligné avec celui
-créé par le worker OFF (`workers/off/pricetracker_off/pg.py`) pour
-qu'Alembic puisse le `CREATE TABLE IF NOT EXISTS`.
+Meme Base pour qu'Alembic autogenerate detecte les tables. DDL products aligne
+sur celui du worker OFF (workers/off/pricetracker_off/pg.py).
 """
 
 from __future__ import annotations
@@ -15,7 +13,7 @@ class Base(DeclarativeBase):
     pass
 
 
-# Import des modèles pour qu'ils soient enregistrés sur Base.metadata.
+# enregistre les modeles sur Base.metadata
 from .notification_prefs import NotificationPrefs  # noqa: E402, F401
 from .ocr_feedback import OcrFeedback  # noqa: E402, F401
 from .prix_extraits import PrixExtrait  # noqa: E402, F401

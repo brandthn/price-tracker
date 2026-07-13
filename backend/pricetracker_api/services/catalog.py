@@ -1,12 +1,8 @@
-"""Résolution de noms produits contre le catalogue de référence Cloud SQL.
+"""Resolution de noms produits contre le catalogue Cloud SQL.
 
-BigQuery expose les prix/EAN mais ne peut pas joindre Cloud SQL. Le catalogue de
-référence (~14,5k EAN, noms/marques/images) vit dans Postgres `products` — PAS
-dans le mini-miroir BQ `catalogue_produits`. On résout donc en deux temps : BQ
-renvoie les EAN, puis un batch SQL complète nom/marque/image en Python.
-
-Partagé par les routers `observatoire` et `enseignes` (un EAN sans fiche reste
-affiché ACCOMPAGNÉ de son contexte, jamais nu → `in_catalog=false` côté contrat).
+BQ ne peut pas joindre Cloud SQL : BQ renvoie les EAN, puis un batch SQL complete
+nom/marque/image depuis Postgres products (pas le miroir BQ catalogue_produits).
+Partage par observatoire et enseignes ; EAN sans fiche = in_catalog=false.
 """
 
 from __future__ import annotations
@@ -18,11 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 async def resolve_products(
     session: AsyncSession, eans: list[str]
 ) -> dict[str, dict]:
-    """Batch nom/marque/image contre Cloud SQL `products`.
-
-    Renvoie `{ean: {name, brand, image_url}}` pour les seuls EAN présents au
-    catalogue. Les EAN absents ne sont pas dans le dict → traités comme
-    « produit non référencé » (accompagnés de leurs prix côté UI)."""
+    # {ean: {name, brand, image_url}} pour les EAN presents au catalogue seulement
     if not eans:
         return {}
     result = await session.execute(

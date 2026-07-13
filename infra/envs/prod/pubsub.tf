@@ -1,11 +1,5 @@
-# Topics Pub/Sub — bus d'événements asynchrones.
-# `ticket-uploaded` est alimenté directement par GCS via une Pub/Sub
-# notification sur le bucket bronze (cf. notifications.tf) — pas d'Eventarc :
-# le filtre `object_name_prefix` natif fait le job et économise une couche.
-#
-# `ticket-uploaded-dlq` (Phase 5) reçoit les messages que worker-ocr n'a pas
-# réussi à traiter après `max_delivery_attempts` tentatives. Pattern standard
-# Pub/Sub : isoler les empoisonnés pour inspection humaine sans bloquer le flux.
+# topics pub/sub. ticket-uploaded alimente par notif GCS (notifications.tf),
+# *-dlq pour les messages non traites apres max_delivery_attempts.
 module "pubsub" {
   source = "../../modules/pubsub"
 
@@ -14,23 +8,15 @@ module "pubsub" {
 
   topics = {
     "ticket-uploaded" = {
-      message_retention_duration = "604800s" # 7 jours (max Pub/Sub standard)
-      # Le worker OCR consomme ce topic via une push subscription (cf. subscriptions.tf).
-      subscribers = [local.worker_sa]
+      message_retention_duration = "604800s" # 7 jours
+      subscribers                = [local.worker_sa]
     }
     "ticket-uploaded-dlq" = {
       message_retention_duration = "604800s"
-      # Binding `publishers` (Pub/Sub service agent) défini directement dans
-      # subscriptions.tf via google_pubsub_topic_iam_member — son email
-      # provient d'une ressource créée au même apply (known after apply), donc
-      # impossible de le passer en clé d'un for_each de module.
-      # worker-sa peut consommer le DLQ (replay manuel ou inspection).
-      subscribers = [local.worker_sa]
+      subscribers                = [local.worker_sa]
     }
 
-    # Boucle de feedback OCR : un 👎 utilisateur publie le ticket_id ici
-    # (backend-sa = publisher). Une push subscription relaie vers worker-ocr
-    # /retry (cf. subscriptions.tf) pour une seconde passe LLM (tier-2).
+    # feedback loop: backend publie ticket_id -> re-ocr tier-2
     "ocr-retry" = {
       message_retention_duration = "604800s"
       publishers                 = [local.backend_sa]
@@ -41,9 +27,7 @@ module "pubsub" {
       subscribers                = [local.worker_sa]
     }
 
-    # Backends OCR « un backend = un worker » : un topic (+ DLQ) par moteur.
-    # Le backend publie {ticket_id} sur le topic du tier voulu (scratch → moondream
-    # → ocr-retry), une push subscription relaie vers le worker (cf. subscriptions.tf).
+    # un topic (+dlq) par moteur ocr
     "ocr-paddle" = {
       message_retention_duration = "604800s"
       publishers                 = [local.backend_sa]

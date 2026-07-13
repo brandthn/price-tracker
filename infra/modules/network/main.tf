@@ -1,16 +1,10 @@
-# VPC privée pour PriceTracker.
-# Cloud Run accède à Cloud SQL (private IP, Phase 4) via Direct VPC egress :
-# le service Cloud Run est attaché directement au subnet `primary` (config
-# `network_interfaces` dans le module cloud_run de la Phase 5). Pas de
-# Serverless VPC Connector — supprimé après l'échec récurrent de health check
-# sur ce projet + Direct VPC egress est l'approche recommandée par Google
-# depuis 2024 (GA), 0 $/mois vs ~10 $/mois pour un connector.
+# vpc privee. cloud run -> cloud sql private ip via direct vpc egress (pas de connector)
 resource "google_compute_network" "vpc" {
   name                    = var.vpc_name
   project                 = var.project_id
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
-  description             = "PriceTracker VPC — hosts Cloud SQL private IP. Cloud Run attaches via Direct VPC egress."
+  description             = "PriceTracker VPC."
 }
 
 resource "google_compute_subnetwork" "primary" {
@@ -22,7 +16,7 @@ resource "google_compute_subnetwork" "primary" {
   private_ip_google_access = true
 }
 
-# --- Private Services Access (peering pour Cloud SQL private IP) ----------
+# PSA (peering cloud sql private ip)
 resource "google_compute_global_address" "psa_range" {
   name          = var.psa_range_name
   project       = var.project_id
@@ -31,7 +25,7 @@ resource "google_compute_global_address" "psa_range" {
   address       = var.psa_range_address
   prefix_length = var.psa_range_prefix_length
   network       = google_compute_network.vpc.id
-  description   = "Range reserved for Google-managed services (Cloud SQL, etc.) peering."
+  description   = "PSA peering range."
 }
 
 resource "google_service_networking_connection" "psa" {

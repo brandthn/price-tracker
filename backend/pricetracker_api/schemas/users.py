@@ -60,10 +60,8 @@ class BasketProduct(BaseModel):
 
 
 class BasketSummaryOut(BaseModel):
-    """Vue « Mon budget » : le panier réel de l'utilisateur, calculé depuis
-    ses tickets (Cloud SQL). Les champs monétaires restent None tant
-    qu'aucun ticket avec total lisible n'existe — le frontend affiche alors
-    l'onboarding « ajoutez votre premier ticket »."""
+    """Vue budget : panier reel calcule depuis les tickets. Champs monetaires
+    None tant qu'aucun ticket avec total lisible (onboarding cote frontend)."""
 
     tickets_count: int
     total_spent_eur: float | None

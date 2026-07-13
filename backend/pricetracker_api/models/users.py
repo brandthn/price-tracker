@@ -1,6 +1,4 @@
-"""Table `users` — profil applicatif. Complète Firebase Auth (qui détient
-l'authentification et le couple email/password). La PK est l'UID Firebase.
-"""
+"""Table users — profil applicatif, complete Firebase Auth."""
 
 from __future__ import annotations
 
@@ -17,10 +15,8 @@ from . import Base
 class User(Base):
     __tablename__ = "users"
 
-    # firebase_uid : `sub` du JWT Firebase. Clé fonctionnelle (lookup à
-    # chaque requête authentifiée). On garde aussi un UUID interne pour
-    # référencer l'utilisateur depuis d'autres tables sans dépendre du
-    # provider d'auth.
+    # UUID interne pour referencer le user sans dependre du provider d'auth
+    # (firebase_uid = sub du JWT, cle de lookup a chaque requete)
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,

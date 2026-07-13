@@ -1,14 +1,8 @@
-"""Client BigQuery — wrappers fins autour des queries observatoire / catalogue.
+"""Client BigQuery — wrappers observatoire / catalogue.
 
-Les méthodes sont synchrones (le SDK BQ l'est) ; on les expose dans les
-routers via `asyncio.to_thread(...)` pour ne pas bloquer l'event loop.
-
-Tolérant aux tables vides / NULL :
-- Les workers Indices/Alertes (Phase 9) n'ont pas encore rempli les tables
-  Gold → on renvoie une liste vide plutôt qu'une 500.
-- Le worker OFF est rate-limité (15 req/min) → `catalogue_produits` peut
-  contenir des EAN avec `off_found=False` (nom, marque, catégorie = NULL).
-  Les `Product` Pydantic acceptent ces NULL explicitement.
+SDK BQ synchrone, expose via asyncio.to_thread dans les routers. Tolerant aux
+tables vides/NULL : tables Gold pas encore remplies -> liste vide, pas de 500 ;
+catalogue_produits peut avoir off_found=False (nom/marque/categorie NULL).
 """
 
 from __future__ import annotations
@@ -44,12 +38,7 @@ def qualified(dataset: str, table: str) -> str:
 
 
 def rows_to_dicts(rows: Any) -> list[dict[str, Any]]:
-    """Convertit un RowIterator BQ en liste de dicts JSON-serializables.
-
-    BigQuery renvoie des `Row` qui se comportent comme des dicts mais ne
-    sont pas serializables par FastAPI. On convertit les DATE/DATETIME en
-    isoformat pour pydantic.
-    """
+    # Row BQ pas serializable par FastAPI ; DATE/DATETIME -> isoformat pour pydantic
     out: list[dict[str, Any]] = []
     for row in rows:
         d = dict(row.items())
@@ -65,21 +54,15 @@ def query_dicts(
     *,
     params: list[bigquery.ScalarQueryParameter] | None = None,
 ) -> list[dict[str, Any]]:
-    """Exécute une query et renvoie les rows en list[dict].
-
-    Tolère les tables vides : 0 row → []. Une exception (table absente,
-    permission denied) remonte — le router décidera de la mapper en 200
-    avec liste vide ou en 500.
-    """
+    # 0 row -> [] ; exception (table absente, denied) remonte au router
     client = get_client()
     job_config = bigquery.QueryJobConfig(query_parameters=params or [])
     job = client.query(sql, job_config=job_config)
     return rows_to_dicts(job.result())
 
 
-# Département FR dérivé du code postal Silver (`open_prices_clean.postcode`).
-# Cas particuliers : Corse (20xxx → 2A/2B) et DOM (97x/98x sur 3 chiffres).
-# Utilisé par les requêtes régionales (indices + carte observatoire).
+# departement FR depuis le code postal Silver. cas speciaux : Corse (20xxx -> 2A/2B)
+# et DOM (97x/98x sur 3 chiffres). utilise par les requetes regionales.
 DEPT_FROM_POSTCODE_SQL = """
     CASE
       WHEN postcode LIKE '97%' OR postcode LIKE '98%' THEN SUBSTR(postcode, 1, 3)
@@ -96,12 +79,8 @@ def query_dicts_safe(
     params: list[bigquery.ScalarQueryParameter] | None = None,
     context: str,
 ) -> list[dict[str, Any]]:
-    """Variante 'safe' : log l'erreur et renvoie [] si la table n'existe pas
-    encore (Phase 9 pas livrée) ou est vide.
-
-    À utiliser pour les endpoints observatoire publics qui doivent rester
-    up même si le worker indices n'a pas encore tourné.
-    """
+    # log + [] si la table n'existe pas encore ou est vide. pour les endpoints
+    # observatoire publics qui doivent rester up sans le worker indices.
     try:
         return query_dicts(sql, params=params)
     except Exception as exc:

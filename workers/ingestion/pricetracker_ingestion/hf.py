@@ -1,10 +1,3 @@
-"""Téléchargement du snapshot Parquet depuis HuggingFace.
-
-`hf_hub_download` gère le cache local et reprend les téléchargements
-interrompus. En Cloud Run le FS est éphémère et limité (mémoire-backed sur
-gen2) → on télécharge vers `/tmp` à chaque run et le worker scale-to-zero
-nettoie tout.
-"""
 
 from __future__ import annotations
 
@@ -25,7 +18,7 @@ def download_snapshot(
     token: str | None = None,
     cache_dir: str | Path = "/tmp/hf-cache",
 ) -> Path:
-    """Télécharge un fichier d'un repo dataset HF. Retourne le path local."""
+
     logger.info(
         "hf_download_start",
         dataset=dataset,

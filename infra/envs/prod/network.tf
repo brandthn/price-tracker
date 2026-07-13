@@ -1,9 +1,7 @@
-# VPC + subnet + Private Services Access (peering Cloud SQL) + Serverless VPC
-# Connector pour le egress Cloud Run vers la SQL en private IP.
+# vpc + subnet + PSA (peering cloud sql) + connector egress cloud run
 module "network" {
   source = "../../modules/network"
 
   project_id = var.project_id
   region     = var.region
-  # Defaults : prt-vpc / prt-subnet-ew1 / prt-vpc-connector / prt-psa-range
 }

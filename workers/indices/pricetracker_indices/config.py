@@ -1,4 +1,3 @@
-"""Settings worker indices — env vars pydantic-settings."""
 
 from __future__ import annotations
 
@@ -13,11 +12,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # GCP -----------------------------------------------------------------
+
     google_cloud_project: str = Field(default="")
     prt_gcp_region: str = Field(default="europe-west1")
 
-    # BigQuery ------------------------------------------------------------
+
     prt_bq_dataset_silver: str = Field(default="prt_prod_silver")
     prt_bq_dataset_gold: str = Field(default="prt_prod_gold")
     prt_bq_table_open_prices: str = Field(default="open_prices_clean")
@@ -27,7 +26,7 @@ class Settings(BaseSettings):
     prt_bq_table_anomalies: str = Field(default="anomalies_detected")
     prt_bq_location: str = Field(default="EU")
 
-    # Paramètres métier ---------------------------------------------------
+
     prt_indices_min_observations: int = Field(
         default=3,
         description="Nombre minimum de relevés pour qu'un agrégat soit publié (statistiquement significatif).",
@@ -49,7 +48,7 @@ class Settings(BaseSettings):
         description="Nombre de hausses retenues dans rankings_produits.",
     )
 
-    # OIDC ----------------------------------------------------------------
+
     prt_oidc_disable: bool = Field(default=False)
     prt_oidc_required_audience: str = Field(default="")
     prt_oidc_allowed_issuers: str = Field(

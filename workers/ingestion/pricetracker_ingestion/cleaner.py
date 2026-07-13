@@ -1,20 +1,3 @@
-"""Validation + parsing des lignes Open Prices brutes (post-mapping HF).
-
-Décisions de design (vs port direct du code shared/cleaner.py de worker_test) :
-
-- Pas de `datetime.utcnow()` (deprecated 3.12+). Tout en `datetime.now(timezone.utc)`.
-- Le cleaner NE produit PAS les champs run-time (`pipeline_run_date`, `source`,
-  `ingested_at`, `iqr_outlier`) : ce sont des métadonnées du worker, pas des
-  données validées. Injectées en aval par `transform.py`.
-- Le cleaner NE produit PAS `store_brand_normalized` ni `city` standardisée
-  ni la validation EAN : ce sont des enrichissements (voir `enrichments.py`).
-  Cette séparation permet d'unit-tester chaque étape sans toucher aux autres.
-- L'API reste `(clean_dict | None, rejection_dict | None)` comme le collègue,
-  c'est une convention claire pour le buckting clean vs rejection.
-
-Codes de rejet : enum-like string constants (pas Enum Python — pydantic-settings
-les redécoupe en CSV plus simplement, et le schéma BQ stocke des STRING).
-"""
 
 from __future__ import annotations
 
@@ -25,8 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-# Codes de rejet — utilisés en valeur dans la colonne `reason` de
-# `open_prices_rejections` (cf. schema). Garder synchronisés avec la doc SQL.
+# Codes de rejet
 REJECTION_MISSING_REQUIRED = "MISSING_REQUIRED_FIELD"
 REJECTION_INVALID_CURRENCY = "INVALID_CURRENCY"
 REJECTION_INVALID_COUNTRY = "INVALID_COUNTRY"
@@ -36,10 +18,10 @@ REJECTION_OUT_OF_RANGE_PRICE = "OUT_OF_RANGE_PRICE"
 REJECTION_INVALID_DATE = "INVALID_DATE"
 REJECTION_FUTURE_DATE = "FUTURE_DATE"
 
-# Champs requis avant toute validation fine.
+
 REQUIRED_FIELDS = ("id", "product_code", "price", "currency", "price_date")
 
-# Pays acceptés par défaut : FR + DOM-TOM. Surchargeable via CleanerConfig.
+
 DEFAULT_ALLOWED_COUNTRIES = frozenset(
     {"FR", "GP", "GF", "MQ", "RE", "YT", "PM", "MF", "BL", "WF", "NC", "PF"}
 )
@@ -49,21 +31,18 @@ DEFAULT_ALLOWED_PROOF_TYPES = frozenset({"RECEIPT", "PRICE_TAG", "PRICETAG", "SH
 
 @dataclass(frozen=True)
 class CleanerConfig:
-    """Bornes et listes blanches utilisées par `clean_price_record`."""
+
 
     allowed_countries: frozenset[str] = DEFAULT_ALLOWED_COUNTRIES
     allowed_currencies: frozenset[str] = DEFAULT_ALLOWED_CURRENCIES
     allowed_proof_types: frozenset[str] = DEFAULT_ALLOWED_PROOF_TYPES
     min_price_eur: Decimal = field(default=Decimal("0.01"))
     max_price_eur: Decimal = field(default=Decimal("500.00"))
-    # `reference_date` est paramétrable pour permettre des tests déterministes
-    # sur les rejets FUTURE_DATE. Par défaut le worker passe la date du run.
+
     reference_date: date | None = None
 
 
-# ---------------------------------------------------------------------------
-# Parsers / normalizers utilitaires
-# ---------------------------------------------------------------------------
+
 
 
 def _normalize_text(value: Any) -> str | None:
@@ -86,21 +65,18 @@ def _normalize_proof_type(value: Any) -> str | None:
 
 
 def parse_decimal_price(value: Any) -> Decimal | None:
-    """Parse un prix en Decimal de façon défensive (chaînes "1,99", "1.99", floats, ints).
 
-    Retourne None si non-parsable — l'appelant traduit en rejet INVALID_PRICE.
-    """
     if value is None:
         return None
     if isinstance(value, bool):
-        # `bool` est subclass de int en Python → guard explicite.
+
         return None
     if isinstance(value, int | float):
         if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
             return None
         return Decimal(str(value))
     text = str(value).strip().replace(",", ".")
-    # Garde uniquement chiffres, point, signe moins.
+
     text = re.sub(r"[^\d.\-]", "", text)
     if text.count(".") > 1 or not text:
         return None
@@ -135,7 +111,7 @@ def parse_date(value: Any) -> date | None:
             return datetime.strptime(text, fmt).date()
         except ValueError:
             continue
-    # Dernière chance : ISO 8601 large.
+
     try:
         return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
     except ValueError:
@@ -143,17 +119,13 @@ def parse_date(value: Any) -> date | None:
 
 
 def iso_week_start(d: date) -> date:
-    """Lundi de la semaine ISO contenant `d`."""
+
     iso = d.isocalendar()
     return date.fromisocalendar(iso.year, iso.week, 1)
 
 
 def extract_store_brand_raw(record: dict[str, Any]) -> str | None:
-    """Extrait l'adresse OSM brute du magasin depuis les champs disponibles.
 
-    Fallback chain : on prend la première valeur non vide. La normalisation
-    en enseigne canonique est faite ensuite dans `enrichments.normalize_store_brand`.
-    """
     for key in (
         "store_brand",
         "store_name",
@@ -181,9 +153,6 @@ def _build_rejection(
     reason: str,
     details: str | None,
 ) -> dict[str, Any]:
-    """Sous-ensemble du raw record + raison. Le `raw_payload` complet est
-    injecté en aval par `transform.py` (évite de doubler la sérialisation).
-    """
     return {
         "id": _normalize_text(raw.get("id")),
         "product_code": _normalize_text(raw.get("product_code")),
@@ -197,24 +166,14 @@ def _build_rejection(
     }
 
 
-# ---------------------------------------------------------------------------
-# API publique
-# ---------------------------------------------------------------------------
+
 
 
 def clean_price_record(
     raw: dict[str, Any],
     config: CleanerConfig,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """Valide une ligne post-mapping HF.
 
-    Retourne (clean, rejection) : exactement l'un des deux est None.
-
-    Le clean dict contient les champs validés du schéma `open_prices_clean`
-    SAUF : `pipeline_run_date`, `source`, `ingested_at`, `iqr_outlier`,
-    `store_brand_normalized`, `city` (normalisée), `raw_payload`. Ces 7
-    champs sont remplis par `transform.py` après enrichissements + IQR pass.
-    """
     missing = _check_required(raw)
     if missing:
         return None, _build_rejection(
@@ -240,8 +199,7 @@ def clean_price_record(
         return None, _build_rejection(
             raw, REJECTION_INVALID_PROOF_TYPE, f"Unsupported proof type: {proof_type}"
         )
-    # Normalisation : "PRICETAG" canonicalisé en "PRICE_TAG" pour cohérence
-    # avec le schéma documenté. Pas un rejet, juste un alignement.
+
     if proof_type == "PRICETAG":
         proof_type = "PRICE_TAG"
 
@@ -279,7 +237,7 @@ def clean_price_record(
         "week_start_date": iso_week_start(price_date),
         "product_code": _normalize_text(raw.get("product_code")),
         "price_eur": float(price),
-        # Decimal stringifié pour préserver la précision comptable.
+
         "price_eur_decimal": str(price),
         "price_without_discount_eur": float(discount_price) if discount_price is not None else None,
         "price_is_discounted": is_discounted,
@@ -290,7 +248,7 @@ def clean_price_record(
         "location_id": _normalize_text(raw.get("location_id")),
         "location_name": _normalize_text(raw.get("location_name")),
         "location_osm_display_name": _normalize_text(raw.get("location_osm_display_name")),
-        # `city` brut → sera normalisé par enrichments.standardize_city.
+
         "city": _normalize_text(raw.get("location_osm_address_city")),
         "postcode": _normalize_text(raw.get("location_osm_address_postcode")),
         "latitude": _safe_float(raw.get("location_osm_lat")),

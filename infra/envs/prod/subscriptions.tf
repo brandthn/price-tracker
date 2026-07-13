@@ -1,23 +1,4 @@
-# Pub/Sub subscriptions — Phase 5.
-#
-# Deux subscriptions :
-#   1. Push   : `ticket-uploaded` → tier-1 `prt-prod-worker-ocr-vlm-scratch` (déclenche le pipeline OCR)
-#   2. Pull   : `ticket-uploaded-dlq` (inspection / replay manuel des messages empoisonnés)
-#
-# Le DLQ wiring vit côté subscription principale (`dead_letter_policy`), pas côté topic.
-
-# --- 1) Push subscription : ticket-uploaded → tier-1 worker-ocr-vlm-scratch -
-#
-# OIDC auth : Cloud Run vérifie le token signé par Google contre :
-#   - aud  == URL exacte du service `prt-prod-worker-ocr-vlm-scratch` (audience)
-#   - iss  == worker-sa (qui a `roles/run.invoker` via cloud_run.tf)
-#
-# DLQ : après 5 échecs (5xx ou non-ack dans ack_deadline), Pub/Sub bascule le
-# message vers `ticket-uploaded-dlq`. Le retry policy fait un backoff
-# exponentiel entre 10s et 600s entre deux tentatives.
-#
-# `ack_deadline_seconds=600` : laisse 10 min au worker pour traiter une image
-# avant de re-livrer. À ajuster en Phase 8 selon le P95 mesuré de l'OCR.
+# push ticket-uploaded -> worker-ocr-vlm-scratch /push (tier-1), DLQ apres 5 echecs
 resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
   project = var.project_id
   name    = "ticket-uploaded-ocr-push"
@@ -29,7 +10,6 @@ resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
   enable_message_ordering    = false
 
   push_config {
-    # Tier-1 du pipeline OCR = backend OCR-VLM from-scratch. Le worker expose /push.
     push_endpoint = "${module.run_worker_ocr_vlm_scratch.uri}/push"
 
     oidc_token {
@@ -54,19 +34,13 @@ resource "google_pubsub_subscription" "ticket_uploaded_ocr_push" {
 
   labels = merge(var.labels, { component = "ocr-tier1-dispatch" })
 
-  # Ordre : la sub principale ne peut pas être créée tant que :
-  #   - le service agent Pub/Sub n'a pas TokenCreator sur worker-sa
-  #   - worker-sa n'a pas run.invoker sur worker-ocr
-  # Sinon Pub/Sub valide le push_config au create et renvoie PERMISSION_DENIED.
   depends_on = [
     google_service_account_iam_member.pubsub_token_creator_on_worker,
     google_cloud_run_v2_service_iam_member.worker_sa_invoker,
   ]
 }
 
-# Pub/Sub service agent a besoin de `roles/pubsub.subscriber` sur la sub
-# principale pour pouvoir « lire » le message à forwarder vers le DLQ.
-# Sans ça, le bascule DLQ échoue silencieusement et les messages bouclent.
+# pubsub agent: subscriber (forward DLQ) + publisher (topic DLQ)
 resource "google_pubsub_subscription_iam_member" "pubsub_agent_dlq_forwarder" {
   project      = var.project_id
   subscription = google_pubsub_subscription.ticket_uploaded_ocr_push.name
@@ -74,9 +48,6 @@ resource "google_pubsub_subscription_iam_member" "pubsub_agent_dlq_forwarder" {
   member       = local.pubsub_agent_member
 }
 
-# Pub/Sub service agent doit pouvoir publier dans le DLQ topic. Binding posé
-# hors module pubsub car son email n'existe qu'après création de la
-# google_project_service_identity → for_each du module rejette une clé inconnue.
 resource "google_pubsub_topic_iam_member" "pubsub_agent_dlq_publisher" {
   project = var.project_id
   topic   = module.pubsub.topics["ticket-uploaded-dlq"].name
@@ -84,11 +55,7 @@ resource "google_pubsub_topic_iam_member" "pubsub_agent_dlq_publisher" {
   member  = local.pubsub_agent_member
 }
 
-# --- 2) Pull subscription d'inspection sur le DLQ --------------------------
-#
-# Pas de push : on veut que les messages s'accumulent jusqu'à inspection
-# manuelle (console GCP ou `gcloud pubsub subscriptions pull`).
-# 7 jours de rétention = fenêtre standard pour décider replay ou drop.
+# pull d'inspection sur le DLQ (accumulation jusqu'a replay/drop manuel)
 resource "google_pubsub_subscription" "ticket_uploaded_dlq_inspection" {
   project = var.project_id
   name    = "ticket-uploaded-dlq-inspection"
@@ -102,13 +69,7 @@ resource "google_pubsub_subscription" "ticket_uploaded_dlq_inspection" {
   labels = merge(var.labels, { component = "worker-ocr-dlq" })
 }
 
-# --- 3) Boucle de feedback : ocr-retry → worker-ocr-llm /push --------------
-#
-# Déclenchée par un 👎 utilisateur (le backend publie {ticket_id} sur le topic
-# `ocr-retry`). Le message est poussé vers le **second worker indépendant**
-# `worker-ocr-llm` (OCR tier-2). Même schéma OIDC/DLQ que la subscription OCR
-# principale : le token est minté pour worker-sa (autorisé à invoquer
-# worker-ocr-llm via `worker_sa_invoker`).
+# feedback loop: ocr-retry -> worker-ocr-llm /push (tier-2)
 resource "google_pubsub_subscription" "ocr_retry_worker_push" {
   project = var.project_id
   name    = "ocr-retry-worker-push"
@@ -150,8 +111,6 @@ resource "google_pubsub_subscription" "ocr_retry_worker_push" {
   ]
 }
 
-# Pub/Sub service agent : subscriber sur la sub retry (bascule DLQ) + publisher
-# sur le topic DLQ retry. Mêmes raisons que pour le DLQ OCR principal.
 resource "google_pubsub_subscription_iam_member" "pubsub_agent_retry_dlq_forwarder" {
   project      = var.project_id
   subscription = google_pubsub_subscription.ocr_retry_worker_push.name
@@ -179,14 +138,9 @@ resource "google_pubsub_subscription" "ocr_retry_dlq_inspection" {
   labels = merge(var.labels, { component = "worker-ocr-retry-dlq" })
 }
 
-# --- 4) Backends OCR « un backend = un worker » ----------------------------
-#
-# Un backend = un topic → une push subscription vers son worker /push, même
-# schéma OIDC/DLQ que la sub OCR principale. Le pipeline (scratch → moondream →
-# ocr-retry) est piloté par le backend en publiant {ticket_id} sur le topic du
-# tier voulu ; les workers ne s'appellent pas entre eux.
+# backends ocr: un topic -> une push sub vers le worker /push
 
-# 4a) Backend PaddleOCR
+# paddle
 resource "google_pubsub_subscription" "ocr_paddle_worker_push" {
   project = var.project_id
   name    = "ocr-paddle-push"
@@ -255,7 +209,7 @@ resource "google_pubsub_subscription" "ocr_paddle_dlq_inspection" {
   labels = merge(var.labels, { component = "worker-ocr-paddle-dlq" })
 }
 
-# 4b) Backend VLM Moondream
+# moondream
 resource "google_pubsub_subscription" "ocr_vlm_moondream_worker_push" {
   project = var.project_id
   name    = "ocr-vlm-moondream-push"
@@ -324,7 +278,7 @@ resource "google_pubsub_subscription" "ocr_vlm_moondream_dlq_inspection" {
   labels = merge(var.labels, { component = "worker-ocr-vlm-moondream-dlq" })
 }
 
-# 4c) Backend OCR-VLM from-scratch
+# scratch
 resource "google_pubsub_subscription" "ocr_vlm_scratch_worker_push" {
   project = var.project_id
   name    = "ocr-vlm-scratch-push"

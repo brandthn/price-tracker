@@ -1,20 +1,10 @@
-"""Table `tickets` — métadonnées d'un ticket uploadé.
+"""Table tickets — metadonnees d'un ticket uploade.
 
-État (`status`) :
-- `pending`    : Signed URL générée, attendant l'upload GCS effectif.
-- `uploaded`   : objet présent dans GCS (déclencheur OCR).
-- `ocr_processing` : worker OCR en cours (tier-1 ou re-OCR tier-2).
-- `ocr_done`   : worker OCR a terminé → ticket **pris en compte**. Articles
-                 dispo dans `prix_extraits`. C'est l'état "compté", l'utilisateur
-                 n'a plus à valider chaque ligne (boucle de feedback 👍/👎).
-- `ocr_failed` : OCR a échoué (image illisible, modèle KO). Pas de retry auto.
-- `validated`  : utilisateur a corrigé des lignes (édition optionnelle).
-
-Feedback / retry :
-- `last_feedback` : dernier avis utilisateur ('up'/'down') sur l'output OCR.
-- `ocr_attempts`  : nombre de passes OCR (tier-1 = 1 ; un 👎 déclenche tier-2 = 2).
-- `ocr_model`     : id exact du modèle (ex. "meta-llama/llama-4-..."), complète
-                    `ocr_engine` ("groq").
+status : pending (signed url generee) -> uploaded (objet GCS, declenche OCR) ->
+ocr_processing -> ocr_done (compte, articles dans prix_extraits) / ocr_failed
+(pas de retry auto). validated = user a corrige des lignes.
+last_feedback = up/down ; ocr_attempts = nb de passes (tier-1=1, down -> tier-2=2) ;
+ocr_model = id exact du modele, complete ocr_engine.
 """
 
 from __future__ import annotations
@@ -52,7 +42,7 @@ class Ticket(Base):
         doc="gs://bucket/tickets/raw/{user_id}/{uuid}.jpg",
     )
 
-    # Champs renseignés par le worker OCR — NULL tant que le ticket n'est pas traité.
+    # renseignes par le worker OCR, NULL avant traitement
     enseigne: Mapped[str | None] = mapped_column(String(100), nullable=True)
     date_ticket: Mapped[datetime.date | None] = mapped_column(nullable=True)
     total_eur: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)

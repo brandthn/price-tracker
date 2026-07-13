@@ -1,13 +1,9 @@
-"""DTOs du comparateur d'enseignes (indice de cherté relative, matched-basket).
+"""DTOs comparateur d'enseignes (indice de cherte relative, matched-basket).
 
-Un seul chiffre exposé : l'indice de cherté relative. Pour chaque produit relevé
-dans ≥2 enseignes, on compare le prix médian de l'enseigne à la médiane
-inter-enseignes du produit ; l'indice = médiane de ces ratios ×100. 100 = au
-niveau médian, <100 = moins chère, >100 = plus chère. Le mix de produits ne le
-fausse pas (comparaison produit par produit).
-
-L'« évolution des prix par enseigne » n'est PAS exposée (décision produit
-2026-07-09) : biaisée par l'assortiment à ce volume de données.
+Pour chaque produit releve dans >=2 enseignes : ratio prix median enseigne /
+mediane inter-enseignes ; indice = mediane des ratios x100 (100 = median, <100
+moins chere). Comparaison produit par produit, donc pas biaise par le mix.
+Evolution des prix par enseigne non exposee (decision 2026-07-09, biais assortiment).
 """
 
 from __future__ import annotations

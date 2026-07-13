@@ -1,9 +1,4 @@
-"""FastAPI app worker alertes — POST /run produit un rapport JSON de hausses.
 
-V1 simulation : pas de FCM push (frontend web only, pas de device tokens).
-Le rapport est uploadé sur GCS sous `alerts/date=YYYY-MM-DD/report.json` et
-loggé en stdout. Un endpoint backend Phase 11 pourra le servir aux clients.
-"""
 
 from __future__ import annotations
 

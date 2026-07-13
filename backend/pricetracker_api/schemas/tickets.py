@@ -98,7 +98,7 @@ class TicketsListResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    """Avis 👍/👎 de l'utilisateur sur l'output OCR d'un ticket."""
+    """Avis up/down de l'utilisateur sur l'output OCR d'un ticket."""
 
     rating: FeedbackRating
 
@@ -109,5 +109,5 @@ class FeedbackResponse(BaseModel):
     ticket: TicketDetailOut
     retry_triggered: bool = Field(
         default=False,
-        description="True si un 👎 a déclenché un re-OCR tier-2 (sinon plafond atteint / 👍).",
+        description="True si un retour negatif a declenche un re-OCR tier-2 (sinon plafond atteint).",
     )

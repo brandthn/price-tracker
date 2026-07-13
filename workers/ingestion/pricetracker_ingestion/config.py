@@ -1,9 +1,3 @@
-"""Runtime configuration, loaded from env vars (Cloud Run injects them).
-
-Conventions :
-- Standards GCP (`GOOGLE_CLOUD_PROJECT`) lus sans préfixe.
-- Custom worker → préfixe `PRT_` (sauf `HF_TOKEN` qui suit la convention HF).
-"""
 
 from __future__ import annotations
 
@@ -34,14 +28,12 @@ class Settings(BaseSettings):
     prt_hf_revision: str = Field(default="main")
     hf_token: str | None = Field(default=None)
 
-    # CSV de pays acceptés (FR + DOM-TOM par défaut). Le worker convertit en
-    # frozenset au load via `allowed_countries`. Format CSV pour rester simple
-    # côté pydantic-settings (pas de JSON env var à parser).
+
     prt_filter_country_codes: str = Field(
         default="FR,GP,GF,MQ,RE,YT,PM,MF,BL,WF,NC,PF"
     )
 
-    # OIDC verification ---------------------------------------------------
+
     prt_oidc_disable: bool = Field(
         default=False,
         description="Bypass de la vérif OIDC en dev local. JAMAIS true en prod.",

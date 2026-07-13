@@ -1,6 +1,4 @@
 # syntax=docker/dockerfile:1.7
-# Identique au pattern workers/off : multi-stage uv → runtime mince.
-
 FROM python:3.11-slim-bookworm AS builder
 
 ENV UV_LINK_MODE=copy \

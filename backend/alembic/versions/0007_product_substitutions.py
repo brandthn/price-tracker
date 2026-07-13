@@ -4,22 +4,14 @@ Revision ID: 0007_product_substitutions
 Revises: 0006_quantity_raw_to_text
 Create Date: 2026-07-06
 
-⚠️ id volontairement COURT : `alembic_version.version_num` = VARCHAR(32).
+id court : alembic_version.version_num = VARCHAR(32).
 
-Cache précalculé par le worker `off` (Cloud Run Job, étape séparée de la boucle
-d'enrichissement) : pour chaque produit source, ses substituts **moins chers au
-€/unité** et **comparables** (kNN pgvector + accord catégoriel), avec un score de
-confiance et un tier. Recompute = TRUNCATE + INSERT (comme les tables Gold).
-
-On la DROP puis recrée : c'est un cache dérivé SANS consommateur live
-(vérifié : le backend n'y touche pas — l'endpoint live `/products/{ean}/substitutes`
-lit pgvector directement, aucun router `recommendations` n'est enregistré) et le
-worker la régénère intégralement.
-
-Score (philosophie) : catégorie = signal haute confiance, embedding = filet borné.
-- `tier` 1 « sûr » / 2 « probable » / 3 « élargi » (piloté par la catégorie) ;
-- `score` = confiance ∈ [0,1] ; `cosine`, `cat_agreement` = ses composantes ;
-- prix comparés au **€/unité** (`*_price_per_unit`, `saving_*`) — jamais au prix paquet.
+Cache precalcule par le worker off : par produit source, ses substituts moins chers
+au €/unite et comparables (kNN pgvector + accord categoriel), score + tier. Recompute
+= TRUNCATE + INSERT. DROP + recreate : cache derive sans consommateur live (l'endpoint
+/products/{ean}/substitutes lit pgvector directement), regenere par le worker.
+tier 1 sur / 2 probable / 3 elargi (categorie) ; score = confiance [0,1], cosine +
+cat_agreement = ses composantes ; prix au €/unite, jamais au prix paquet.
 """
 
 from __future__ import annotations
@@ -35,8 +27,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Remplace la table console de Maty (ancien schéma sans `tier`) — cache dérivé
-    # sans consommateur live, régénéré par le worker. Sur un fresh DB : no-op.
+    # remplace l'ancien schema sans tier ; cache derive regenere par le worker, fresh DB = no-op
     op.execute("DROP TABLE IF EXISTS product_substitutions")
     op.execute(
         """
