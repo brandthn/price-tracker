@@ -1,16 +1,11 @@
-// Lecture isomorphe de l'ID token Firebase pour les appels backend.
-//
-// Le token est stocké dans le cookie `pt_id_token` par l'AuthProvider (client).
-// - Server Components (RSC) : lecture via `next/headers` (cookie envoyé par le
-//   navigateur sur la navigation). Rend la route dynamique — les pages
-//   authentifiées sont déjà en `force-dynamic`.
-// - Client Components : lecture directe de `document.cookie`.
+// cookie posé par l'AuthProvider, relu côté RSC et côté client
+// attention: next/headers rend la route dynamique (les pages authent sont déjà force-dynamic)
 
 const COOKIE_NAME = "pt_id_token";
 
 async function readServerToken(): Promise<string | null> {
-  // Import dynamique : `next/headers` n'existe que côté serveur. Le bundler ne
-  // l'inclut pas dans le bundle client grâce au garde `typeof window`.
+  // import dyn: next/headers n'existe pas côté client, le garde typeof window
+  // évite qu'il finisse dans le bundle
   const { cookies } = await import("next/headers");
   const store = await cookies();
   return store.get(COOKIE_NAME)?.value ?? null;

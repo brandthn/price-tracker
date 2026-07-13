@@ -23,8 +23,7 @@ export function OcrFeedback({
   const [busy, setBusy] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
 
-  // Composant monté en continu entre deux passes : on re-cale l'état des boutons
-  // sur la vérité serveur à chaque refresh (sinon le surlignage reste figé).
+  // le composant reste monté entre 2 passes, sans ça le surlignage reste figé
   useEffect(() => {
     setFeedback(initialFeedback);
   }, [initialFeedback]);
@@ -38,9 +37,8 @@ export function OcrFeedback({
       const res = await submitFeedback(ticketId, rating);
       if (res.retry_triggered) {
         toast.info("Merci ! Une nouvelle analyse plus poussée est lancée…");
-        // Baseline autoritative = nb de passes AVANT le re-OCR, renvoyé par la
-        // réponse elle-même. On ne dépend pas d'un prop qui pourrait être périmé
-        // entre deux 👎 (source du faux « maximum atteint »).
+        // on prend la baseline dans la réponse, pas dans le prop: un prop périmé
+        // entre deux votes déclenchait un faux "maximum atteint"
         await pollUntilReanalyzed(ticketId, res.ticket.ocr_attempts, setReanalyzing);
         router.refresh();
       } else if (rating === "up") {
@@ -122,7 +120,7 @@ async function pollUntilReanalyzed(
           return;
         }
       } catch {
-        // transient — on retente au tick suivant
+        // transient, on retente au tick suivant
       }
     }
   } finally {

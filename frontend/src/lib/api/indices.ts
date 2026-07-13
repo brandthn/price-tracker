@@ -1,7 +1,6 @@
 import { apiFetch } from "./client";
 import type { InflationIndex, MapOut, RankingsOut } from "./types";
 
-// Grain temporel de l'Observatoire — une seule variable pilote toute la page.
 export type Granularity = "week" | "month";
 
 export function getNationalIndex(

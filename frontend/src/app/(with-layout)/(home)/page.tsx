@@ -16,12 +16,7 @@ import { formatDateLong, formatNumber } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
 
-// L'Observatoire : la vitrine publique. Chaque section répond à une question
-// de lecteur — « ça augmente de combien ? », « où ? », « sur quoi ? ».
-// Toutes les sources sont indépendantes (Promise.allSettled) : une table
-// Gold vide ou une erreur BQ ne fait jamais tomber la page entière.
-// La granularité (semaine/mois) est portée par le searchParam `?g=` et
-// propagée à toutes les requêtes.
+// allSettled: une table Gold vide ou une erreur BQ ne doit pas tuer la page
 export default async function ObservatoirePage({
   searchParams,
 }: {
@@ -77,14 +72,12 @@ export default async function ObservatoirePage({
       {apiDown && (
         <div className="mb-6 rounded-2xl border border-red-light bg-red-light-6 p-5 text-sm text-red dark:border-red-dark dark:bg-red/10">
           L&apos;observatoire est momentanément indisponible. Réessayez dans
-          quelques instants — vos données ne sont pas perdues.
+          quelques instants. Vos données ne sont pas perdues.
         </div>
       )}
 
-      {/* ── Indice national ─────────────────────────────────────────── */}
       <NationalIndexCard index={national} granularity={gran} />
 
-      {/* ── Carte + mouvements ──────────────────────────────────────── */}
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <section className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark lg:col-span-2">
           <h2 className="text-lg font-bold text-dark dark:text-white">
@@ -114,7 +107,7 @@ export default async function ObservatoirePage({
             </p>
             <MoversList
               items={up?.items ?? []}
-              emptyMessage="Pas de hausse marquante détectée sur la période — ou pas encore assez de relevés."
+              emptyMessage="Pas de hausse marquante détectée sur la période, ou pas encore assez de relevés."
             />
           </section>
 
@@ -127,27 +120,25 @@ export default async function ObservatoirePage({
             </p>
             <MoversList
               items={down?.items ?? []}
-              emptyMessage="Pas de baisse marquante détectée sur la période — ou pas encore assez de relevés."
+              emptyMessage="Pas de baisse marquante détectée sur la période, ou pas encore assez de relevés."
             />
           </section>
         </div>
       </div>
 
-      {/* ── Hall of shame ───────────────────────────────────────────── */}
       {shame && shame.items.length > 0 && (
         <section className="mt-6 rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
           <h2 className="text-lg font-bold text-dark dark:text-white">
             Les hausses les plus visibles
           </h2>
           <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-            Produits très relevés et en forte hausse — ceux qui pèsent le plus en
+            Produits très relevés et en forte hausse, ceux qui pèsent le plus en
             caisse
           </p>
           <MoversList items={shame.items} emptyMessage="" />
         </section>
       )}
 
-      {/* ── Pont vers le personnel ──────────────────────────────────── */}
       <section className="mt-6 rounded-2xl bg-primary/5 p-6 dark:bg-primary/10 sm:p-8">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
@@ -197,7 +188,6 @@ function NationalIndexCard({
 
           {deltaPct != null ? (
             <>
-              {/* Hero : LE chiffre de la page */}
               <div className="mt-5 flex items-baseline gap-3">
                 <span className="text-heading-3 font-bold text-dark dark:text-white">
                   {index!.current!.toLocaleString("fr-FR", {
@@ -222,7 +212,7 @@ function NationalIndexCard({
           ) : (
             <EmptyBlock className="mt-5">
               L&apos;indice se calcule dès que la fenêtre de relevés est
-              suffisante. Les premiers chiffres arrivent — revenez bientôt.
+              suffisante. Les premiers chiffres arrivent, revenez bientôt.
             </EmptyBlock>
           )}
         </div>

@@ -6,10 +6,8 @@ import { formatNumber } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
 
-// Comparateur d'enseignes : « chez qui payez-vous le moins cher ? ». Un seul
-// chiffre, honnête : l'indice de cherté relative (à produits identiques, il
-// neutralise les différences d'assortiment). Les enseignes sous le seuil de
-// couverture restent listées mais sans indice (transparence).
+// indice de cherté = à produits identiques, neutralise l'assortiment
+// sous le seuil de couverture on liste quand meme, mais sans indice
 export default async function EnseignesPage() {
   let data: EnseignesOut | null = null;
   try {
@@ -30,7 +28,7 @@ export default async function EnseignesPage() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-dark-5 dark:text-dark-6">
             Chez qui payez-vous le moins cher ? Comparaison à produits identiques
-            — le même produit d&apos;une enseigne à l&apos;autre — sur les{" "}
+            (le même produit d&apos;une enseigne à l&apos;autre) sur les{" "}
             {data?.window_weeks ?? 12} dernières semaines.
           </p>
         </div>
@@ -45,7 +43,7 @@ export default async function EnseignesPage() {
       {data == null && (
         <div className="rounded-2xl border border-red-light bg-red-light-6 p-5 text-sm text-red dark:border-red-dark dark:bg-red/10">
           Le comparateur est momentanément indisponible. Réessayez dans quelques
-          instants — vos données ne sont pas perdues.
+          instants. Vos données ne sont pas perdues.
         </div>
       )}
 
@@ -148,7 +146,6 @@ function EnseigneRow({ item }: { item: EnseigneSummary }) {
           </div>
         </div>
 
-        {/* Barre pleine largeur sous la ligne en mobile (le tableau ne scrolle pas). */}
         <div className="mt-2 sm:hidden">
           <CherteBar index={index} />
         </div>

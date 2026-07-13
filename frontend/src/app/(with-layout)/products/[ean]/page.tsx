@@ -13,9 +13,7 @@ import { formatDateLong, formatEuro } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
 
-// Fiche produit : identité (OFF) + prix (Open Prices) + alternatives
-// (pgvector). Chaque source dégrade indépendamment : un produit sans
-// relevés publics garde sa fiche, un produit sans embedding garde ses prix.
+// chaque source dégrade indépendamment (pas de relevés -> on garde la fiche, etc)
 export default async function ProductDetailPage({
   params,
 }: {
@@ -40,8 +38,7 @@ export default async function ProductDetailPage({
   const substitutes: Substitute[] =
     subsR.status === "fulfilled" ? subsR.value : [];
 
-  // Deux états dégradés distincts : hors catalogue (aucune fiche, suivi par
-  // les seuls prix) vs. au catalogue mais enrichissement OFF non abouti.
+  // 2 cas distincts: hors catalogue vs au catalogue mais enrichissement OFF pas fini
   const priceOnly = !product.catalog;
   const offMissing = product.catalog && !product.off_found;
   const hasSeries = !!prices && prices.series.length >= 2;
@@ -92,18 +89,17 @@ export default async function ProductDetailPage({
 
       {offMissing && (
         <div className="mb-6 rounded-xl border border-dashed border-stroke bg-gray-1 p-4 text-sm text-dark-5 dark:border-dark-3 dark:bg-dark-2 dark:text-dark-6">
-          La fiche de ce produit est en cours d&apos;enrichissement — les
+          La fiche de ce produit est en cours d&apos;enrichissement. Les
           prix restent suivis normalement.
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* ── Colonne gauche : image + identité ─────────────────────── */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
             {product.image_url ? (
               <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gray-1 dark:bg-dark-2">
-                {/* next/image distant : hostname OFF non déclaré → <img>. */}
+                {/* hostname OFF pas déclaré dans next.config */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={product.image_url}
@@ -151,7 +147,6 @@ export default async function ProductDetailPage({
           </div>
         </div>
 
-        {/* ── Colonne droite : prix + alternatives ──────────────────── */}
         <div className="space-y-6 lg:col-span-2">
           <section className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
             <h2 className="text-lg font-bold text-dark dark:text-white">
@@ -244,7 +239,7 @@ export default async function ProductDetailPage({
               Produits proches
             </h2>
             <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-              Même famille, composition similaire — des pistes pour comparer
+              Même famille, composition similaire : des pistes pour comparer
               ou remplacer
             </p>
             {substitutes.length === 0 ? (
@@ -264,7 +259,7 @@ export default async function ProductDetailPage({
                           {s.name ?? s.ean}
                         </div>
                         <div className="text-xs text-dark-5 dark:text-dark-6">
-                          {s.brand ?? "—"}
+                          {s.brand ?? "-"}
                           {s.nutriscore && (
                             <span className="ml-2 opacity-70">
                               Nutri-Score {s.nutriscore.toUpperCase()}
@@ -298,7 +293,7 @@ function Field({
     <div className="flex items-baseline justify-between gap-2">
       <dt className="text-dark-5 dark:text-dark-6">{label}</dt>
       <dd className="text-right font-medium text-dark dark:text-white">
-        {value ?? <span className="text-dark-5 dark:text-dark-6">—</span>}
+        {value ?? <span className="text-dark-5 dark:text-dark-6">-</span>}
       </dd>
     </div>
   );

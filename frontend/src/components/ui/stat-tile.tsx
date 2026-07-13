@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 
-// Tuile statistique : label + valeur (chiffres proportionnels, pas de
-// tabular-nums sur un grand nombre isolé) + contexte optionnel (delta,
-// mention d'échantillon…).
+// pas de tabular-nums: c'est un grand chiffre isolé, pas une colonne
 export function StatTile({
   label,
   value,

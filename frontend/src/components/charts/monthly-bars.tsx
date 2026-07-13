@@ -1,8 +1,6 @@
 "use client";
 
-// Colonnes des dépenses mensuelles — série unique séquentielle (accent de
-// marque), barres ≤24px à sommet arrondi 4px / base carrée, survol = tooltip.
-// Seule la dernière colonne porte un label direct ; l'axe Y fait le reste.
+// seule la dernière colonne est labellisée, l'axe Y suffit pour le reste
 
 import { useState } from "react";
 import { formatEuro, formatMonth } from "@/lib/format-fr";
@@ -63,7 +61,6 @@ export function MonthlyBars({ months }: { months: BasketMonth[] }) {
           const barH = Math.max(2, PAD.top + usableH - y(m.total_eur));
           const r = Math.min(4, barW / 2, barH);
           const top = y(m.total_eur);
-          // Sommet arrondi, base carrée.
           const d = `M${x(i)},${top + r}
             a${r},${r} 0 0 1 ${r},-${r}
             h${barW - 2 * r}
@@ -92,7 +89,6 @@ export function MonthlyBars({ months }: { months: BasketMonth[] }) {
           );
         })}
 
-        {/* label direct sur la dernière colonne uniquement */}
         <text
           x={x(last) + barW / 2}
           y={y(months[last].total_eur) - 6}

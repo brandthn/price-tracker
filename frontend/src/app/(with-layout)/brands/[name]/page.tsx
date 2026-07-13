@@ -40,7 +40,7 @@ export default async function BrandStatsPage({
           value={
             stats.avg_price_eur != null
               ? `${stats.avg_price_eur.toFixed(2)} €`
-              : "—"
+              : "-"
           }
         />
         {stats.median_pct_change != null && (
@@ -64,13 +64,13 @@ export default async function BrandStatsPage({
               >
                 <div>
                   <div className="text-sm font-medium text-dark dark:text-white">
-                    {item.produit_nom ?? item.ean ?? "—"}
+                    {item.produit_nom ?? item.ean ?? "-"}
                   </div>
                   <div className="text-xs text-dark-6">
                     {item.price_eur_previous != null &&
                     item.price_eur_current != null
                       ? `${item.price_eur_previous.toFixed(2)} → ${item.price_eur_current.toFixed(2)} €`
-                      : "—"}
+                      : "-"}
                   </div>
                 </div>
                 <span className="rounded-full bg-red/10 px-2.5 py-0.5 text-sm font-medium text-red">

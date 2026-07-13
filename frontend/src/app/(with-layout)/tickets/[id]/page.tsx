@@ -45,19 +45,15 @@ export default async function TicketDetailPage({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Colonne gauche : la photo du ticket, visible d'emblée. */}
         <aside className="space-y-4">
           <TicketImage ticketId={ticket.id} />
           <ReadingCard ticket={ticket} />
         </aside>
 
-        {/* Colonne droite : lecture à vérifier, dépliée. */}
         <div className="space-y-6 lg:col-span-2">
           {hasOcrResult && (
-            // Identité stable (pas de `key` dynamique) : le composant reste monté
-            // entre deux passes et re-synchronise son état depuis les props à
-            // chaque `router.refresh()`. Un `key` dérivé de la donnée empilait des
-            // instances dans l'arbre RSC au lieu de les remplacer.
+            // surtout pas de key dérivée de la donnée: ça empilait des instances
+            // dans l'arbre RSC au lieu de les remplacer
             <OcrFeedback
               ticketId={ticket.id}
               initialFeedback={ticket.last_feedback}
@@ -99,7 +95,7 @@ function ReadingCard({
         {ticket.ocr_error && (
           <Row
             label="Lecture"
-            value="Échouée — reprenez la photo, bien à plat et nette."
+            value="Échouée. Reprenez la photo, bien à plat et nette."
             variant="error"
           />
         )}

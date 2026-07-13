@@ -1,10 +1,6 @@
 "use client";
 
-// Garde client : protège les pages de l'espace authentifié.
-// - Tant que l'état Firebase charge → spinner (évite un flash de la page).
-// - Si Firebase non configuré (NEXT_PUBLIC_FIREBASE_* absents) → laisse passer :
-//   mode démo, le backend tourne encore en PRT_AUTH_DISABLE=1.
-// - Si configuré et non connecté → redirige vers /login.
+// firebase pas configuré = on laisse passer (mode démo, backend en PRT_AUTH_DISABLE=1)
 
 import { useAuth } from "@/lib/firebase/auth-context";
 import { useRouter, usePathname } from "next/navigation";

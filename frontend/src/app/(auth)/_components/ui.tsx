@@ -1,6 +1,5 @@
 "use client";
 
-// Petits éléments d'UI partagés par les formulaires d'auth.
 import { type InputHTMLAttributes } from "react";
 
 export function Field({
