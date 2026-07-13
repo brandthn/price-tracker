@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getMyBasket } from "@/lib/api/users";
-import type { BasketSummary } from "@/lib/api/types";
+import { getMyBasket, getMyRecommendations } from "@/lib/api/users";
+import type { BasketSummary, RecommendationsOut } from "@/lib/api/types";
 import { MonthlyBars } from "@/components/charts/monthly-bars";
 import { StatTile } from "@/components/ui/stat-tile";
 import { DeltaPill } from "@/components/ui/delta-pill";
@@ -13,12 +13,23 @@ export const dynamic = "force-dynamic";
 // simulé. Sans ticket : onboarding, pas de zéros tristes.
 export default async function BudgetPage() {
   let basket: BasketSummary | null = null;
+  let recommendations: RecommendationsOut | null = null;
   let error: string | null = null;
   try {
     basket = await getMyBasket();
   } catch (err) {
     error = (err as Error).message;
   }
+
+  // Section optionnelle : une erreur ici ne doit pas casser la page budget.
+  if (basket && basket.tickets_count > 0) {
+    try {
+      recommendations = await getMyRecommendations();
+    } catch {
+      recommendations = null;
+    }
+  }
+
 
   const hasData = !!basket && basket.tickets_count > 0;
   const monthly = basket?.monthly ?? [];
@@ -187,6 +198,58 @@ export default async function BudgetPage() {
               </Link>
             </div>
           </section>
+          {recommendations && recommendations.items.length > 0 && (
+            <section className="mt-6 rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-lg font-bold text-dark dark:text-white">
+                  Économies possibles
+                </h2>
+                <span className="text-sm font-semibold text-green dark:text-green">
+                  jusqu&apos;à {formatEuro(recommendations.total_monthly_saving_eur)} / mois
+                </span>
+              </div>
+              <p className="mb-3 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
+                Des équivalents moins chers pour des produits que vous achetez déjà
+              </p>
+
+              <ul className="divide-y divide-stroke dark:divide-dark-3">
+                {recommendations.items.map((item) => (
+                  <li key={`${item.source.ean}-${item.target.ean}`} className="py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <span className="truncate text-dark-5 line-through dark:text-dark-6">
+                            {item.source.name ?? item.source.ean}
+                          </span>
+                          <span aria-hidden className="text-dark-5 dark:text-dark-6">
+                            →
+                          </span>
+                          <Link
+                            href={`/products/${item.target.ean}`}
+                            className="truncate font-medium text-dark hover:underline dark:text-white"
+                          >
+                            {item.target.name ?? item.target.ean}
+                          </Link>
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-dark-5 dark:text-dark-6">
+                          <DeltaPill pct={-item.saving_pct} />
+                          <span>
+                            {formatEuro(item.source.price_per_unit)} → {formatEuro(item.target.price_per_unit)} / {item.unit}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className="shrink-0 text-sm font-semibold text-green"
+                        style={{ fontVariantNumeric: "tabular-nums" }}
+                      >
+                        −{formatEuro(item.monthly_saving_eur)}/mois
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
     </>

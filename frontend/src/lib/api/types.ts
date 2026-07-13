@@ -239,3 +239,32 @@ export interface EnseigneDetailOut {
   cheaper: EnseigneProductRank[];
   dearer: EnseigneProductRank[];
 }
+
+// Reco « substitut moins cher » — /me/recommendations
+export interface RecoProductRef {
+  ean: string;
+  name: string | null;
+  brand: string | null;
+  image_url: string | null;
+  // €/unité (jamais le prix paquet)
+  price_per_unit: number;
+}
+
+export interface RecommendationItem {
+  source: RecoProductRef;
+  target: RecoProductRef;
+  unit: string;
+  tier: number;
+  score: number;
+  saving_per_unit: number;
+  // Pourcentage d'économie, ex: 18.4 = 18,4 % moins cher
+  saving_pct: number;
+  monthly_packs: number;
+  monthly_saving_eur: number;
+}
+
+export interface RecommendationsOut {
+  items: RecommendationItem[];
+  total_monthly_saving_eur: number;
+  count: number;
+}
