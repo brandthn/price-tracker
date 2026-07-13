@@ -1,11 +1,8 @@
-"""DTOs recommandations — « substitut moins cher » (reco Brique A, Étape 3).
+"""DTOs recommandations — substitut moins cher (Brique A, Etape 3).
 
-Expose, pour les produits que l'utilisateur achète, le meilleur substitut
-**moins cher au €/unité** et son **économie mensuelle** en euros réels.
-
-Source des paires : cache `product_substitutions` (précalculé par le worker
-`off`, kNN embeddings + accord catégoriel). Source du panier : agrégation
-live des `prix_extraits` de l'utilisateur (mêmes tickets que `/me/basket`).
+Meilleur substitut moins cher au €/unite + economie mensuelle. Paires depuis
+product_substitutions (worker off, kNN embeddings + accord categoriel) ; panier
+depuis agregation live des prix_extraits (memes tickets que /me/basket).
 """
 
 from __future__ import annotations
@@ -26,8 +23,7 @@ class RecoProductRef(BaseModel):
 
 
 class RecommendationItem(BaseModel):
-    """Un swap actionnable : « remplace `source` par `target`, économise
-    `monthly_saving_eur` €/mois »."""
+    """Un swap : remplace source par target, economise monthly_saving_eur/mois."""
 
     source: RecoProductRef
     target: RecoProductRef
@@ -45,10 +41,8 @@ class RecommendationItem(BaseModel):
 
 
 class RecommendationsOut(BaseModel):
-    """Liste des recommandations d'économies, triée par économie mensuelle desc.
-
-    Panier vide ou aucun substitut moins cher → `items=[]`, `total=0`
-    (jamais une erreur) : le frontend affiche « ajoutez un ticket »."""
+    """Recommandations triees par economie mensuelle desc. Panier vide ou aucun
+    substitut moins cher -> items=[], total=0 (jamais d'erreur)."""
 
     items: list[RecommendationItem] = Field(default_factory=list)
     total_monthly_saving_eur: float = 0.0

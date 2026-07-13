@@ -4,47 +4,20 @@ Revision ID: 0004_seed_aliases_catalogue
 Revises: 0003_ocr_feedback_loop
 Create Date: 2026-07-04
 
-NB id COURT : `alembic_version.version_num` est VARCHAR(32). Un revision id plus long
-est tronqué → le bump de version échoue et rollback TOUTE la migration (le seed inclus).
+id court : alembic_version.version_num = VARCHAR(32) ; id plus long -> tronque ->
+bump echoue et rollback toute la migration.
 
-But : alimenter `product_aliases` (vide) avec le corpus (libellé-ticket, enseigne) → EAN
-produit par le worker `catalogue` (Gemini vision sur les images Open Prices), stocké
-dans `catalogue_labels`. C'est le premier corpus d'alias exploitable par un futur
-matcher OCR — aujourd'hui l'OCR ne résout aucun EAN.
+Alimente product_aliases (vide) depuis catalogue_labels (worker catalogue, Gemini
+vision sur images Open Prices). Choix :
+- raw_text = libelle_original brut ; la normalisation est au matcher, pas stockee ici.
+- source='catalogue' : PK (raw_text, enseigne, source) cohabite avec user-validation
+  sans ecraser ; arbitrage au lookup.
+- confidence=0.7 = plancher du filtre worker, pas verite terrain -> validated_by_user=false.
+- paires ambigues ecartees (~174 libelles -> plusieurs EAN) : on n'importe que les
+  1-EAN pour ne pas fabriquer de fausse certitude.
 
-Décisions (et leur raison) :
-
-  raw_text = libelle_original          → on garde le libellé BRUT tel qu'écrit sur le
-                                          ticket. La normalisation n'est PAS stockée ici :
-                                          c'est une responsabilité du matcher (une seule
-                                          fonction, appliquée symétriquement au match).
-                                          On IGNORE volontairement catalogue_labels.
-                                          libelle_normalise (normaliseur étranger, lossy).
-
-  source   = 'catalogue'               → source dédiée. La PK (raw_text, enseigne, source)
-                                          fait cohabiter ces alias avec ceux de la
-                                          validation utilisateur ('user-validation') sans
-                                          jamais les écraser. L'arbitrage se fait au lookup.
-
-  confidence = 0.7                     → PLANCHER du filtre worker (il ne garde que les
-                                          matchs >= 0.7). La vraie confiance par ligne
-                                          n'est pas persistée par le worker. Ce ne sont
-                                          PAS des vérités terrain → validated_by_user=false.
-
-  Clés AMBIGUËS écartées               → ~174 paires (libellé, enseigne) pointent vers
-                                          plusieurs EAN (libellés génériques abrégés par
-                                          la caisse, ex. "LINDT EXCELLENCE NOI"). La PK
-                                          n'autorise qu'un EAN par paire ; en choisir un
-                                          fabriquerait une fausse certitude. On n'importe
-                                          QUE les paires non-ambiguës (1 seul EAN).
-                                          Le job catalogue reste intact (rien n'est supprimé
-                                          côté catalogue_labels).
-
-Effet attendu : ~7924 INSERT (= 8098 paires distinctes − 174 ambiguës). Confirmer avec
-la pré-vérif du runbook AVANT d'appliquer. Purement additif, réversible par downgrade.
-
-NB : lit catalogue_labels / catalogue_products, tables créées hors Alembic par le worker
-catalogue (CREATE TABLE IF NOT EXISTS). Elles doivent exister au moment du upgrade.
+Effet : ~7924 INSERT. Additif, reversible. Lit catalogue_labels/catalogue_products
+(crees hors Alembic par le worker catalogue) : doivent exister au upgrade.
 """
 
 from __future__ import annotations
@@ -95,8 +68,7 @@ _DELETE_SQL = "DELETE FROM product_aliases WHERE source = 'catalogue';"
 def upgrade() -> None:
     bind = op.get_bind()
     bind.execute(sa.text(_INSERT_SQL))
-    # Cloud SQL est injoignable en local : on logge le décompte pour vérifier
-    # directement dans les logs du Cloud Run Job (pas de requête locale possible).
+    # Cloud SQL injoignable en local : on logge le decompte, lisible dans les logs du Job
     n = bind.execute(
         sa.text("SELECT count(*) FROM product_aliases WHERE source = 'catalogue'")
     ).scalar()
@@ -104,5 +76,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Réversible exactement : on retire uniquement ce que cette migration a inséré.
     op.execute(_DELETE_SQL)

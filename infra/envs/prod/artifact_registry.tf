@@ -1,6 +1,4 @@
-# Repo Docker centralisé pour le backend et les workers.
-# - Lecture : backend-sa, worker-sa (pull au démarrage Cloud Run)
-# - Écriture : gh-actions-sa (push depuis CI, Phase 3)
+# repo docker : readers backend/worker/frontend, writer gh-actions
 module "artifact_registry" {
   source = "../../modules/artifact_registry"
 

@@ -1,4 +1,3 @@
-"""structlog → stdout JSON. Cloud Logging parse `severity` + `message` natifs."""
 
 from __future__ import annotations
 
@@ -9,7 +8,7 @@ import structlog
 
 
 def _add_severity(_logger: object, method_name: str, event_dict: dict) -> dict:
-    # Cloud Logging map `severity` (string) directement.
+
     event_dict["severity"] = method_name.upper()
     return event_dict
 

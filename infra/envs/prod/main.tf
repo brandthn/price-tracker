@@ -3,18 +3,13 @@ provider "google" {
   region  = var.region
 }
 
-# google-beta : utilisé uniquement par `google_project_service_identity`
-# (cf. service_agents.tf). Le reste du code reste sur le provider stable.
+# google-beta : uniquement pour google_project_service_identity
 provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
 
-# --- tf-state bucket -------------------------------------------------------
-# Créé manuellement en Phase 0 (chicken-and-egg : Terraform a besoin d'un
-# backend pour stocker son state). On l'adopte ensuite sous Terraform via
-# `terraform import google_storage_bucket.tf_state price-tracker-prod-01-tf-state`.
-# Cf. infra/README.md §Import.
+# tf-state bucket (cree a la main puis importe)
 resource "google_storage_bucket" "tf_state" {
   name                        = var.tf_state_bucket
   project                     = var.project_id
@@ -54,10 +49,6 @@ resource "google_storage_bucket" "tf_state" {
   }
 }
 
-# --- Service Accounts ------------------------------------------------------
-# Rôles volontairement minimaux pour Phase 1. Les phases suivantes ajouteront
-# les rôles spécifiques (Cloud SQL Client, BQ, Secret Accessor, etc.) au fur
-# et à mesure que les ressources sont créées.
 module "iam" {
   source = "../../modules/iam"
 
@@ -67,7 +58,7 @@ module "iam" {
   service_accounts = {
     terraform = {
       display_name = "Terraform runner SA"
-      description  = "Impersonné par les humains/CI pour exécuter `terraform apply`."
+      description  = "Impersonne pour terraform apply."
       project_roles = [
         "roles/editor",
         "roles/resourcemanager.projectIamAdmin",
@@ -79,14 +70,11 @@ module "iam" {
     }
     backend = {
       display_name = "Backend API SA (FastAPI on Cloud Run)"
-      description  = "Runtime du service Cloud Run prt-prod-backend (Phase 7)."
+      description  = "Runtime prt-prod-backend."
       project_roles = [
         "roles/logging.logWriter",
         "roles/monitoring.metricWriter",
         "roles/cloudtrace.agent",
-        # Phase 4 — accès Cloud SQL via Cloud SQL Auth Proxy / connecteur, et BQ
-        # pour la lecture des indices observatoire. Le rôle `instanceUser` est
-        # requis si on s'authentifie via IAM database authentication.
         "roles/cloudsql.client",
         "roles/cloudsql.instanceUser",
         "roles/bigquery.jobUser",
@@ -94,14 +82,11 @@ module "iam" {
     }
     worker = {
       display_name = "Workers SA (OCR, ingestion, OFF, indices, alertes)"
-      description  = "SA partagé pour tous les workers Cloud Run (Phases 6/8/9)."
+      description  = "SA partage pour tous les workers Cloud Run."
       project_roles = [
         "roles/logging.logWriter",
         "roles/monitoring.metricWriter",
         "roles/cloudtrace.agent",
-        # Phase 4 — workers ingestion/OFF/indices ont besoin de Cloud SQL +
-        # BQ jobs. Vertex AI est ajouté pour la génération des embeddings
-        # produit dans le worker OFF (Phase 6.2).
         "roles/cloudsql.client",
         "roles/cloudsql.instanceUser",
         "roles/bigquery.jobUser",
@@ -110,14 +95,12 @@ module "iam" {
     }
     gh-actions = {
       display_name = "GitHub Actions deployer SA"
-      description  = "Impersonné par GitHub Actions via Workload Identity Federation (Phase 3)."
-      # Aucun rôle projet en Phase 1. Phase 3 ajoutera le binding WIF + le droit
-      # d'impersonner prt-prod-terraform-sa pour les changements infra.
+      description  = "Impersonne par GitHub Actions via WIF."
       project_roles = []
     }
     frontend = {
       display_name = "Frontend Next.js SA (Cloud Run)"
-      description  = "Runtime du service Cloud Run prt-prod-frontend (Phase 10). Aucun accès data : le front parle uniquement HTTPS au backend public."
+      description  = "Runtime prt-prod-frontend. Aucun acces data."
       project_roles = [
         "roles/logging.logWriter",
         "roles/monitoring.metricWriter",

@@ -1,10 +1,7 @@
-"""Tests endpoint GET /me/recommendations (reco « substitut moins cher », Étape 3).
+"""Tests GET /me/recommendations (reco substitut moins cher).
 
-Cloud SQL est injoignable en CI (cf. conftest) → on override `get_session` par
-une fausse session. Elle doit servir DEUX requêtes distinctes :
-  1. le `SELECT User` de `get_or_create_user` (→ un user fake avec un `.id`) ;
-  2. la requête reco (CTE panier x product_substitutions) → les rows mockées.
-On les distingue sur la présence de « product_substitutions » dans le SQL.
+get_session override par une fausse session qui sert deux requetes : le SELECT User
+de get_or_create_user et la requete reco, distinguees sur "product_substitutions".
 """
 
 from __future__ import annotations
@@ -17,8 +14,7 @@ from fastapi.testclient import TestClient
 
 
 def _reco_row(**overrides) -> dict:
-    """Une row telle que renvoyée par _RECOMMENDATIONS_SQL (colonnes castées float8).
-    `saving_pct` est en fraction (0-1) comme en base."""
+    # row facon _RECOMMENDATIONS_SQL ; saving_pct en fraction (0-1) comme en base
     base = dict(
         source_ean="3017620422003",
         target_ean="3560070976478",
@@ -28,7 +24,7 @@ def _reco_row(**overrides) -> dict:
         source_ppu=15.45,
         target_ppu=8.60,
         saving_per_unit=6.85,
-        saving_pct=0.443,  # fraction → 44.3 % attendu en sortie
+        saving_pct=0.443,  # fraction, 44.3% en sortie
         packs_6m=6.0,      # 1 pack / mois
         source_name="Huile d'olive vierge extra",
         source_brand="Marque A",
@@ -36,7 +32,7 @@ def _reco_row(**overrides) -> dict:
         target_name="Huile d'olive",
         target_brand="Marque B",
         target_image_url="https://img/olive2.jpg",
-        # taille pack source = 1 kg → monthly_saving = 6.85 x 1 x (6/6) = 6.85
+        # pack source 1 kg -> monthly_saving = 6.85 x 1 x (6/6)
         monthly_saving_eur=6.85,
     )
     base.update(overrides)
@@ -64,8 +60,7 @@ class _Result:
 
 
 class _FakeSession:
-    """Sert le user pour get_or_create_user, et les rows reco pour la requête SQL."""
-
+    # user pour get_or_create_user, rows reco pour la requete SQL
     def __init__(self, user, reco_rows: list[dict]):
         self._user = user
         self._reco_rows = reco_rows
@@ -78,10 +73,9 @@ class _FakeSession:
             self.last_sql = sql
             self.last_params = params
             return _Result(rows=self._reco_rows)
-        # get_or_create_user : SELECT User WHERE firebase_uid = ...
         return _Result(scalar=self._user)
 
-    def add(self, *_a, **_k) -> None:  # pragma: no cover - user existe déjà
+    def add(self, *_a, **_k) -> None:  # pragma: no cover
         pass
 
     async def commit(self) -> None:  # pragma: no cover
@@ -141,15 +135,13 @@ def test_recommendations_happy_path(make_client) -> None:
     assert first["target"]["name"] == "Huile d'olive"
     assert first["unit"] == "kg"
     assert first["tier"] == 1
-    # fraction 0.443 -> 44.3 % en sortie
     assert first["saving_pct"] == pytest.approx(44.3)
-    # packs_6m 6 -> 1 pack/mois
     assert first["monthly_packs"] == pytest.approx(1.0)
     assert first["monthly_saving_eur"] == pytest.approx(6.85)
 
 
 def test_recommendations_empty_is_200_not_error(make_client) -> None:
-    """Panier vide / aucun substitut moins cher → 200 items=[], pas d'erreur."""
+    # panier vide / aucun substitut -> 200 items=[]
     session = _FakeSession(_fake_user(), [])
     client = make_client(session)
 
@@ -171,13 +163,12 @@ def test_recommendations_query_params_flow_to_sql(make_client) -> None:
     assert session.last_params["limit"] == 5
     assert session.last_params["max_tier"] == 1
     assert session.last_params["min_purchases"] == 2
-    # la fenêtre panier 6 mois et le tri par tier/score sont dans le SQL
     assert "6 months" in session.last_sql
     assert "product_substitutions" in session.last_sql
 
 
 def test_recommendations_defaults_exclude_tier3(make_client) -> None:
-    """Par défaut max_tier=2 : le Tier 3 (piège embedding) n'est pas exposé."""
+    # defaut max_tier=2 : Tier 3 non expose
     session = _FakeSession(_fake_user(), [])
     client = make_client(session)
 

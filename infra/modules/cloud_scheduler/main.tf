@@ -15,9 +15,7 @@ resource "google_cloud_scheduler_job" "this" {
 
   http_target {
     http_method = each.value.http_method
-    # uri = service root URL + optional path (where the request actually goes).
-    # audience = service root URL only (Cloud Run OIDC checks `aud` against the
-    # service URL stripped of any path). Hence the two are kept distinct.
+    # uri = url + path ; audience = url seule (aud OIDC sans path)
     uri  = "${each.value.target_url}${each.value.target_path}"
     body = each.value.body_base64
 

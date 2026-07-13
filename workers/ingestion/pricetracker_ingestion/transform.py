@@ -1,37 +1,3 @@
-"""Pipeline Silver complet : raw HF Parquet → (clean, rejections, metrics).
-
-Architecture (par batch) :
-    raw pyarrow Table (HF)
-        │
-        ├─ to_pylist (row-by-row)
-        │     │
-        │     └─ hf_mapping.map_hf_row  (renomme `date`→`price_date`, infère country code)
-        │             │
-        │             └─ cleaner.clean_price_record  (devise/pays/proof/prix/date)
-        │                     │
-        │                     ├─ rejet (MISSING_REQUIRED, INVALID_*, OUT_OF_RANGE, FUTURE_DATE)
-        │                     │     → bucket rejections
-        │                     │
-        │                     └─ ok → enrichments :
-        │                             - validate_ean        (rejet INVALID_EAN)
-        │                             - check_discount      (rejet INCOHERENT_DISCOUNT)
-        │                             - normalize_store_brand
-        │                             - standardize_city
-        │                             → bucket clean
-        │
-        ├─ post-pass IQR sur clean rows (group by product_code, flag outliers)
-        │
-        ├─ inject pipeline_run_date, source, ingested_at, raw_payload sur chaque bucket
-        │
-        └─ assembly pyarrow Tables conformes aux schémas BQ
-
-Performance : itération row-by-row Python (~1.5M lignes HF/jour). À volume actuel,
-acceptable dans le timeout Cloud Run 30 min sur 2 CPU. Vectorisation pyarrow.compute
-possible si la durée devient problématique — différé tant qu'on n'a pas mesuré.
-
-Dédup intra-snapshot : sur `id`, en gardant la 1ère occurrence (le collègue déduplique
-côté MERGE BQ seulement ; nous redondons car ça raccourcit le load + MERGE).
-"""
 
 from __future__ import annotations
 
@@ -56,17 +22,15 @@ from .logging import get_logger
 
 logger = get_logger(__name__)
 
-# Code de rejet additionnels produits par les enrichissements (pas par le cleaner).
+
 REJECTION_INVALID_EAN = "INVALID_EAN"
 REJECTION_INCOHERENT_DISCOUNT = "INCOHERENT_DISCOUNT"
 
-# Source label injecté dans la colonne `source`. Match la description du schéma BQ.
+
 SOURCE_LABEL = "hf-open-prices"
 
 
-# ---------------------------------------------------------------------------
-# Schémas pyarrow alignés sur les schémas BQ JSON.
-# ---------------------------------------------------------------------------
+
 
 SILVER_SCHEMA = pa.schema(
     [
@@ -100,10 +64,7 @@ SILVER_SCHEMA = pa.schema(
 
 REJECTIONS_SCHEMA = pa.schema(
     [
-        # nullable=False obligatoire : la table BQ déclare cette colonne REQUIRED
-        # (partition key). Sans ça, pyarrow crée un field nullable, BQ rejette
-        # le load_table_from_file avec "Field has changed mode from REQUIRED to
-        # NULLABLE" (load direct sur partition$YYYYMMDD avec CREATE_NEVER).
+
         pa.field("pipeline_run_date", pa.date32(), nullable=False),
         ("id", pa.string()),
         ("product_code", pa.string()),
@@ -120,20 +81,18 @@ REJECTIONS_SCHEMA = pa.schema(
 )
 
 
-# ---------------------------------------------------------------------------
-# Helpers internes
-# ---------------------------------------------------------------------------
+
 
 
 def _json_default(obj: Any) -> Any:
-    """Sérialise les types non-natifs JSON présents dans les rows HF brutes."""
+
     if isinstance(obj, Decimal):
         return float(obj)
     if isinstance(obj, datetime | date):
         return obj.isoformat()
-    if hasattr(obj, "item"):  # numpy scalars
+    if hasattr(obj, "item"):
         return obj.item()
-    return str(obj)  # last-resort, jamais raise (sinon perte du raw_payload)
+    return str(obj)
 
 
 def _dumps_payload(raw: dict[str, Any]) -> str:
@@ -154,9 +113,7 @@ def _empty_rejections_table() -> pa.Table:
     )
 
 
-# ---------------------------------------------------------------------------
-# Pipeline public
-# ---------------------------------------------------------------------------
+
 
 
 def transform_open_prices(
@@ -166,16 +123,7 @@ def transform_open_prices(
     ingested_at: datetime | None = None,
     config: CleanerConfig | None = None,
 ) -> tuple[pa.Table, pa.Table, dict[str, Any]]:
-    """Pipeline complet sur un snapshot HF Open Prices.
 
-    Retourne `(clean_table, rejections_table, metrics)`. Les deux tables sont
-    typées strictement conformes aux schémas BQ ; vides mais bien formées si
-    aucune ligne ne passe le pipeline.
-
-    `pipeline_run_date` est la date du run (utilisée comme partition côté
-    rejections et borne `FUTURE_DATE` côté cleaner si `config.reference_date`
-    n'est pas fixé). Paramétré pour permettre tests déterministes.
-    """
     n_input = raw.num_rows
     ingested_at_ts = ingested_at or datetime.now(UTC)
     cleaner_config = config or CleanerConfig(reference_date=pipeline_run_date)
@@ -199,7 +147,7 @@ def transform_open_prices(
 
     raw_rows = raw.to_pylist()
     for raw_row in raw_rows:
-        # On capture le raw_payload une fois pour réutilisation (clean OU rejet).
+
         raw_payload_json = _dumps_payload(raw_row)
         mapped = map_hf_row(raw_row)
 
@@ -213,8 +161,7 @@ def transform_open_prices(
             )
             continue
 
-        # Cleaner OK → enrichments. validate_ean et check_discount peuvent
-        # produire de nouveaux rejets.
+
         assert clean is not None
         ean_ok, ean_details = validate_ean(clean["product_code"])
         if not ean_ok:
@@ -240,21 +187,21 @@ def transform_open_prices(
             )
             continue
 
-        # Dédup intra-snapshot sur `id` (1ère occurrence gagne).
+
         if clean["id"] in seen_ids:
             continue
         seen_ids.add(clean["id"])
 
-        # Enrichissements purs (pas de rejet possible) + champs run-time.
+
         clean["store_brand_normalized"] = normalize_store_brand(clean["store_brand"])
         clean["city"] = standardize_city(clean["city"])
         clean["raw_payload"] = raw_payload_json
         clean_rows.append(clean)
 
-    # Post-pass IQR : ajoute `iqr_outlier` à chaque clean row (mutation in-place).
+
     flag_iqr_outliers(clean_rows)
 
-    # Inject run-time metadata + assembly pyarrow.
+
     for row in clean_rows:
         row["pipeline_run_date"] = pipeline_run_date
         row["ingested_at"] = ingested_at_ts
@@ -292,11 +239,7 @@ def _build_rejection_from_clean(
     details: str | None,
     raw_payload_json: str,
 ) -> dict[str, Any]:
-    """Construit un rejet quand le filtre est appliqué APRES le cleaner (ex: EAN).
 
-    On utilise les valeurs validées du `clean` quand disponibles, fallback sur
-    `raw_row` sinon. `pipeline_run_date` + `rejected_at` ajoutés en aval.
-    """
     return {
         "id": clean.get("id"),
         "product_code": clean.get("product_code"),
@@ -314,11 +257,7 @@ def _build_rejection_from_clean(
 
 
 def _rows_to_table(rows: list[dict[str, Any]], schema: pa.Schema) -> pa.Table:
-    """Convertit une liste de dicts en pyarrow Table conforme à `schema`.
 
-    Les colonnes manquantes dans les dicts → NULL. Les colonnes en surplus
-    → ignorées (sécurise contre une drift accidentelle des dicts).
-    """
     if not rows:
         return pa.table(
             {name: pa.array([], type=t) for name, t in zip(schema.names, schema.types, strict=True)},
@@ -332,9 +271,7 @@ def _rows_to_table(rows: list[dict[str, Any]], schema: pa.Schema) -> pa.Table:
     return pa.table(arrays, schema=schema)
 
 
-# ---------------------------------------------------------------------------
-# I/O parquet (utilisés par main.py pour Bronze archival)
-# ---------------------------------------------------------------------------
+
 
 
 def read_parquet(path: str) -> pa.Table:

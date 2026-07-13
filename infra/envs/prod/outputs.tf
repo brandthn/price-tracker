@@ -13,8 +13,6 @@ output "terraform_sa_email" {
   value       = module.iam.emails["terraform"]
 }
 
-# --- Phase 2 -----------------------------------------------------------------
-
 output "buckets" {
   description = "Data lake buckets (bronze, silver, models)."
   value = {
@@ -25,7 +23,7 @@ output "buckets" {
 }
 
 output "network" {
-  description = "VPC and subnet identifiers. Cloud Run will attach to `subnet` via Direct VPC egress (Phase 5)."
+  description = "VPC and subnet identifiers."
   value = {
     vpc_self_link = module.network.vpc_self_link
     subnet_id     = module.network.subnet_id
@@ -42,8 +40,6 @@ output "secrets" {
   description = "Map of secret_id => resource ID."
   value       = module.secrets.secret_ids
 }
-
-# --- Phase 4 -----------------------------------------------------------------
 
 output "cloud_sql" {
   description = "Cloud SQL instance — connection_name (project:region:instance) + private IP + db name."
@@ -70,8 +66,6 @@ output "gcs_notification_ticket_uploaded" {
   description = "GCS→Pub/Sub notification ID for ticket uploads."
   value       = google_storage_notification.ticket_uploaded.id
 }
-
-# --- Phase 5 -----------------------------------------------------------------
 
 output "cloud_run_services" {
   description = "Cloud Run services and their auto-generated HTTPS URIs."

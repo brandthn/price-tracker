@@ -1,12 +1,5 @@
-# Bucket BRONZE — données brutes : tickets users (Backend signe PUT) +
-# snapshots HuggingFace open-prices archivés par worker-ingestion.
-# Backend et workers ont objectAdmin (lecture/écriture/suppression). Convention
-# alignée avec Silver pour éviter d'ajuster les rôles à chaque nouveau pipeline.
-#
-# CORS : ouvert pour PUT/OPTIONS depuis le navigateur du frontend, sinon le
-# preflight déclenché par `Content-Type: image/jpeg` bloque l'upload Signed URL.
-# `origin = ["*"]` en démo Phase 10 — restreindre à l'URL Cloud Run frontend
-# une fois stabilisée (cf. var.frontend_cors_origins ci-dessous).
+# bucket bronze : tickets users + snapshots HF. backend+workers objectAdmin.
+# CORS ouvert pour l'upload signed url depuis le navigateur.
 module "bucket_bronze" {
   source = "../../modules/storage"
 
@@ -29,8 +22,7 @@ module "bucket_bronze" {
   ]
 }
 
-# Bucket SILVER — données nettoyées (parquet OpenPrices, OFF, etc.).
-# Workers d'ingestion écrivent (objectAdmin). Backend lit pour stats (viewer).
+# bucket silver : donnees nettoyees. workers objectAdmin, backend viewer.
 module "bucket_silver" {
   source = "../../modules/storage"
 
@@ -45,8 +37,7 @@ module "bucket_silver" {
   object_viewers = [local.backend_sa]
 }
 
-# Bucket MODELS — poids des modèles OCR / embeddings versionnés.
-# Pas de suppression auto sur les versions courantes. Worker = viewer.
+# bucket models : poids OCR/embeddings versionnes. worker viewer.
 module "bucket_models" {
   source = "../../modules/storage"
 

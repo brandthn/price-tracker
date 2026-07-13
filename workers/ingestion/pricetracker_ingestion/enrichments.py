@@ -1,13 +1,3 @@
-"""Enrichissements post-cleaner : normalisation enseigne, ville, EAN, IQR.
-
-Différences vs `local_pipeline/silver_enrichments.py` du collègue :
-- Pas de dépendance pandas. `flag_iqr_outliers` réécrit en numpy pur — le
-  worker importe déjà numpy via pyarrow, on évite une lourde dep transitives.
-- `validate_ean` et `check_discount_coherence` retournent `(bool, str | None)`
-  pour s'aligner sur le pattern du cleaner et permettre un bucketing rejection
-  homogène côté `transform.py`.
-- Patterns d'enseignes pré-compilés au module load (gain perf sur 10⁶ lignes).
-"""
 
 from __future__ import annotations
 
@@ -17,13 +7,7 @@ from typing import Any
 
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# 1. Normalisation enseigne
-# ---------------------------------------------------------------------------
-#
-# Liste ordonnée du plus spécifique au plus général : "Carrefour Market"
-# AVANT "Carrefour" sinon le second matche le premier et écrase. Les patterns
-# sont insensibles à la casse (re.IGNORECASE compilé une fois).
+
 
 _BRAND_PATTERNS: list[tuple[str, str]] = [
     (r"e\.?\s*leclerc|centre\s+commercial\s+e\.?\s*leclerc", "E.Leclerc"),
@@ -62,13 +46,7 @@ _COMPILED_BRAND_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
 
 def normalize_store_brand(raw: str | None) -> str | None:
-    """Extrait l'enseigne canonique depuis l'adresse OSM brute.
 
-    Si aucune enseigne connue ne matche, retourne le premier segment avant
-    la virgule (= nom du POI OSM), tronqué à 80 caractères. Évite des
-    valeurs `store_brand_normalized` à NULL alors qu'on a quand même un nom
-    de magasin partiellement utilisable.
-    """
     if not raw:
         return None
     for pattern, canonical in _COMPILED_BRAND_PATTERNS:
@@ -78,9 +56,7 @@ def normalize_store_brand(raw: str | None) -> str | None:
     return first_segment[:80] if first_segment else None
 
 
-# ---------------------------------------------------------------------------
-# 2. Standardisation ville
-# ---------------------------------------------------------------------------
+
 
 _ARRONDISSEMENT_PATTERN = re.compile(
     r"\s+\d+\s*(e|er|[èe]me|i[èe]me)?\s*(arrondissement)?$",
@@ -89,7 +65,7 @@ _ARRONDISSEMENT_PATTERN = re.compile(
 
 
 def standardize_city(raw: str | None) -> str | None:
-    """Normalise le nom de ville (title-case, supprime suffixe d'arrondissement)."""
+
     if not raw:
         return None
     city = raw.strip()
@@ -100,16 +76,11 @@ def standardize_city(raw: str | None) -> str | None:
     return city or None
 
 
-# ---------------------------------------------------------------------------
-# 3. Validation EAN-13 / EAN-8
-# ---------------------------------------------------------------------------
+
 
 
 def validate_ean(product_code: str | None) -> tuple[bool, str | None]:
-    """Vérifie longueur + checksum modulo 10 (EAN-13 ou EAN-8).
 
-    Retourne (True, None) si valide, sinon (False, details).
-    """
     if not product_code:
         return False, "product_code vide"
     code = str(product_code).strip()
@@ -132,21 +103,11 @@ def validate_ean(product_code: str | None) -> tuple[bool, str | None]:
     return False, f"longueur EAN invalide: {len(code)} chiffres (attendu 8 ou 13)"
 
 
-# ---------------------------------------------------------------------------
-# 4. Cohérence prix remisé
-# ---------------------------------------------------------------------------
+
 
 
 def check_discount_coherence(row: dict[str, Any]) -> tuple[bool, str | None]:
-    """Vérifie qu'un prix marqué en promo a un `price_without_discount` cohérent.
 
-    Règles :
-    - `price_is_discounted=False/None` → toujours cohérent (rien à vérifier).
-    - `price_is_discounted=True` ET `price_without_discount_eur=None` → on tolère
-      (l'enseigne n'a pas saisi le prix d'origine, courant en GMS). Pas un rejet.
-    - `price_is_discounted=True` ET prix d'origine ≤ prix remisé → INCOHERENT.
-    - Remise > 95% → suspect (saisie probablement erronée) → INCOHERENT.
-    """
     if not row.get("price_is_discounted"):
         return True, None
     price = row.get("price_eur")
@@ -160,26 +121,11 @@ def check_discount_coherence(row: dict[str, Any]) -> tuple[bool, str | None]:
     return True, None
 
 
-# ---------------------------------------------------------------------------
-# 5. Flag IQR outliers (post-pass, group-by product_code)
-# ---------------------------------------------------------------------------
+
 
 
 def flag_iqr_outliers(rows: list[dict[str, Any]], *, iqr_multiplier: float = 3.0) -> None:
-    """Annote chaque row avec `iqr_outlier: bool` (mutation in-place).
 
-    Pour chaque `product_code` ayant ≥ 5 observations, calcule Q1/Q3 sur
-    `price_eur` et flag les valeurs hors [Q1 - k·IQR, Q3 + k·IQR]. Pour les
-    EAN avec < 5 observations, on ne peut pas calculer un quartile fiable →
-    `iqr_outlier = False` par défaut (innocent par manque de preuve).
-
-    `iqr_multiplier=3` (plus large que le 1.5 classique) car les promotions
-    légitimes et les produits premium peuvent légitimement s'écarter — on veut
-    flag uniquement les saisies clairement aberrantes (ex: lait à 999€).
-
-    Implémenté en numpy pur (pas de pandas) pour rester dans la dep stack
-    pyarrow déjà présente.
-    """
     if not rows:
         return
 
@@ -203,7 +149,6 @@ def flag_iqr_outliers(rows: list[dict[str, Any]], *, iqr_multiplier: float = 3.0
             p = rows[i]["price_eur"]
             rows[i]["iqr_outlier"] = bool(p < lower or p > upper)
 
-    # Toute ligne sans product_code (ne devrait pas arriver post-cleaner mais
-    # garde-fou) : iqr_outlier = False.
+
     for r in rows:
         r.setdefault("iqr_outlier", False)

@@ -1,9 +1,7 @@
-"""Table `ocr_feedback` — historique des avis 👍/👎 sur l'output OCR.
+"""Table ocr_feedback — historique des avis up/down sur l'output OCR.
 
-Une ligne par avis (pas d'upsert) : après un re-OCR (tier-2) l'utilisateur peut
-re-noter, ce qui crée une nouvelle ligne avec un `ocr_attempt` incrémenté. Cette
-historisation sert à analyser a posteriori où le système s'est trompé (quel
-modèle / quelle passe a produit un résultat jugé erroné).
+Une ligne par avis (pas d'upsert) : un re-OCR tier-2 cree une nouvelle ligne avec
+ocr_attempt incremente. Sert a analyser quelle passe a produit un resultat errone.
 """
 
 from __future__ import annotations

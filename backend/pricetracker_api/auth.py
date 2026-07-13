@@ -1,15 +1,9 @@
-"""Auth Firebase via ADC — vérification des JWT Bearer.
+"""Auth Firebase via ADC — verification des JWT Bearer.
 
-Initialisation `firebase_admin.initialize_app()` sans argument → ADC :
-- En prod : la SA `prt-prod-backend-sa` attachée au Cloud Run.
-- En local : `gcloud auth application-default login`.
-
-Aucune clé JSON nécessaire (org policy `iam.disableServiceAccountKeyCreation`).
-La vérification du JWT se fait contre les certs publics Google — aucun rôle
-IAM Firebase requis sur la SA.
-
-DEV ONLY : `PRT_AUTH_DISABLE=1` retourne un user fake (`uid='dev-bypass'`).
-Ne jamais activer en prod : check explicite dans `_verify`.
+initialize_app() sans arg -> ADC (backend-sa en prod, adc login en local).
+Pas de cle JSON (org policy iam.disableServiceAccountKeyCreation) ; verif du JWT
+contre les certs publics Google, aucun role IAM Firebase requis sur la SA.
+PRT_AUTH_DISABLE=1 (dev only) renvoie un user fake ; jamais en prod.
 """
 
 from __future__ import annotations
@@ -31,10 +25,7 @@ _firebase_initialized = False
 
 @dataclass
 class AuthenticatedUser:
-    """Identité minimale extraite du JWT Firebase. Le `uid` est la clé
-    primaire utilisée côté Cloud SQL (`users.firebase_uid`).
-    """
-
+    # uid = users.firebase_uid cote Cloud SQL
     uid: str
     email: str | None
     email_verified: bool
@@ -47,7 +38,7 @@ def _ensure_firebase_initialized() -> None:
     try:
         firebase_admin.initialize_app()
     except ValueError:
-        # Déjà initialisé (cas testcontainers / reload uvicorn).
+        # deja init (testcontainers / reload uvicorn)
         pass
     _firebase_initialized = True
 
@@ -63,18 +54,11 @@ def _bypass_user() -> AuthenticatedUser:
 async def verify_bearer(
     authorization: str | None = Header(default=None),
 ) -> AuthenticatedUser:
-    """FastAPI dependency : extrait + valide le JWT Firebase.
-
-    - Si `PRT_AUTH_DISABLE=1` et `PRT_ENV != 'prod'` → renvoie le bypass user.
-    - Sinon : require `Authorization: Bearer <id_token>` et le vérifie via
-      `firebase_admin.auth.verify_id_token` (bloque le revoked tokens).
-
-    Lève 401 sur token manquant/invalide/expiré, 403 sur email non vérifié.
-    """
+    # 401 token manquant/invalide/expire ; bypass si PRT_AUTH_DISABLE et env != prod
     settings = get_settings()
     if settings.prt_auth_disable:
         if settings.prt_env == "prod":
-            # Garde-fou : ne JAMAIS bypass en prod, même par accident.
+            # jamais de bypass en prod
             logger.error("auth_disable_in_prod_forbidden")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -99,9 +83,8 @@ async def verify_bearer(
 
     _ensure_firebase_initialized()
     try:
-        # `check_revoked=False` : pour `check_revoked=True` Firebase fait un
-        # appel HTTP à chaque requête (latence + quota). On fait confiance à
-        # l'expiration courte des tokens (1h) pour limiter la fenêtre de revoke.
+        # check_revoked=False : evite un appel HTTP par requete ; on couvre via
+        # l'expiration courte des tokens (1h)
         payload = await asyncio.to_thread(firebase_auth.verify_id_token, token, None, False)
     except firebase_auth.ExpiredIdTokenError as exc:
         raise HTTPException(
@@ -110,8 +93,7 @@ async def verify_bearer(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     except (firebase_auth.InvalidIdTokenError, ValueError) as exc:
-        # ValueError est levée pour un token mal formé. On loggue le détail
-        # côté serveur uniquement — pas de leak au client.
+        # ValueError = token mal forme ; log serveur only, pas de leak client
         logger.info("auth_invalid_token", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -127,6 +109,5 @@ async def verify_bearer(
 
 
 def reset_for_tests(settings: Settings | None = None) -> None:
-    """Tests : permet de re-initialiser Firebase Admin si besoin (rare)."""
     global _firebase_initialized
     _firebase_initialized = False

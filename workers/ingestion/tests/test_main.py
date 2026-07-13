@@ -1,4 +1,3 @@
-"""Smoke tests sur l'app FastAPI : healthz + OIDC bypass + run mocké."""
 
 from __future__ import annotations
 
@@ -29,15 +28,14 @@ def test_run_orchestrates_pipeline(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Mock chaque étape externe (HF, GCS, BQ) — on valide juste que l'app
-    appelle les bonnes fonctions et renvoie la réponse JSON attendue."""
+
     fake_raw_path = tmp_path / "raw.parquet"
     pq.write_table(
         pa.table(
             {
                 "id": ["a"],
                 "date": [date(2026, 5, 17)],
-                "product_code": ["3017620422003"],  # Nutella, EAN valide
+                "product_code": ["3017620422003"],
                 "price": [3.49],
                 "currency": ["EUR"],
                 "location_osm_address_country": ["France"],
@@ -67,7 +65,7 @@ def test_run_orchestrates_pipeline(
     assert body["gcs_uri"].startswith("gs://price-tracker-prod-01-bronze/open-prices/dt=")
     assert "pipeline_run_date" in body
     assert isinstance(body["duration_s"], int | float)
-    # Metrics propagées : on vérifie au moins la présence des clés.
+
     metrics = body["metrics"]
     assert metrics["rows_input"] == 1
     assert metrics["rows_clean"] == 1

@@ -1,23 +1,3 @@
-"""Chargement BigQuery : MERGE clean + WRITE_TRUNCATE partition rejections.
-
-Stratégie clean (`open_prices_clean`) :
-    1. Load parquet GCS dans une staging table éphémère (WRITE_TRUNCATE).
-    2. MERGE sur `id` vers la table finale partitionnée.
-    3. DROP staging.
-    Idempotent : un re-run du même snapshot produit 0 nouvelle ligne (les rows
-    matchent toutes par `id`).
-
-Stratégie rejections (`open_prices_rejections`) :
-    Load parquet local (pyarrow → fichier temp) directement vers la **décoration
-    partition** `table$YYYYMMDD` avec `WRITE_TRUNCATE`. Atomique côté BQ :
-    la partition du jour est remplacée intégralement par le résultat du run.
-    Idempotent : un re-run du jour J remplace la partition J.
-
-    Pourquoi pas un MERGE comme pour clean ? La PK `id` peut être NULL en
-    rejections (rejet avant tout parsing), donc MERGE serait ambigu. La
-    partition decorator est plus simple et logiquement plus juste : "voici
-    tous les rejets du run du jour".
-"""
 
 from __future__ import annotations
 
@@ -33,8 +13,7 @@ from .logging import get_logger
 
 logger = get_logger(__name__)
 
-# Liste des colonnes MERGE pour open_prices_clean — gardée explicite (et pas
-# générée depuis le schéma) pour qu'un drift accidentel soit visible en code review.
+
 _OPEN_PRICES_CLEAN_COLUMNS = (
     "id",
     "pipeline_run_date",
@@ -77,10 +56,7 @@ def load_and_merge_clean(
     table: str,
     gcs_uri: str,
 ) -> int:
-    """Charge `gcs_uri` (parquet) en staging, MERGE sur `id` vers la table cible.
 
-    Retourne le nombre de lignes affectées par le MERGE (insert + update).
-    """
     client = bigquery.Client(project=project_id, location=location)
     target_full = f"{project_id}.{dataset}.{table}"
     staging_full = _staging_table_id(project_id, dataset, table)
@@ -133,12 +109,7 @@ def load_rejections(
     rejections: pa.Table,
     partition_day: date,
 ) -> int:
-    """Écrit `rejections` dans la partition `partition_day` (WRITE_TRUNCATE).
 
-    Si `rejections` est vide, on TRUNCATE quand même la partition pour
-    refléter le fait que le run du jour n'a rien rejeté (sinon une exécution
-    précédente du même jour laisserait des résidus).
-    """
     client = bigquery.Client(project=project_id, location=location)
     partition_suffix = partition_day.strftime("%Y%m%d")
     target_partition = f"{project_id}.{dataset}.{table}${partition_suffix}"
@@ -146,7 +117,7 @@ def load_rejections(
     load_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.PARQUET,
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-        # Pas CREATE_IF_NEEDED : la table doit déjà exister (créée par Terraform).
+
         create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
     )
 

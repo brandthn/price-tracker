@@ -1,8 +1,7 @@
-"""Table `prix_extraits` — lignes articles extraites d'un ticket par l'OCR.
+"""Table prix_extraits — lignes articles extraites d'un ticket par l'OCR.
 
-Une ligne par article du ticket. `ean` peut être NULL si l'OCR n'a pas
-trouvé de match (utilisateur doit valider). `validated_by_user` passe à
-true quand l'utilisateur a confirmé/corrigé.
+Une ligne par article. ean NULL si pas de match (user valide) ;
+validated_by_user passe true apres confirmation/correction.
 """
 
 from __future__ import annotations

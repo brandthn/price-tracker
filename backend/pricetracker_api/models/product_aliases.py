@@ -1,15 +1,9 @@
-"""Table `product_aliases` — mapping (libellé brut, enseigne) → EAN canonique.
+"""Table product_aliases — mapping (libelle brut, enseigne) -> EAN canonique.
 
-Alimentée par plusieurs sources :
-- Worker OCR (Phase 8) : candidats issus du matching pgvector/Levenshtein,
-  `validated_by_user=False` jusqu'à la confirmation utilisateur.
-- Feedback utilisateur : `PATCH /tickets/{id}/items` met `validated_by_user=True`.
-- Seed Maty : script one-shot `scripts/seed_aliases_and_catalogue.py` qui
-  ingère un JSONL de mappings (raw_text, enseigne) → ean, marqués
-  `source='colleague-matching'`.
-
-PK composite (raw_text, enseigne, source) pour qu'une même paire puisse
-exister depuis plusieurs sources (l'agrégation se fait au lookup).
+Sources : worker OCR (matching pgvector/Levenshtein, validated_by_user=False),
+feedback user (PATCH /tickets/{id}/items met true), seed Maty
+(source='colleague-matching'). PK composite (raw_text, enseigne, source) : une
+meme paire peut venir de plusieurs sources, agregation au lookup.
 """
 
 from __future__ import annotations

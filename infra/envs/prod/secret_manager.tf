@@ -1,11 +1,4 @@
-# Secrets vides en Phase 2 (containers + IAM uniquement).
-# Les valeurs sont populées soit :
-#   - manuellement (hf-token HuggingFace)
-#   - automatiquement en Phase 4 (cloudsql-password généré par Terraform)
-#
-# Pas de secret Firebase Admin SDK : la policy org `iam.disableServiceAccountKeyCreation`
-# (héritée de l'organisation) interdit la création de clés JSON. Le backend FastAPI
-# utilisera ADC via la SA Cloud Run attachée — voir infra/README.md §Runbook Firebase.
+# secrets. pas de cle Firebase (org policy interdit les cles JSON, ADC via SA).
 module "secrets" {
   source = "../../modules/secret_manager"
 
@@ -14,15 +7,15 @@ module "secrets" {
 
   secrets = {
     "${var.name_prefix}-cloudsql-password" = {
-      description = "Mot de passe du user applicatif sur Cloud SQL. Généré en Phase 4."
+      description = "Mdp user applicatif Cloud SQL."
       accessors   = [local.backend_sa, local.worker_sa]
     }
     "${var.name_prefix}-hf-token" = {
-      description = "HuggingFace API token (worker ingestion lit le snapshot Open Prices)."
+      description = "HuggingFace API token."
       accessors   = [local.worker_sa]
     }
     "${var.name_prefix}-groq-api-key" = {
-      description = "Groq API key — worker OCR (LLaMA 4 Scout VLM). Alimenter manuellement : echo -n '<KEY>' | gcloud secrets versions add prt-prod-groq-api-key --data-file=- --project=price-tracker-prod-01"
+      description = "Groq API key (worker OCR)."
       accessors   = [local.worker_sa]
     }
   }

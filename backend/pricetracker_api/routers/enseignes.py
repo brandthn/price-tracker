@@ -1,20 +1,10 @@
-"""Router enseignes public — comparateur de cherté relative (matched-basket).
+"""Router enseignes public — comparateur de cherte relative (matched-basket).
 
-Chiffre unique et honnête : l'indice de cherté relative. Pour chaque produit
-relevé dans ≥2 enseignes sur la fenêtre, on compare le prix médian de l'enseigne
-à la médiane inter-enseignes du produit ; l'indice de l'enseigne est la médiane
-de ces ratios ×100. 100 = au niveau médian, <100 = moins chère, >100 = plus
-chère. Le mix de produits ne fausse pas l'indice (comparaison produit par
-produit), contrairement à un prix médian brut par enseigne.
-
-L'« évolution des prix par enseigne » n'est PAS exposée (décision produit
-2026-07-09) : l'index base-100 brut de `indices_inflation` est dominé par
-l'assortiment (la médiane hebdo dépend des produits scannés cette semaine, pas
-des prix), et une évolution honnête « à panier constant » manque de données à ce
-volume. La question « ça monte où ? » reste répondue au niveau produit.
-
-Noms résolus contre Cloud SQL `products` (catalogue de référence), jamais un EAN
-nu. `query_dicts_safe` tolère une table Silver vide → panorama vide (200).
+Indice de cherte relative : par produit releve dans >=2 enseignes, ratio prix
+median enseigne / mediane inter-enseignes ; indice = mediane des ratios x100
+(100 = median, <100 moins chere). Comparaison produit par produit, pas biaise par
+le mix. Evolution des prix par enseigne non exposee (decision 2026-07-09, biais
+assortiment). Noms resolus contre Cloud SQL products ; Silver vide -> panorama vide (200).
 """
 
 from __future__ import annotations
@@ -51,13 +41,8 @@ def _silver_fq() -> str:
 
 
 def _matched_cte(window_weeks: int) -> str:
-    """CTE partagée panorama/fiche : prix médians appariés produit par produit.
-
-    - `ens`    : prix médian + nb relevés par (produit, enseigne), fenêtre glissante.
-    - `ref`    : prix de référence du produit = médiane inter-enseignes (produits
-                 vus dans ≥2 enseignes seulement → comparaison possible).
-    - `ratios` : prix enseigne / prix référence, par (enseigne, produit).
-    """
+    # CTE panorama/fiche : ens = median par (produit, enseigne) ; ref = mediane
+    # inter-enseignes (produits vus dans >=2 enseignes) ; ratios = enseigne / ref
     silver = _silver_fq()
     return f"""
     ens AS (
@@ -105,12 +90,9 @@ async def get_enseignes(
     window_weeks: int = Query(default=_DEFAULT_WINDOW_WEEKS, ge=4, le=52),
     min_matched: int = Query(default=_DEFAULT_MIN_MATCHED, ge=1, le=100),
 ) -> EnseignesOut:
-    """Panorama : classement des enseignes par cherté relative.
-
-    Ne dépend que de BigQuery (les noms d'enseignes sont déjà lisibles) → la
-    vitrine reste disponible même si Cloud SQL est indisponible. Une enseigne
-    sous le seuil `min_matched` reste listée (transparence) mais avec
-    `cherte_index=None` (« couverture insuffisante »)."""
+    """Panorama : classement des enseignes par cherte relative."""
+    # BQ seul (pas de Cloud SQL requis) ; enseigne sous min_matched listee avec
+    # cherte_index=None
     sql = f"""
     WITH {_matched_cte(window_weeks)}
     SELECT
@@ -138,8 +120,7 @@ async def get_enseignes(
             )
         )
 
-    # Classables (indice non nul) triés par cherté croissante (la moins chère en
-    # tête), puis le reste par couverture décroissante.
+    # indice non nul d'abord (croissant, moins chere en tete), reste par couverture desc
     items.sort(
         key=lambda it: (
             it.cherte_index is None,
@@ -156,7 +137,7 @@ async def get_enseignes(
 
 
 def _enseigne_exists(enseigne: str) -> bool:
-    """L'enseigne a-t-elle au moins un relevé (pour distinguer « non suivie »)."""
+    # au moins un releve ? distingue "non suivie"
     sql = f"""
     SELECT 1 FROM {_silver_fq()}
     WHERE country_code = '{_COUNTRY}' AND store_brand_normalized = @enseigne
@@ -192,12 +173,10 @@ async def get_enseigne_detail(
     min_matched: int = Query(default=_DEFAULT_MIN_MATCHED, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
 ) -> EnseigneDetailOut:
-    """Fiche enseigne : positionnement cherté + produits où elle est la moins /
-    plus chère. Enseigne inconnue → payload « non suivie » (jamais un 404 brut)."""
+    """Fiche enseigne : positionnement + produits moins/plus chers. Inconnue -> non suivie, pas 404."""
     enseigne = nom.strip()
-    # `agg` réutilise la MÊME expression APPROX_QUANTILES que le panorama →
-    # l'indice de la fiche est strictement identique à celui du comparateur
-    # (joint par CROSS JOIN, constant sur toutes les lignes).
+    # agg reutilise la meme expr APPROX_QUANTILES que le panorama : indice fiche =
+    # indice comparateur (CROSS JOIN, constant sur toutes les lignes)
     sql = f"""
     WITH {_matched_cte(window_weeks)},
     agg AS (
@@ -230,8 +209,7 @@ async def get_enseigne_detail(
     )
 
     if not rows:
-        # Aucun produit apparié : soit l'enseigne existe mais n'a pas assez de
-        # relevés comparables, soit elle n'est pas suivie du tout.
+        # aucun produit apparie : enseigne sans releves comparables ou non suivie
         exists = await asyncio.to_thread(_enseigne_exists, enseigne)
         return EnseigneDetailOut(
             enseigne=enseigne,
@@ -249,8 +227,8 @@ async def get_enseigne_detail(
         else None
     )
 
-    # rows triés par ratio ASC : les moins chères (ratio<1) en tête, les plus
-    # chères (ratio>1) en fin → on inverse ces dernières (plus chère d'abord).
+    # rows tries par ratio ASC : moins chers (ratio<1) en tete, plus chers en fin ;
+    # on inverse ces derniers (plus cher d'abord)
     cheaper_rows = [
         r for r in rows if r.get("delta_pct") is not None and float(r["delta_pct"]) < 0
     ][:_TOP_PRODUCTS]

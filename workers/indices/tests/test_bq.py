@@ -1,4 +1,3 @@
-"""Tests SQL builder — vérifie que les 4 statements sont bien formés."""
 
 from __future__ import annotations
 
@@ -51,7 +50,7 @@ def test_each_sql_references_correct_tables() -> None:
 
 
 def test_each_sql_starts_with_truncate_and_inserts() -> None:
-    """Préserve les options Terraform : TRUNCATE + INSERT (pas CREATE OR REPLACE)."""
+
     plan = build_sql_plan(_config())
     for label, sql in plan:
         assert "TRUNCATE TABLE" in sql, f"{label} doit faire TRUNCATE"
@@ -60,7 +59,7 @@ def test_each_sql_starts_with_truncate_and_inserts() -> None:
 
 
 def test_iqr_outliers_excluded_in_all_sql() -> None:
-    """Les outliers IQR pré-flaggés par le cleaner ingestion sont exclus."""
+
     plan = build_sql_plan(_config())
     for label, sql in plan:
         assert "iqr_outlier" in sql, f"{label} doit filtrer iqr_outlier"

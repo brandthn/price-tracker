@@ -48,7 +48,7 @@ async def patch_me(
     if body.display_name is not None:
         db_user.display_name = body.display_name
     if body.departement is not None:
-        # Validation minimale : 2 ou 3 chars (FR métropole + DOM).
+        # 2 ou 3 chars (metropole + DOM)
         dept = body.departement.upper()
         if len(dept) not in (2, 3):
             raise HTTPException(
@@ -66,13 +66,8 @@ async def get_my_basket(
     user: AuthenticatedUser = Depends(verify_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> BasketSummaryOut:
-    """Panier réel de l'utilisateur, agrégé depuis ses tickets (Cloud SQL).
-
-    C'est la source de vérité de la vue « Mon budget » : dépenses mensuelles,
-    panier moyen, produits récurrents. La date de référence d'un ticket est
-    `date_ticket` (lue sur le ticket) avec repli sur `created_at` quand
-    l'extraction n'a pas trouvé de date.
-    """
+    """Panier reel agrege depuis les tickets (vue budget)."""
+    # date de reference = date_ticket, repli sur created_at si extraction sans date
     db_user = await get_or_create_user(session, user)
     uid = {"uid": db_user.id}
 
@@ -111,8 +106,8 @@ async def get_my_basket(
         )
     ).mappings().all()
 
-    # Produits récurrents : groupés par EAN quand il est résolu, sinon par
-    # libellé normalisé — un même produit mal OCRisé ne compte qu'une fois.
+    # groupes par EAN si resolu, sinon par libelle normalise (un produit mal
+    # OCRise ne compte qu'une fois)
     top_rows = (
         await session.execute(
             text(
@@ -168,15 +163,10 @@ async def get_my_basket(
     )
 
 
-# Reco « substitut moins cher » (Étape 3). Join local Cloud SQL :
-#   panier live (prix_extraits x tickets, EAN résolu, fenêtre 6 mois)
-#     x product_substitutions (cache précalculé, tier ≤ max_tier)
-#     x products (x2 : noms/marques/images + quantity_value du source).
-# On garde LE meilleur substitut par produit du panier (tier asc, score desc),
-# et on calcule l'économie mensuelle en euros réels :
-#   monthly_saving = saving_per_unit [€/unité] x source.quantity_value [unité/pack]
-#                    x (packs_6m / 6) [packs/mois].
-# Tri final par économie mensuelle desc. Tout est en €/unité — jamais le prix paquet.
+# reco substitut moins cher : panier live (prix_extraits x tickets, EAN resolu, 6 mois)
+# x product_substitutions (tier <= max_tier) x products x2. Meilleur substitut par
+# produit (tier asc, score desc). monthly_saving = saving_per_unit x quantity_value
+# x (packs_6m / 6). tout en €/unite, jamais le prix paquet.
 _RECOMMENDATIONS_SQL = text(
     """
     WITH basket AS (
@@ -230,8 +220,7 @@ _RECOMMENDATIONS_SQL = text(
 
 
 def _row_to_reco(r: dict) -> RecommendationItem:
-    """Map une row SQL → RecommendationItem. `saving_pct` est stocké en fraction
-    (0-1) → exposé en pourcentage (x100), cohérent avec `pct_change_window`."""
+    # saving_pct stocke en fraction (0-1), expose en % (x100)
     return RecommendationItem(
         source=RecoProductRef(
             ean=r["source_ean"],
@@ -269,16 +258,8 @@ async def get_my_recommendations(
     user: AuthenticatedUser = Depends(verify_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> RecommendationsOut:
-    """Recommandations d'économies : pour chaque produit récurrent du panier,
-    le meilleur substitut moins cher au €/unité, avec l'économie mensuelle.
-
-    Panier = agrégation live des tickets de l'utilisateur (mêmes données que
-    `/me/basket`). `user_basket_history` (pré-agrégé par le worker indices)
-    reste un cache futur, non requis ici.
-
-    Panier vide ou aucun substitut moins cher → `200` avec `items=[]` : c'est
-    l'état d'onboarding « ajoutez un ticket », pas une erreur.
-    """
+    """Meilleur substitut moins cher au €/unite par produit recurrent + economie mensuelle."""
+    # panier = agregation live des tickets ; vide ou aucun substitut -> 200 items=[]
     db_user = await get_or_create_user(session, user)
     rows = (
         await session.execute(
@@ -305,9 +286,7 @@ async def get_prefs(
     db_user = await get_or_create_user(session, user)
     prefs = await session.get(NotificationPrefs, db_user.id)
     if prefs is None:
-        # Renvoie un payload de défauts plutôt que 404 : la ligne sera créée
-        # au premier PATCH. C'est plus utile pour le frontend qui peut
-        # afficher les défauts sans avoir à gérer le 404.
+        # defauts plutot que 404 (ligne creee au 1er PATCH)
         return NotificationPrefsOut(
             threshold_pct=5.0,
             frequency="weekly",

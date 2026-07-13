@@ -1,8 +1,7 @@
-# IAM — Coéquipiers développeurs.
-# Pour ajouter/retirer un dev : éditer `developer_members` → apply.
+# IAM devs de l'equipe. ajouter/retirer : editer developer_members.
 
 variable "developer_members" {
-  description = "Emails des coéquipiers développeurs (préfixés `user:`). Email utilisé par `gcloud auth login`."
+  description = "Emails devs (prefixe user:)."
   type        = list(string)
   default = [
     "user:giorgioesgi@gmail.com",
@@ -13,50 +12,23 @@ variable "developer_members" {
 
 locals {
   developer_project_roles = [
-    # BigQuery — édition données + lancement queries
     "roles/bigquery.dataEditor",
     "roles/bigquery.jobUser",
-
-    # Cloud SQL — connexion via cloud-sql-proxy (mdp via Secret Manager)
     "roles/cloudsql.client",
     "roles/cloudsql.instanceUser",
-
-    # Artifact Registry — push images
     "roles/artifactregistry.writer",
-
-    # Cloud Run — déployer révisions
     "roles/run.developer",
-    # Indispensable avec run.developer : "act as" les SAs runtime au deploy.
-    # N'autorise PAS la création/modification de bindings IAM.
     "roles/iam.serviceAccountUser",
-
-    # Compute Engine — administrer les instances
     "roles/compute.instanceAdmin",
-
-    # Secret Manager — lire valeurs + ajouter versions (rotations)
     "roles/secretmanager.secretAccessor",
     "roles/secretmanager.viewer",
     "roles/secretmanager.secretVersionAdder",
-
-    # Vertex AI — Gemini, embeddings
     "roles/aiplatform.user",
-
-    # Firebase — Auth + FCM en mode développeur
     "roles/firebase.developAdmin",
-
-    # Pub/Sub — créer/supprimer topics & subscriptions, publier/consommer
     "roles/pubsub.admin",
-
-    # Cloud Build — déclencher `gcloud builds submit` pour builder des images
     "roles/cloudbuild.builds.editor",
-
-    # Cloud Scheduler — déclencher manuellement les workers (`gcloud scheduler jobs run`)
     "roles/cloudscheduler.admin",
-
-    # Service Usage — consommer les APIs activées du projet (quota project).
     "roles/serviceusage.serviceUsageConsumer",
-
-    # Monitoring + Logs
     "roles/monitoring.editor",
     "roles/logging.viewer",
   ]
@@ -76,7 +48,7 @@ resource "google_project_iam_member" "developers" {
   member   = each.value.member
 }
 
-# Buckets data — R/W bronze+silver, lecture seule models
+# buckets: rw bronze+silver, ro models
 resource "google_storage_bucket_iam_member" "developers_bronze_rw" {
   for_each = local.developer_members_set
   bucket   = module.bucket_bronze.name
@@ -98,7 +70,7 @@ resource "google_storage_bucket_iam_member" "developers_models_ro" {
   member   = each.value
 }
 
-# tf-state — R/W pour `terraform apply` en local
+# tf-state rw
 resource "google_storage_bucket_iam_member" "developers_tfstate_rw" {
   for_each = local.developer_members_set
   bucket   = var.tf_state_bucket

@@ -1,4 +1,3 @@
-"""Tests du mapping HF row → format attendu par cleaner."""
 
 from __future__ import annotations
 
@@ -10,7 +9,7 @@ from pricetracker_ingestion.hf_mapping import map_hf_row
 def test_renames_date_to_price_date() -> None:
     out = map_hf_row({"date": "2026-05-17"})
     assert out["price_date"] == "2026-05-17"
-    # `date` original conservé (idempotence + audit).
+
     assert out["date"] == "2026-05-17"
 
 
@@ -25,9 +24,9 @@ def test_idempotent_when_price_date_present() -> None:
         ("France", "FR"),
         ("FRANCE", "FR"),
         ("Guadeloupe", "GP"),
-        ("FR", "FR"),  # déjà ISO2
-        ("FRA", "FR"),  # ISO3
-        ("Atlantis", None),  # inconnu → pas d'inférence
+        ("FR", "FR"),
+        ("FRA", "FR"),
+        ("Atlantis", None),
     ],
 )
 def test_infers_country_code(input_country: str, expected_iso2: str | None) -> None:

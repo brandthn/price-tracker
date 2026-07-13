@@ -1,17 +1,3 @@
-"""Vérification OIDC pour `/run`.
-
-Le caller (Cloud Scheduler) attache un Bearer JWT signé par Google. Le worker
-doit valider :
-- signature contre les JWKs publics Google,
-- `aud` == URL exacte du service Cloud Run,
-- `iss` ∈ issuers Google connus,
-- `email` ∈ liste blanche (worker-sa) si la liste est non vide,
-- `email_verified` true.
-
-Cloud Run vérifie déjà la signature côté ingress quand `allow_unauthenticated=false`,
-mais on double-check `aud` et `email` côté applicatif pour ne pas reposer
-uniquement sur la couche infra (defense in depth).
-"""
 
 from __future__ import annotations
 
@@ -30,8 +16,7 @@ _request_transport = google_requests.Request()
 def _resolve_audience(settings: Settings, request: Request) -> str:
     if settings.prt_oidc_required_audience:
         return settings.prt_oidc_required_audience
-    # Fallback : reconstruire l'URL telle que Cloud Run la voit.
-    # Cloud Scheduler signe l'audience = URL du service (sans path).
+
     forwarded_host = request.headers.get("x-forwarded-host") or request.url.hostname
     forwarded_proto = request.headers.get("x-forwarded-proto", "https")
     return f"{forwarded_proto}://{forwarded_host}"
@@ -41,7 +26,7 @@ def verify_oidc(
     request: Request,
     authorization: str | None = Header(default=None),
 ) -> dict:
-    """FastAPI dependency. Renvoie le payload décodé en cas de succès."""
+
     settings = get_settings()
     if settings.prt_oidc_disable:
         logger.warning("oidc_check_disabled", reason="PRT_OIDC_DISABLE=1 (dev only)")

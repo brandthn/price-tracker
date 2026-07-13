@@ -15,8 +15,7 @@ resource "google_cloud_run_v2_service" "this" {
       max_instance_count = var.max_instances
     }
 
-    # Direct VPC egress — gen2 only. Skipped if vpc_subnet is null
-    # (e.g. for a Cloud Run that doesn't need private resources).
+    # direct vpc egress, skip si vpc_subnet null
     dynamic "vpc_access" {
       for_each = var.vpc_subnet == null ? [] : [1]
       content {
@@ -67,9 +66,7 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
-# Optionnel : exposer le service publiquement (utile uniquement pour le
-# backend en attendant le Load Balancer de la Phase 7). Les workers gardent
-# ce flag à false → seules les SAs autorisées via run.invoker peuvent invoquer.
+# expose public si allow_unauthenticated (workers = false)
 resource "google_cloud_run_v2_service_iam_member" "all_users" {
   count = var.allow_unauthenticated ? 1 : 0
 

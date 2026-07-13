@@ -1,8 +1,3 @@
-"""Pipeline transform v2 : raw HF → (clean, rejections, metrics).
-
-Construit le parquet d'entrée à la volée (pas de fixture binaire versionnée)
-pour rester explicite sur le schéma et résilient si pyarrow évolue.
-"""
 
 from __future__ import annotations
 
@@ -18,17 +13,17 @@ from pricetracker_ingestion.transform import (
 )
 
 
-# Valides EAN-13 (checksum vérifié) — utilisés dans le bucket clean.
+
 NUTELLA = "3017620422003"
 PASTA = "8076809513753"
 
 
 def _build_raw_table() -> pa.Table:
-    """Snapshot HF synthétique avec un mix de cas (clean / rejets variés)."""
+
     return pa.table(
         {
             "id": ["1", "2", "3", "3", "4", "5", "6", "7", "8"],
-            # HF expose `date`, hf_mapping le renomme en `price_date`.
+
             "date": [date(2026, 5, 17)] * 9,
             "product_code": [
                 NUTELLA,
@@ -55,7 +50,7 @@ def _build_raw_table() -> pa.Table:
                 "Carrefour Market, Lyon",
                 "Carrefour Market, Lyon",
             ],
-            # HF expose `location_osm_address_country` (nom), hf_mapping infère ISO2.
+
             "location_osm_address_country": ["France"] * 9,
             "location_osm_address_city": [
                 "Paris",
@@ -87,9 +82,7 @@ def test_transform_buckets_and_dedup() -> None:
         raw, pipeline_run_date=date(2026, 5, 17)
     )
 
-    # 9 lignes → -1 doublon id=3 → -1 EAN invalide (id=4) → -1 prix < 0.01 EUR (id=5)
-    # -1 currency=USD (id=6) → 5 clean.
-    # 9 input - 5 clean - 1 dédup = 3 rejets (EAN, prix, devise).
+
     assert clean.num_rows == 5
     assert rejected.num_rows == 3
     assert metrics["rows_input"] == 9
@@ -115,7 +108,7 @@ def test_transform_store_brand_normalized() -> None:
     raw = _build_raw_table()
     clean, _, _ = transform_open_prices(raw, pipeline_run_date=date(2026, 5, 17))
     brands = sorted(set(clean.column("store_brand_normalized").to_pylist()))
-    # "Lidl, ..." → "Lidl" ; "Carrefour Market, ..." → "Carrefour Market"
+
     assert "Lidl" in brands
     assert "Carrefour Market" in brands
 
@@ -124,7 +117,7 @@ def test_transform_city_normalized() -> None:
     raw = _build_raw_table()
     clean, _, _ = transform_open_prices(raw, pipeline_run_date=date(2026, 5, 17))
     cities = sorted(set(clean.column("city").to_pylist()))
-    # Vérifie : "Lyon 7e Arrondissement" → "Lyon", "LYON" → "Lyon", "lyon" → "Lyon"
+
     assert cities == ["Lyon", "Paris"]
 
 
@@ -139,14 +132,14 @@ def test_transform_injects_run_metadata() -> None:
     assert all(d == date(2026, 5, 17) for d in clean.column("pipeline_run_date").to_pylist())
     assert all(t == run_dt for t in clean.column("ingested_at").to_pylist())
     assert set(clean.column("source").to_pylist()) == {"hf-open-prices"}
-    # Idem côté rejections : pipeline_run_date + rejected_at.
+
     assert all(d == date(2026, 5, 17) for d in rejected.column("pipeline_run_date").to_pylist())
 
 
 def test_transform_week_start_date() -> None:
     raw = _build_raw_table()
     clean, _, _ = transform_open_prices(raw, pipeline_run_date=date(2026, 5, 17))
-    # 2026-05-17 = dimanche → semaine ISO commence le lundi 2026-05-11.
+
     weeks = set(clean.column("week_start_date").to_pylist())
     assert weeks == {date(2026, 5, 11)}
 
@@ -164,7 +157,7 @@ def test_transform_empty_input() -> None:
 
 
 def test_transform_raw_payload_preserved() -> None:
-    """Le JSON brut de chaque ligne HF est sérialisé dans `raw_payload`."""
+
     raw = _build_raw_table()
     clean, rejected, _ = transform_open_prices(raw, pipeline_run_date=date(2026, 5, 17))
     payloads = clean.column("raw_payload").to_pylist()
@@ -174,7 +167,7 @@ def test_transform_raw_payload_preserved() -> None:
 
 
 def test_transform_country_filter_via_config() -> None:
-    """Une CleanerConfig restreinte à FR rejette les lignes hors FR."""
+
     raw = pa.table(
         {
             "id": ["a", "b"],

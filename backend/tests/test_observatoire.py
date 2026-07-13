@@ -1,6 +1,4 @@
-"""Tests observatoire — la robustesse aux tables Gold vides est critique
-en Phase 7 puisque le worker indices (Phase 9) n'a pas encore tourné.
-"""
+"""Tests observatoire — robustesse aux tables Gold vides (worker indices pas passe)."""
 
 from __future__ import annotations
 
@@ -23,11 +21,7 @@ def client() -> TestClient:
 def test_rankings_returns_empty_when_gold_table_missing(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Si BQ lève (table absente, permission denied), `query_dicts_safe` log
-    et renvoie [] — l'endpoint reste 200 avec items=[]. C'est le contrat
-    attendu par le frontend qui peut afficher "Calcul en cours".
-    """
-
+    # BQ leve -> query_dicts_safe renvoie [], endpoint reste 200 items=[]
     def _raise(*_a, **_k):
         raise RuntimeError("Not found: Table rankings_produits")
 

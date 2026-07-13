@@ -1,8 +1,7 @@
-"""Table `user_basket_history` — agrégation des achats récurrents d'un user.
+"""Table user_basket_history — achats recurrents agreges par user.
 
-Alimentée par le worker indices (Phase 9) à partir des `prix_extraits`
-validés sur 6 mois glissants. Sert au calcul de l'indice personnel et au
-ciblage des alertes (« vos produits habituels »).
+Alimentee par le worker indices depuis prix_extraits valides sur 6 mois glissants.
+Sert a l'indice personnel et au ciblage des alertes.
 """
 
 from __future__ import annotations

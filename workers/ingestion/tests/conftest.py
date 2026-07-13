@@ -1,9 +1,3 @@
-"""Isolation des tests vis-à-vis de l'environnement Cloud Run.
-
-On purge / override les env vars `PRT_*`, `HF_TOKEN`, `GOOGLE_CLOUD_PROJECT`
-pour éviter qu'un `gcloud auth application-default login` local fasse
-fuiter du contexte dans les tests.
-"""
 
 from __future__ import annotations
 

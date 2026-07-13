@@ -1,13 +1,8 @@
 """FastAPI app PriceTracker backend.
 
-Lifecycle :
-- startup : init structlog + SQLAlchemy engine + Firebase Admin (lazy à
-  la 1ère vérif Bearer pour ne pas bloquer le démarrage si ADC manque
-  en CI/tests).
-- shutdown : dispose engine.
-
-OpenAPI activable/désactivable via `PRT_OPENAPI_ENABLED` (validation Brandon :
-laissé `true` en prod pour faciliter l'intégration frontend + soutenance).
+startup : structlog + engine SQLAlchemy ; Firebase init lazy a la 1ere verif
+Bearer (ne bloque pas le boot si ADC manque en CI). shutdown : dispose engine.
+OpenAPI via PRT_OPENAPI_ENABLED (laisse true en prod).
 """
 
 from __future__ import annotations
@@ -74,8 +69,7 @@ def _build_app() -> FastAPI:
         openapi_url=openapi_url,
     )
 
-    # CORS — `*` désactive obligatoirement allow_credentials (Bearer Auth sans cookie).
-    # À durcir Phase 10 quand le frontend aura un domaine fixe.
+    # `*` force allow_credentials=False (Bearer, pas de cookie)
     origins = settings.cors_origins_list
     app.add_middleware(
         CORSMiddleware,

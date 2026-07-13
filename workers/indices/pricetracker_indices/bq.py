@@ -1,17 +1,3 @@
-"""BigQuery SQL — recalcul Gold (4 tables) à partir de Silver.
-
-Stratégie d'écriture : `TRUNCATE TABLE` + `INSERT INTO ... SELECT ...`. Préserve
-la partition / clustering / labels gérés par Terraform, contrairement à
-`CREATE OR REPLACE TABLE` qui les recréerait sans ces options.
-
-Filtre IQR : on exclut les outliers déjà flaggés par le cleaner ingestion
-(`iqr_outlier = TRUE`) avant de calculer les médianes — évite que les valeurs
-extrêmes ne biaisent les agrégats Gold.
-
-Fenêtre glissante : 12 semaines pour les agrégats/indices (suffisant pour voir
-les tendances saisonnières court terme), 8 semaines pour les rankings/anomalies
-(focus sur les variations récentes signalables aux utilisateurs).
-"""
 
 from __future__ import annotations
 
@@ -228,7 +214,7 @@ def _sql_anomalies(cfg: IndicesConfig) -> str:
 
 
 def build_sql_plan(cfg: IndicesConfig) -> list[tuple[str, str]]:
-    """Renvoie la liste ordonnée [(label, sql)] des 4 jobs Gold."""
+
     return [
         ("aggregats_enseignes", _sql_aggregats(cfg)),
         ("indices_inflation", _sql_indices(cfg)),
@@ -244,8 +230,7 @@ def _count_rows(client: bigquery.Client, project: str, dataset: str, table: str)
 
 
 def refresh_gold_tables(cfg: IndicesConfig, run_date: str) -> dict[str, int]:
-    """Exécute les 4 SQL (TRUNCATE + INSERT) puis renvoie le nombre de lignes
-    publiées dans chaque table Gold."""
+
     client = _client(cfg.project_id, cfg.location)
     plan = build_sql_plan(cfg)
     job_config = bigquery.QueryJobConfig(query_parameters=_params(cfg, run_date))
@@ -254,8 +239,7 @@ def refresh_gold_tables(cfg: IndicesConfig, run_date: str) -> dict[str, int]:
     for label, sql in plan:
         logger.info("bq_query_start", table=label, run_date=run_date)
         client.query(sql, job_config=job_config).result()
-        # `TRUNCATE TABLE ...; INSERT INTO ...;` en script BQ exécute les deux
-        # statements ; on relit le COUNT(*) pour avoir la métrique post-INSERT.
+
         table_name = {
             "aggregats_enseignes": cfg.table_aggregats,
             "indices_inflation": cfg.table_indices,

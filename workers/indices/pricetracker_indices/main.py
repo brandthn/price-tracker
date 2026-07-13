@@ -1,4 +1,3 @@
-"""FastAPI app worker indices — POST /run recalcule les 4 tables Gold."""
 
 from __future__ import annotations
 
@@ -62,10 +61,7 @@ def _build_config(settings: Settings, project_id: str) -> IndicesConfig:
 @app.post("/run")
 async def run(
     _oidc: dict = Depends(verify_oidc),
-    run_date: str | None = Query(
-        default=None,
-        description="Date de référence ISO YYYY-MM-DD. Défaut : UTC today.",
-    ),
+    run_date: str | None = Query(default=None),
 ) -> dict[str, object]:
     t0 = time.monotonic()
     settings = get_settings()
