@@ -1,18 +1,12 @@
-"""Local inference provider for the hybrid CLIP+SmolLM receipt VLM.
+"""Provider d'inference pour le VLM hybride (CLIP + SmolLM2), en local.
 
-Loads a merged checkpoint (LoRA folded via ``LoRALinear.merge_weights`` by
-``vlm_training/scripts/export_checkpoint.py``) from ``RECEIPT_VLM_MODEL_PATH``
-and lazy-loads it on the first ``analyze`` call. The model emits the canonical
-JSON directly under grammar-constrained decoding; parsing / validation /
-retries stay in :mod:`pricetracker_receipt_pipeline.backends.vlm.extraction` exactly as for the
-Groq and Moondream providers.
+Charge le checkpoint fusionne (les LoRA y ont deja ete replies par
+export_checkpoint.py) depuis RECEIPT_VLM_MODEL_PATH, et ne le charge qu'au premier
+appel : le module reste importable sans torch.
 
-Les dépendances lourdes (``torch``, ``transformers``) et le code du modèle
-(``receipt_vlm``, installé depuis ``dev_ocr/vlm_training`` via ``[tool.uv.sources]``)
-sont importées paresseusement : le module reste importable sans elles (tests).
-
-Note: the model was trained on a fixed instruction, so the ``prompt`` argument
-required by the :class:`VlmProvider` interface is accepted but ignored.
+Le modele sort le JSON canonique directement, grace au decodage contraint. Le
+parsing, la validation et les retries restent donc les memes que pour Groq et
+Moondream, sans une ligne de plus.
 """
 
 from __future__ import annotations

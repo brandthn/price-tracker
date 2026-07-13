@@ -4,7 +4,7 @@ Worker OCR, backend **receipt-vlm-500m** — le VLM hybride maison
 (CLIP ViT-B/16 gelé + projecteur entraîné + SmolLM2-360M + LoRA mergé),
 inférence CPU, décodage contraint par grammaire → JSON canonique direct.
 
-Un des 6 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
+Un des 4 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
 commun vit dans [`libs/pricetracker_receipt_pipeline`](../../libs/pricetracker_receipt_pipeline) ;
 `receipt_vlm_provider.py` est propre à ce worker. Le **code du modèle** reste
 dans `dev_ocr/vlm_training` (paquet `receipt_vlm`), consommé en lecture seule
@@ -72,6 +72,6 @@ gcloud builds submit . --config=workers/ocr-vlm-receipt/cloudbuild.yaml \
 ```
 
 Déploiement : bumper `worker_ocr_vlm_receipt_image_tag` dans
-`infra/envs/prod/variables_ocr_backends.tf`, puis `terraform apply`.
+`infra/envs/prod/variables.tf`, puis `terraform apply`.
 Dimensionnement Cloud Run : 4 vCPU / 16 Gi (chargement du checkpoint + inférence
 fp32 CPU), `max_instances = 2`.

@@ -1,4 +1,4 @@
-"""Settings worker OCR backend receipt-vlm-500m (CLIP+SmolLM, poids locaux)."""
+"""Settings du worker receipt-vlm-500m (le modele hybride, poids locaux)."""
 
 from __future__ import annotations
 

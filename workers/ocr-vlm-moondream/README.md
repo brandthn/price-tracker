@@ -2,7 +2,7 @@
 
 Worker OCR, backend **VLM Moondream 0.5B (int8, inférence locale CPU)**.
 
-Un des 5 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
+Un des 4 workers « un backend = un worker » issus de `dev_ocr`. Le pipeline
 commun vit dans [`libs/pricetracker_receipt_pipeline`](../../libs/pricetracker_receipt_pipeline) ;
 seul `moondream_provider.py` est propre à ce worker.
 

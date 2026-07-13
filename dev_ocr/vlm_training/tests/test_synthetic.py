@@ -95,7 +95,7 @@ def test_build_live_synthetic_samples() -> None:
 
     samples = build_live_synthetic_samples(8, seed=0, diverse=True, distort=True)
     assert len(samples) == 8
-    assert all(s.source == "synthetic_live")
+    assert all(s.source == "synthetic_live" for s in samples)
     assert callable(samples[0].image)
     img = samples[0].image()
     assert img.size[0] > 100

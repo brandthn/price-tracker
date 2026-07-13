@@ -61,3 +61,4 @@ gcp-key*.json
 vertex-sa.json
 *-sa.json
 vertex-*.json
+.claude
