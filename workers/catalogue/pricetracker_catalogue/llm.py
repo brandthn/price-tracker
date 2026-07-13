@@ -1,10 +1,4 @@
-"""Matching ticket ↔ dataset via Gemini vision (Vertex AI).
 
-Utilise `gemini-1.5-flash-002` — même auth ADC que le reste du projet
-(pas de clé API externe, cohérence avec workers/off/vertex.py).
-
-Lazy-load du SDK Vertex pour ne pas payer le coût d'import au boot.
-"""
 from __future__ import annotations
 
 import base64
@@ -23,7 +17,7 @@ logger = get_logger(__name__)
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "matching_prompt.txt"
 _SYSTEM_PROMPT = _PROMPT_PATH.read_text(encoding="utf-8")
 
-# Lazy-loaded
+
 _vertex_model = None
 
 
@@ -44,9 +38,7 @@ def _get_model(settings: Settings):
     return _vertex_model
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TÉLÉCHARGEMENT IMAGE
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def download_image(proof_file_path: str, settings: Settings) -> bytes | None:
     url = settings.prt_off_image_base_url + proof_file_path
@@ -66,9 +58,7 @@ def download_image(proof_file_path: str, settings: Settings) -> bytes | None:
         return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FORMATAGE DU CONTEXTE
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _format_candidats(produits: list[dict], enseigne: str, max_items: int) -> str:
     lines = [
@@ -88,9 +78,7 @@ def _detect_mime(proof_file_path: str) -> str:
             "webp": "image/webp", "png": "image/png"}.get(ext, "image/jpeg")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# APPEL LLM
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def match_ticket(
     image_bytes: bytes,
@@ -99,10 +87,6 @@ def match_ticket(
     enseigne: str,
     settings: Settings,
 ) -> dict:
-    """
-    Envoie l'image + candidats à Gemini. Retourne le JSON parsé du LLM.
-    En cas d'erreur retourne {"erreur": "..."}.
-    """
     from vertexai.generative_models import GenerationConfig, Image, Part
 
     model = _get_model(settings)
@@ -144,9 +128,7 @@ def match_ticket(
         return {"erreur": str(e)}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# POST-TRAITEMENT
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _normalise(texte: str) -> str:
     if not texte:
@@ -167,12 +149,6 @@ def filter_reliable_matches(
     enseigne: str,
     settings: Settings,
 ) -> list[dict]:
-    """
-    Filtre les matches LLM :
-    - EAN doit exister dans les candidats (anti-hallucination)
-    - confiance >= prt_confidence_threshold
-    Retourne une liste prête pour pg.upsert_matches().
-    """
     if "erreur" in llm_result:
         logger.warning("llm_error_skipped", proof_id=proof_id, detail=llm_result["erreur"])
         return []

@@ -1,4 +1,4 @@
-"""Vérif OIDC du JWT Cloud Scheduler. Identique au pattern workers/off/."""
+
 
 from __future__ import annotations
 

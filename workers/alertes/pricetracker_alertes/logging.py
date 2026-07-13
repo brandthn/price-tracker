@@ -1,4 +1,4 @@
-"""structlog → stdout JSON. Aligné sur workers/off/, workers/ingestion/."""
+
 
 from __future__ import annotations
 

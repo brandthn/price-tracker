@@ -1,16 +1,4 @@
-"""Point d'entrée du worker catalogue.
 
-Modes :
-- Production (Cloud Run Job) : traite tous les tickets non encore traités.
-- --limite N                 : traite au maximum N tickets (tests).
-- --dry-run                  : charge le dataset, affiche les stats, n'écrit rien.
-- --analyse                  : affiche les métriques du catalogue en base.
-
-Usage local :
-    python -m pricetracker_catalogue.main --dry-run --limite 10
-    python -m pricetracker_catalogue.main --limite 100
-    python -m pricetracker_catalogue.main --analyse
-"""
 from __future__ import annotations
 
 import argparse
@@ -33,9 +21,7 @@ from .pg import (
 logger = get_logger(__name__)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TRAITEMENT D'UN TICKET
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def process_ticket(proof_id: int, ticket: dict, settings) -> dict:
     enseigne = ticket.get("enseigne", "")
@@ -49,13 +35,13 @@ def process_ticket(proof_id: int, ticket: dict, settings) -> dict:
         nb_produits=len(produits),
     )
 
-    # 1. Télécharger l'image
+
     image_bytes = download_image(proof_file_path, settings)
     if image_bytes is None:
         mark_processed(settings, proof_id, "erreur", "image_download_failed")
         return {"statut": "erreur", "raison": "image"}
 
-    # 2. Appel LLM vision
+
     llm_result = match_ticket(
         image_bytes=image_bytes,
         proof_file_path=proof_file_path,
@@ -65,7 +51,7 @@ def process_ticket(proof_id: int, ticket: dict, settings) -> dict:
     )
     time.sleep(settings.prt_llm_delay_seconds)
 
-    # 3. Filtrer les matches fiables
+
     matches = filter_reliable_matches(
         llm_result=llm_result,
         produits_candidats=produits,
@@ -74,7 +60,7 @@ def process_ticket(proof_id: int, ticket: dict, settings) -> dict:
         settings=settings,
     )
 
-    # 4. Écriture en base
+
     if matches:
         upsert_matches(settings, matches)
 
@@ -100,12 +86,9 @@ def process_ticket(proof_id: int, ticket: dict, settings) -> dict:
     return {"statut": "ok", "nb_produits": len(produits), "nb_matches": len(matches)}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ANALYSE
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def run_analyse(settings) -> None:
-    """Affiche les métriques du catalogue après un run."""
     with get_conn(settings) as conn:
         with conn.cursor() as cur:
 
@@ -165,9 +148,7 @@ def run_analyse(settings) -> None:
     print("=" * 55)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PIPELINE PRINCIPAL
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def run(limite: int | None = None, dry_run: bool = False) -> None:
     settings = get_settings()
@@ -179,15 +160,15 @@ def run(limite: int | None = None, dry_run: bool = False) -> None:
         limite=limite,
     )
 
-    # Schéma DB
+
     if not dry_run:
         ensure_schema(settings)
 
-    # Chargement dataset
+
     df = download_parquet(settings)
     tickets = group_by_ticket(df)
 
-    # Filtrage tickets déjà traités
+
     if not dry_run:
         processed = get_processed_ids(settings)
         logger.info("progression_loaded", already_done=len(processed))
@@ -204,7 +185,7 @@ def run(limite: int | None = None, dry_run: bool = False) -> None:
     if limite:
         tickets = dict(list(tickets.items())[:limite])
 
-    # Boucle principale
+
     stats = {"ok": 0, "erreur": 0, "matches": 0, "produits": 0}
 
     for i, (proof_id, ticket) in enumerate(tickets.items(), 1):
@@ -236,9 +217,7 @@ def run(limite: int | None = None, dry_run: bool = False) -> None:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ENTRYPOINT CLI
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Price Tracker — worker catalogue")

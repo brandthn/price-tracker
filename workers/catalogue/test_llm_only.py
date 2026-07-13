@@ -1,7 +1,4 @@
-"""
-Test du matching LLM sans base de données.
-Lance sur N tickets et affiche les résultats dans le terminal.
-"""
+
 import os
 os.environ["GOOGLE_CLOUD_PROJECT"] = "price-tracker-prod-01"
 
@@ -12,11 +9,11 @@ from pricetracker_catalogue.llm import download_image, match_ticket, filter_reli
 
 settings = get_settings()
 
-# Charger le dataset
+
 df = download_parquet(settings)
 tickets = group_by_ticket(df)
 
-# Tester sur 10 tickets
+
 for i, (proof_id, ticket) in enumerate(list(tickets.items())[:10]):
     print(f"\n{'='*60}")
     print(f"Ticket {i+1}/10 — proof_id={proof_id} | {ticket['enseigne']}")
