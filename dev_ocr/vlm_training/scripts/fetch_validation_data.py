@@ -1,34 +1,19 @@
-"""Fetch public Latin-script receipt datasets as real validation data.
+"""Recupere des jeux de tickets publics, pour avoir de quoi valider pour de vrai.
 
-French real receipts are scarce (~18 photos), which is too narrow to validate the
-model. This pulls public, no-auth receipt datasets from the HuggingFace hub and writes
-them in the canonical ``{"ticket": {...}}`` label format under ``dev_ocr/data/`` so
-``scripts/evaluate.py`` can score against real receipts in more languages.
+On n'avait qu'une poignee de photos francaises, ce qui est bien trop peu et bien trop
+homogene pour croire une metrique. Ce script telecharge des datasets publics et les
+reecrit au format de label canonique, pour que les scripts d'eval les notent sans rien
+changer.
 
-Datasets:
-  - CORD-v2 (naver-clova-ix/cord-v2) — ~1k Indonesian receipts, Latin script, FULL line
-    items. Strong OCR / line-item validation. Reuses receipt_vlm.data.cord_adapter.
-  - SROIE 2019 (best-effort HF mirror) — English; company/date/address/total, NO line
-    items. Header-field validation only. Skipped gracefully if unavailable.
-  - TrainingDataPro OCR Receipts Text Detection (HF) — 20 US receipts, real
-    transcribed shop/item/date_time text (not pseudo-labelled). CC-BY-NC-ND-4.0 —
-    non-commercial eval use only. Reuses receipt_vlm.data.trainingdatapro_adapter.
-  - ExpressExpense SRD ("srd_images") — 200 English restaurant receipts, MIT licence,
-    direct public zip. IMAGES ONLY: no ground truth, so this fetcher does NOT run
-    pseudo-labelling (that means live Groq calls) — see its own docstring for the
-    follow-up `pseudo_label.py` + `review_labels.py` steps.
+Le choix des sources est dicte par une contrainte betement pratique : le pseudo-labelling
+via Groq est plafonne par le quota gratuit. Donc on privilegie les datasets qui livrent
+DEJA le texte transcrit (CORD, TrainingDataPro, WildReceipt) : un adaptateur, zero appel
+LLM. SRD ne fournit que des images, donc lui demande un passage par pseudo_label.py.
 
-Output layout (per dataset <name>):
-    dev_ocr/data/raw/<name>/<id>.jpg
-    dev_ocr/data/labels/<name>/<id>.json          # {"ticket": {...}}
-    dev_ocr/data/labels/<name>/splits.json        # {"val": [...], "test": [...]}
-    dev_ocr/data/labels/<name>/review_status.json # all reviewed=true (dataset ground truth)
+Attention aux licences : TrainingDataPro est en CC-BY-NC-ND, donc usage academique non
+commercial uniquement.
 
-Usage:
-    python scripts/fetch_validation_data.py --datasets cord,sroie,trainingdatapro,srd_images [--limit N]
-    # then, e.g.:
-    python scripts/evaluate.py --checkpoint <merged.pt> \
-        --images ../data/raw/cord_v2 --labels ../data/labels/cord_v2 --split test
+    python scripts/fetch_validation_data.py --datasets cord,trainingdatapro,wildreceipt
 """
 
 from __future__ import annotations
@@ -53,7 +38,7 @@ def _write_labels(lbl_dir: Path, labels: dict[str, Ticket], splits: dict[str, li
         (lbl_dir / f"{stem}.json").write_text(
             json.dumps(ticket.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        review[fname] = {"reviewed": True}  # dataset-provided ground truth
+        review[fname] = {"reviewed": True}  # verite terrain fournie par le dataset
     (lbl_dir / "splits.json").write_text(
         json.dumps(splits, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -86,7 +71,7 @@ def fetch_cord(out_root: Path, limit: int | None) -> int:
         ground_truths = ds["ground_truth"]
         for index, gt in enumerate(ground_truths):
             ticket = ticket_from_cord_ground_truth(gt)
-            if not ticket.produits:  # unusable target
+            if not ticket.produits:  # cible inexploitable
                 continue
             fname = f"cord_{hf_split}_{index:04d}.jpg"
             ds[index]["image"].convert("RGB").save(img_dir / fname, "JPEG", quality=92)
@@ -126,7 +111,7 @@ def fetch_sroie(out_root: Path, limit: int | None) -> int:
         print(f"  SROIE: skipped (unexpected schema {cols}); use sroie_adapter on a local copy")
         return 0
 
-    # Map BIO tag ids -> entity name via the feature's class names.
+    # On remonte des ids de tags BIO vers les noms d'entites.
     try:
         tag_names = ds.features["ner_tags"].feature.names
     except Exception:
@@ -249,8 +234,7 @@ def fetch_srd_images(out_root: Path, limit: int | None) -> int:
             extra.unlink()
         n = limit
     print(f"  SRD: {n} images landed in {img_dir} (MIT licence)")
-    print("       NOT LABELLED YET -- run scripts/pseudo_label.py on this folder, "
-          "then scripts/review_labels.py.")
+    print("       pas de labels : passer par pseudo_label.py puis review_labels.py")
     return n
 
 
@@ -290,7 +274,7 @@ def fetch_wildreceipt(out_root: Path, limit: int | None) -> int:
         n = 0
         for image_path, ticket in iter_wildreceipt(raw_dir, split_file):
             fname = image_path.name
-            if fname in labels:  # basename collision across the nested tree (rare)
+            if fname in labels:  # collision de nom de fichier dans l'arbre imbrique (rare)
                 continue
             labels[fname] = ticket
             splits[bucket].append(fname)
@@ -301,11 +285,11 @@ def fetch_wildreceipt(out_root: Path, limit: int | None) -> int:
             if limit is not None and total >= limit:
                 break
 
-    _ingest("test.txt", "test", None)                 # WildReceipt test -> our test
+    _ingest("test.txt", "test", None)                 # le test de WildReceipt devient notre test
     if limit is None or total < limit:
-        _ingest("train.txt", "val", 300)              # carve a val slice from train
+        _ingest("train.txt", "val", 300)              # on taille une tranche de val dans le train
     if limit is None or total < limit:
-        _ingest("train.txt", "train", None)           # remainder -> train (skips val dupes)
+        _ingest("train.txt", "train", None)           # le reste part en train
 
     _write_labels(out_root / "labels" / name, labels, splits)
     print(f"  WildReceipt: {len(splits['train'])} train / {len(splits['val'])} val / "
@@ -316,9 +300,9 @@ def fetch_wildreceipt(out_root: Path, limit: int | None) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--datasets", default="cord",
-                        help="comma list: cord,sroie,trainingdatapro,srd_images,wildreceipt")
-    parser.add_argument("--limit", type=int, default=None, help="cap receipts per dataset")
-    parser.add_argument("--out", default=str(DEV_OCR / "data"), help="output root")
+                        help="liste separee par des virgules : cord,sroie,trainingdatapro,srd_images,wildreceipt")
+    parser.add_argument("--limit", type=int, default=None, help="plafonne le nombre de tickets par dataset")
+    parser.add_argument("--out", default=str(DEV_OCR / "data"), help="racine de sortie")
     args = parser.parse_args()
 
     out_root = Path(args.out)
@@ -338,22 +322,13 @@ def main() -> None:
             continue
         try:
             summary[key] = fetchers[key](out_root, args.limit)
-        except Exception as exc:  # network/HF/version issues must not abort the rest
+        except Exception as exc:  # un souci reseau sur une source ne doit pas tuer les autres
             print(f"  {key.upper()}: FAILED — {type(exc).__name__}: {exc}")
             summary[key] = 0
 
-    print("\nDone. Landed:", {k: v for k, v in summary.items()})
-    dir_name = {"cord": "cord_v2"}
-    for key, n in summary.items():
-        if not n:
-            continue
-        if key == "srd_images":
-            print("  next: python scripts/pseudo_label.py --images ../data/raw/expressexpense_srd "
-                  "--output ../data/labels/expressexpense_srd")
-            continue
-        name = dir_name.get(key, key)
-        print(f"  eval: python scripts/evaluate.py --checkpoint <merged.pt> "
-              f"--images ../data/raw/{name} --labels ../data/labels/{name} --split test")
+    print("\nRecupere :", {k: v for k, v in summary.items()})
+    if summary.get("srd_images"):
+        print("SRD n'a pas de labels : il faut le passer dans pseudo_label.py.")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
-# Phase 2 — LoRA fine-tuning: French receipt understanding.
+# Phase 2 : on ouvre les LoRA. Le projecteur est deja degrossi, donc il ne pousse
+# plus de bruit dans le decodeur.
 phase: 2
 lr: 1.0e-4
 epochs: 10

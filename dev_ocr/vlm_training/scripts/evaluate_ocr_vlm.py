@@ -1,18 +1,14 @@
-"""Evaluate the from-scratch OCR-VLM (`OcrVLM`) on real receipts + held-out synthetic.
+"""Evalue l'OCR-VLM maison sur des tickets reels, et sur du synthetique tenu a l'ecart.
 
-Loads an ``ocr_vlm_epoch*.pt`` checkpoint + its char tokenizer, runs the model end-to-end
-(``prepare_ocr_pixels`` -> ``generate`` -> ``Ticket``) and scores predictions with the shared
-``evaluate_tickets`` metrics. Prints a per-dataset + aggregate acceptance table and a few
-qualitative pred-vs-gold dumps, so we can read the sim-to-real gap after M1.
+Charge un checkpoint et son tokenizer, fait tourner le modele de bout en bout, et note
+les predictions avec les memes metriques que les autres backends.
 
-Unlike ``scripts/evaluate.py`` (hardwired to the CLIP+SmolLM2 model), this one drives the
-from-scratch stack. No CLIP normalization, no constrained decoding — greedy ``generate``.
+Contrairement a evaluate.py (qui ne sait parler qu'au modele hybride), celui-ci pilote
+la pile maison : pas de normalisation CLIP, pas de decodage contraint, un generate
+glouton et c'est tout.
 
-Usage:
-    python scripts/evaluate_ocr_vlm.py \
-        --checkpoint checkpoints/ocr_vlm_epoch040_loss0.2265.pt \
-        --tokenizer checkpoints/tokenizer_20260607_0900.json \
-        --synthetic 128
+    python scripts/evaluate_ocr_vlm.py --checkpoint checkpoints/ocr_vlm_epoch050_loss0.3619.pt \
+        --tokenizer checkpoints/tokenizer_20260607_0900.json --synthetic 128
 """
 
 from __future__ import annotations
@@ -177,21 +173,21 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", default="checkpoints/ocr_vlm_epoch040_loss0.2265.pt")
-    p.add_argument("--tokenizer", default=None, help="default: tokenizer*.json next to checkpoint")
+    p.add_argument("--tokenizer", default=None, help="par defaut : le tokenizer*.json a cote du checkpoint")
     p.add_argument("--split", default="test")
     p.add_argument("--datasets", nargs="*", default=["cord_v2", "wildreceipt", "trainingdatapro"],
                    help=f"dataset keys: {DATASET_NAMES}")
     p.add_argument("--data-dir", default=None,
-                   help="base holding raw/<name>+labels/<name> (e.g. attached Kaggle Dataset); "
+                   help="le dossier qui contient raw/<nom> et labels/<nom> (un Dataset Kaggle attache, par ex.) ; "
                         "defaults to dev_ocr/data")
     p.add_argument("--include-unreviewed", action="store_true",
-                   help="keep unreviewed labels (adds SRD's pseudo-labelled test split)")
-    p.add_argument("--synthetic", type=int, default=0, help="also eval N held-out synthetic")
+                   help="accepte les labels non relus (ajoute le test SRD, qui est pseudo-labellise)")
+    p.add_argument("--synthetic", type=int, default=0, help="evalue aussi N tickets synthetiques tenus a l'ecart")
     p.add_argument("--synthetic-langs", default="fr,en,es,de,it")
     p.add_argument("--synthetic-seed", type=int, default=999999)
-    p.add_argument("--limit", type=int, default=0, help="cap samples per dataset (0=all)")
+    p.add_argument("--limit", type=int, default=0, help="plafonne par dataset (0 = tout)")
     p.add_argument("--batch-size", type=int, default=16)
-    p.add_argument("--max-len", type=int, default=0, help="0 = model's trained max_len")
+    p.add_argument("--max-len", type=int, default=0, help="0 = le max_len avec lequel le modele a ete entraine")
     p.add_argument("--examples", type=int, default=3)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--output", default=None)
@@ -217,7 +213,7 @@ def main() -> None:
         if key not in DATASET_NAMES:
             raise SystemExit(f"unknown dataset {key!r}; choices: {sorted(DATASET_NAMES)}")
         images_dir, labels_dir = data_base / "raw" / key, data_base / "labels" / key
-        req = False if args.include_unreviewed else None  # None -> reviewed on the test split
+        req = False if args.include_unreviewed else None  # None : on exige des labels relus sur le split de test
         if not labels_dir.is_dir():
             print(f"[{key}] not under {data_base} — skipping")
             continue

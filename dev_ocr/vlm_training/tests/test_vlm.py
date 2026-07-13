@@ -1,7 +1,7 @@
-"""Smoke tests for the full ReceiptVLM assembly.
+"""L'assemblage complet du modele hybride.
 
-Marked ``slow``: instantiation downloads CLIP ViT-B/16 and SmolLM2-360M from
-the HuggingFace hub (~1.5 GB on first run). Run with ``pytest -m slow``.
+Marques `slow` : instancier le modele telecharge CLIP et SmolLM2 depuis HuggingFace,
+soit environ 1,5 Go au premier run. Ils sont donc sautes par defaut.
 """
 
 import json
@@ -28,7 +28,7 @@ def model():
 def test_param_budget(model) -> None:
     stats = count_trainable_params(model)
     assert 400_000_000 < stats["total"] < 550_000_000, stats
-    # Only projector + LoRA train: a few percent at most.
+    # Seuls le projecteur et les LoRA s'entrainent : quelques pour cent, pas plus.
     assert stats["trainable_pct"] < 5.0, stats
 
 
@@ -49,7 +49,10 @@ def test_forward_shapes_and_loss(model) -> None:
 
 
 def test_constrained_generate_emits_valid_canonical_json(model) -> None:
-    """Even untrained, constrained decoding must yield parseable canonical JSON."""
+    """Meme non entraine, le decodage contraint doit sortir du JSON canonique valide.
+
+    C'est tout l'interet du masque de tokens : la forme est garantie par construction,
+    independamment de ce que le modele a appris."""
     pixels = torch.randn(1, 3, 224, 224)
     outputs = model.generate(pixels, max_new_tokens=200, constrained=True)
     payload = json.loads(outputs[0])

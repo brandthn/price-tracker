@@ -1,7 +1,9 @@
-# Phase 1 — projector warmup: vision→language alignment.
+# Phase 1 : on chauffe le projecteur seul, pour aligner vision et langage.
 phase: 1
 lr: 3.0e-4
 epochs: 5
 trainable: [projector]
-sources: [cord, sroie, synthetic]
-max_gen_samples: 0   # F1 is not the phase-1 target; skip constrained-decoding val
+sources: [cord, synthetic]
+
+# Le F1 n'est pas la cible ici, et la validation par generation contrainte est lente.
+max_gen_samples: 0

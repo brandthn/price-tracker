@@ -1,4 +1,4 @@
-"""Tests for CORD/SROIE schema mapping and the real-photos loader."""
+"""Le mapping CORD et SROIE vers le schema, et le chargeur de vraies photos."""
 
 import json
 
@@ -8,8 +8,6 @@ from receipt_vlm.data.cord_adapter import _parse_price, ticket_from_cord_ground_
 from receipt_vlm.data.real_photos import freeze_splits, load_real_samples
 from receipt_vlm.data.sroie_adapter import normalize_sroie_date, ticket_from_sroie_entities
 
-
-# --- CORD -------------------------------------------------------------------
 
 def test_cord_price_parsing() -> None:
     assert _parse_price("2,000") == 2000.0
@@ -40,7 +38,7 @@ def test_cord_ground_truth_mapping() -> None:
     assert ticket.produits[0].nom_produit == "ICE AMERICANO"
     assert ticket.produits[0].unites == 2
     assert ticket.produits[0].prix_unitaire_ou_kg == 9000.0
-    assert ticket.chaine_supermarche == ""  # lossy by design
+    assert ticket.chaine_supermarche == ""  # CORD n'a pas d'enseigne, c'est assume
 
 
 def test_cord_single_menu_dict() -> None:
@@ -49,8 +47,6 @@ def test_cord_single_menu_dict() -> None:
     )
     assert len(ticket.produits) == 1
 
-
-# --- SROIE ------------------------------------------------------------------
 
 def test_sroie_date_normalization() -> None:
     assert normalize_sroie_date("15/03/2024") == "20240315 00:00"
@@ -74,8 +70,6 @@ def test_sroie_entity_mapping() -> None:
     assert ticket.adresse.startswith("JALAN")
     assert ticket.produits == []  # SROIE has no product annotations
 
-
-# --- real photos -------------------------------------------------------------
 
 @pytest.fixture()
 def real_layout(tmp_path):
@@ -113,16 +107,16 @@ def test_freeze_splits_and_reviewed_filter(real_layout) -> None:
     splits = freeze_splits(names, labels, test_fraction=0.25, val_fraction=0.25)
     assert sorted(splits["train"] + splits["val"] + splits["test"]) == sorted(names)
 
-    # Refuses to overwrite frozen splits.
+    # Refuse d'ecraser des splits deja figes.
     with pytest.raises(FileExistsError):
         freeze_splits(names, labels)
 
-    # Test split requires reviewed labels (none reviewed yet → empty).
+    # Le split de test exige des labels relus. Aucun ne l'est, donc il est vide.
     assert load_real_samples(images, labels, split="test") == []
 
     reviewed = {name: {"reviewed": True} for name in splits["test"]}
     (labels / "review_status.json").write_text(json.dumps(reviewed), encoding="utf-8")
     assert len(load_real_samples(images, labels, split="test")) == len(splits["test"])
 
-    # Train split works without review flags.
+    # Le split de train, lui, marche sans relecture.
     assert len(load_real_samples(images, labels, split="train")) == len(splits["train"])

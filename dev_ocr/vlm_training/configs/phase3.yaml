@@ -1,4 +1,5 @@
-# Phase 3 — JSON alignment: clean structured output at low LR.
+# Phase 3 : alignement sur le JSON, a faible LR. C'est la phase qui n'a jamais
+# tourne pour le checkpoint hybride qu'on a fini par mesurer.
 phase: 3
 lr: 5.0e-5
 epochs: 5

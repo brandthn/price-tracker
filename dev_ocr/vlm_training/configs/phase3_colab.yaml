@@ -1,6 +1,4 @@
-# Phase 3 on Colab — low-LR JSON alignment. Requires phase2_best.pt.
-# Est. ~30–60 min on T4.
-
+# Phase 3 sur Colab. Demande phase2_best.pt.
 phase: 3
 lr: 5.0e-5
 epochs: 5

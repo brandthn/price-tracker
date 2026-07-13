@@ -1,18 +1,16 @@
-"""Pseudo-label real receipt photos with the Groq provider, for manual review.
+"""Pre-annote les vraies photos avec Groq, pour relecture a la main ensuite.
 
-For every image in ``--images``, runs the production Groq JSON extraction and
-writes a canonical label file ``<stem>.json`` into ``--output``, plus:
+Pour chaque image, fait tourner l'extraction Groq et ecrit un label canonique, plus un
+review_status.json (tout a false au depart) et un splits.json fige une fois pour toutes.
 
-- ``review_status.json``: per-image ``{"reviewed": false}`` flags — flip to
-  ``true`` after manually checking a label (mandatory for the test split);
-- ``splits.json``: frozen train/val/test partition (created once, never
-  overwritten).
+Ces labels ne sont PAS de la verite terrain tant qu'un humain ne les a pas relus. Le
+split de test refuse d'ailleurs les labels non relus : c'est volontaire, sinon on
+mesurerait le modele contre les erreurs d'un autre modele.
 
-Requires ``GROQ_API_KEY`` and ``pip install -e ..`` (receipt_ocr).
+Demande GROQ_API_KEY.
 
-Usage:
-    python scripts/pseudo_label.py \
-        --images ../data/raw/images_tickets_caisse --output data/real_labels
+    python scripts/pseudo_label.py --images ../data/raw/images_tickets_caisse \
+        --output data/real_labels
 """
 
 from __future__ import annotations
@@ -36,20 +34,20 @@ from receipt_vlm.data.schema import serialize_ticket, ticket_from_dict  # noqa: 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--images", required=True, help="directory of receipt photos")
-    parser.add_argument("--output", required=True, help="labels output directory")
+    parser.add_argument("--images", required=True, help="dossier des photos de tickets")
+    parser.add_argument("--output", required=True, help="dossier ou ecrire les labels")
     parser.add_argument("--overwrite", action="store_true",
-                        help="re-label images that already have a label file")
+                        help="re-annote meme les images qui ont deja un label")
     parser.add_argument("--test-fraction", type=float, default=0.3)
     parser.add_argument("--val-fraction", type=float, default=0.15)
     args = parser.parse_args()
 
-    # The Groq provider only supports JSON mode; force it for this run.
+    # Le provider Groq n'accepte que le mode JSON.
     os.environ["RECEIPT_VLM_MODE"] = "json"
 
     from receipt_ocr.env import load_project_env
 
-    load_project_env()  # pick up GROQ_API_KEY / groq_key from dev_ocr/.env
+    load_project_env()  # recupere GROQ_API_KEY (ou l'ancien groq_key) depuis dev_ocr/.env
 
     from receipt_ocr.backends.vlm.extraction import run_vlm_extraction
     from receipt_ocr.backends.vlm.groq_provider import GroqProvider
@@ -108,8 +106,8 @@ def main() -> None:
             f"Frozen splits: {len(splits['train'])} train / "
             f"{len(splits['val'])} val / {len(splits['test'])} test"
         )
-        print("NOW: manually review every label in the test split and set "
-              f"\"reviewed\": true in {review_path.name}.")
+        print(f"Les labels du split de test sont a relire a la main dans {review_path.name} : "
+              "tant qu'ils sont a false, l'eval les ignore.")
 
 
 if __name__ == "__main__":

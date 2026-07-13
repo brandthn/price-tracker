@@ -1,25 +1,14 @@
-"""Generate synthetic receipts with perfect canonical labels — parameterised & multilingual.
+"""Genere des tickets synthetiques avec leurs labels.
 
-Dial the corpus up gradually and reproducibly: how many, which Latin-script languages, which
-capture variations, how hard. Writes ``receipt_{i:06d}.png`` + canonical ``.json`` labels, plus a
-``manifest.json`` recording the exact config (reproducible / auditable). Images round-robin across
-the requested languages so they stay balanced.
+On choisit combien, dans quelles langues, avec quelles deformations et a quelle
+intensite. Un manifest.json garde la config exacte du run, pour pouvoir le refaire.
 
-Backward-compatible with the original French-only flags (``--n``, ``--output``, ``--diverse``,
-``--distort``, ``--distort-intensity``, ``--start-index``).
+Le levier le plus efficace n'est pas le nombre de tickets mais la diversite des polices
+(--fonts-dir) : c'est ce qui empeche le modele d'apprendre a lire une seule typo.
 
-Examples:
-    # legacy French set (unchanged):
     python scripts/generate_synthetic.py --n 5000 --output data/synthetic --diverse --distort
-
-    # 200 receipts across 3 languages, all variations, medium:
-    python scripts/generate_synthetic.py --count 200 --languages fr,en,es --diverse --distort \\
-        --out data/synth_demo
-
-    # scale up with a chosen variation subset + extra fonts (biggest OCR-diversity lever):
-    python scripts/generate_synthetic.py --count 10000 --languages fr,en,es,de,it --diverse \\
-        --distort --variations warp,blur,chroma,jpeg,frame --intensity heavy \\
-        --fonts-dir /path/to/ttfs --out data/synth_10k
+    python scripts/generate_synthetic.py --count 10000 --languages fr,en,es,de,it \
+        --diverse --distort --intensity heavy --fonts-dir /chemin/vers/ttf
 """
 
 from __future__ import annotations
@@ -46,24 +35,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--n", "--count", dest="count", type=int, default=2000,
-                        help="number of receipts")
+                        help="combien de tickets")
     parser.add_argument("--output", "--out", dest="output", default="data/synthetic",
-                        help="output directory")
+                        help="dossier de sortie")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--languages", "--langs", dest="languages", default="fr",
                         help=f"comma list of Latin-script locales. Available: {','.join(available_locales())}")
     parser.add_argument("--diverse", action="store_true",
-                        help="multi-style layouts, colour palettes, pre-render printer noise")
+                        help="plusieurs mises en page, palettes, et bruit d'imprimante avant rendu")
     parser.add_argument("--distort", action="store_true",
-                        help="post-render capture distortions (see --variations)")
+                        help="deformations de prise de vue apres rendu (cf. --variations)")
     parser.add_argument("--distort-intensity", "--intensity", dest="intensity",
                         choices=("light", "medium", "heavy"), default="medium")
     parser.add_argument("--variations", default="all",
                         help=f"'all', 'none', or comma subset of: {','.join(ALL_VARIATIONS)}")
     parser.add_argument("--fonts-dir", default=None,
-                        help="extra .ttf/.otf pool for glyph diversity")
+                        help="des .ttf/.otf en plus : c'est le meilleur levier de diversite")
     parser.add_argument("--start-index", type=int, default=0,
-                        help="first receipt index in filenames (append to an existing folder)")
+                        help="index du premier ticket, pour completer un dossier existant")
     args = parser.parse_args()
 
     langs = [c.strip().lower() for c in args.languages.split(",") if c.strip()] or ["fr"]
@@ -92,7 +81,7 @@ def main() -> None:
     for i in range(args.count):
         idx = args.start_index + i
         seed = args.seed + idx
-        locale = langs[i % len(langs)]  # round-robin -> balanced languages
+        locale = langs[i % len(langs)]  # tourniquet : les langues restent equilibrees
         counts[locale] += 1
         ticket = generate_ticket(seed=seed, locale=locale)
         image = render_receipt_image(

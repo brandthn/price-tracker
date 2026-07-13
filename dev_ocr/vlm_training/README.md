@@ -43,13 +43,40 @@ tenable dans le temps du projet.
 
 ## Entraînement et éval
 
-**Pas en local.** L'entraînement comme l'évaluation tournent sur Kaggle (GPU) :
-un `generate` en local a déjà figé la machine, et il n'y a aucune raison de
-retenter. Le worker qui sert ce modèle le dit aussi
-(`workers/ocr-vlm-scratch/README.md`).
+Deux modèles, donc deux boucles d'entraînement séparées. C'est la chose à savoir
+avant de lire quoi que ce soit d'autre ici :
 
-Le package s'installe et s'importe normalement (`pip install -e .`), et les
-notebooks d'entraînement vivent côté Kaggle, pas dans le repo.
+| | modèle | script | boucle |
+|---|---|---|---|
+| hybride | CLIP + SmolLM2 + LoRA | `scripts/train.py` (+ `configs/phase*.yaml`) | `receipt_vlm/training/trainer.py` |
+| from scratch | `OcrVLM`, tout maison | `scripts/train_ocr_vlm.py` | dans le script lui-même |
+
+Le second n'utilise **pas** `trainer.py`. Chercher son entraînement dans le paquet
+est une perte de temps : tout est dans le script.
+
+Les données d'entraînement ne sont pas sur le disque. `scripts/train_ocr_vlm.py`
+construit des échantillons dont l'image est un *callable* : le ticket est dessiné au
+moment où le DataLoader le demande. À chaque epoch le modèle voit donc des tickets
+fraîchement rendus, avec une mise en page, une police et des distorsions différentes,
+et un label parfait par construction. C'est ce qui permet d'entraîner un modèle de
+lecture sans posséder un seul ticket annoté à la main.
+
+**En pratique tout tourne sur Kaggle** (`notebooks/*_kaggle.ipynb`). Un `generate` en
+local a déjà figé la machine, et il n'y a aucune raison de retenter. Les notebooks
+Colab / Vertex et les configs `*_local.yaml` sont des pistes qu'on a explorées puis
+abandonnées ; elles sont gardées ici pour mémoire, pas pour être relancées.
+
+Le tokenizer caractère est figé au premier run et sauvé à côté du checkpoint. C'est
+pour ça que le worker a besoin de **deux** fichiers : un checkpoint sans le vocabulaire
+avec lequel il a été entraîné ne vaut rien.
+
+## Ce qu'il y a autour du package
+
+- `scripts/` : entraînement, éval, export, génération synthétique, pseudo-labelling.
+- `configs/` : les YAML du curriculum en 3 phases (hybride uniquement).
+- `notebooks/` : les runs Kaggle, plus les variantes Colab/Vertex abandonnées.
+- `tests/` : `pytest tests -m "not slow"`. Les tests `slow` téléchargent CLIP et
+  SmolLM2, donc on les saute par défaut.
 
 ## Inférence
 

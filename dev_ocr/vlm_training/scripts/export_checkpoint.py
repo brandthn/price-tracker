@@ -1,11 +1,9 @@
-"""Merge LoRA into base weights and export a single inference-ready .pt.
+"""Refond les LoRA dans les poids de base et sort un seul .pt pret pour l'inference.
 
-The output is consumed by ``receipt_ocr.backends.vlm.receipt_vlm_provider``
-via ``RECEIPT_VLM_MODEL_PATH``.
+Le checkpoint d'entrainement ne contient que le projecteur et les LoRA. Ici on rejoue
+l'init pre-entrainee, on fusionne, et on ecrit un modele ordinaire, sans adaptateur.
 
-Usage:
-    python scripts/export_checkpoint.py \
-        --checkpoint checkpoints/phase3_best.pt \
+    python scripts/export_checkpoint.py --checkpoint checkpoints/phase3_best.pt \
         --output checkpoints/receipt_vlm_500m_merged.pt
 """
 
@@ -20,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", required=True, help="training checkpoint (.pt)")
-    parser.add_argument("--output", required=True, help="merged output path (.pt)")
+    parser.add_argument("--checkpoint", required=True, help="checkpoint d'entrainement (.pt)")
+    parser.add_argument("--output", required=True, help="ou ecrire le .pt fusionne")
     args = parser.parse_args()
 
     import torch
@@ -36,8 +34,8 @@ def main() -> None:
         lora_alpha=model_cfg.get("lora_alpha", 32.0),
         lora_dropout=model_cfg.get("lora_dropout", 0.05),
     )
-    # Checkpoints are adapter-only (projector + LoRA); the frozen CLIP/SmolLM2
-    # backbones come from the pretrained init above, so load non-strict.
+    # Le checkpoint ne contient que le projecteur et les LoRA. Les backbones geles
+    # viennent de l'init pre-entrainee ci-dessus, donc chargement non-strict.
     result = model.load_state_dict(checkpoint["model_state"], strict=False)
     if result.unexpected_keys:
         raise RuntimeError(f"unexpected keys in checkpoint: {result.unexpected_keys[:5]}")

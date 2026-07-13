@@ -1,9 +1,7 @@
-"""Helper for reviewing Groq pseudo-labels on the held-out test split.
+"""Aide a relire les pseudo-labels du split de test.
 
-Usage:
     python scripts/review_labels.py --list test
     python scripts/review_labels.py --mark-reviewed image_8.jpg image_11.jpg
-    python scripts/review_labels.py --mark-all-test   # use only after manual check
 """
 
 from __future__ import annotations
@@ -26,12 +24,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--labels", default="data/real_labels")
     parser.add_argument("--images", default="../data/raw/images_tickets_caisse")
-    parser.add_argument("--list", choices=("train", "val", "test", "all"), help="show split")
+    parser.add_argument("--list", choices=("train", "val", "test", "all"), help="affiche un split")
     parser.add_argument("--mark-reviewed", nargs="+", metavar="IMAGE.jpg")
     parser.add_argument(
         "--mark-all-test",
         action="store_true",
-        help="set reviewed=true for every image in the test split",
+        help="passe tout le split de test a reviewed=true",
     )
     args = parser.parse_args()
 

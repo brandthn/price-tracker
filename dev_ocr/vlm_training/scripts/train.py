@@ -1,10 +1,10 @@
-"""Train one curriculum phase of the receipt VLM.
+"""Joue une phase du curriculum du modele hybride (CLIP + SmolLM2 + LoRA).
 
-Usage:
+Attention : ce script n'entraine PAS l'OCR-VLM maison, qui a sa propre boucle dans
+train_ocr_vlm.py.
+
     python scripts/train.py --config configs/phase1.yaml
-    python scripts/train.py --config configs/phase1_colab.yaml
-    python scripts/train.py --config configs/phase2_colab.yaml --resume /content/drive/MyDrive/receipt_vlm/checkpoints/phase1_best.pt
-    python scripts/train.py --config configs/phase3.yaml --resume checkpoints/phase2_best.pt
+    python scripts/train.py --config configs/phase2.yaml --resume checkpoints/phase1_best.pt
 """
 
 from __future__ import annotations
@@ -93,8 +93,8 @@ def load_config(phase_config_path: str) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", required=True, help="phase YAML config")
-    parser.add_argument("--resume", help="checkpoint to resume from")
+    parser.add_argument("--config", required=True, help="le YAML de la phase")
+    parser.add_argument("--resume", help="checkpoint depuis lequel reprendre")
     args = parser.parse_args()
 
     config = load_config(args.config)

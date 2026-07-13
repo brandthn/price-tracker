@@ -1,12 +1,8 @@
-"""Zip real receipt photos + pseudo-labels for upload to Google Drive (Colab).
+"""Zippe les photos et leurs labels, pour les envoyer sur Drive.
 
-Creates ``colab_upload/receipt_vlm_colab_data.zip`` with:
-  images_tickets_caisse/*.jpg
-  real_labels/*.json
+Sert aux phases 2 et 3, qui ont besoin des vraies photos. La phase 1 n'en a pas besoin.
 
-Usage (from repo root or dev_ocr/vlm_training):
     python scripts/zip_colab_upload.py
-    python scripts/zip_colab_upload.py --output ../colab_upload/receipt_vlm_colab_data.zip
 """
 
 from __future__ import annotations
@@ -53,7 +49,7 @@ def main() -> None:
 
     size_mb = out.stat().st_size / 1e6
     print(f"Wrote {out} ({size_mb:.1f} MB): {n_img} images, {n_json} label files")
-    print("Upload to Google Drive: My Drive/receipt_vlm/ then unzip in the notebook.")
+    print("A deposer dans My Drive/receipt_vlm/, le notebook le dezippe.")
 
 
 if __name__ == "__main__":

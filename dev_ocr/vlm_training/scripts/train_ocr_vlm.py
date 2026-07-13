@@ -1,18 +1,18 @@
-"""Train the from-scratch OCR-VLM (encoder + decoder) — resumable, checkpoint-per-epoch.
+"""Entraine l'OCR-VLM maison (encodeur + decodeur, sans CLIP ni LLM pre-entraine).
 
-Image -> OcrEncoder -> OcrDecoder -> linearized schema -> Ticket. Trains on on-the-fly
-multilingual synthetic (infinite variety, no PNGs on disk) with perfect labels. Designed for
-free-tier multi-session GPUs: every epoch writes a resumable checkpoint
-``ocr_vlm_epoch{NN}_loss{L}.pt`` (model + optimizer + config) into ``--checkpoint-dir``; on
-restart it auto-resumes from the latest, so a crash costs <= 1 epoch. A fixed tokenizer
-(``tokenizer.json``, default broad-Latin charset) keeps the vocab identical across sessions.
+Image -> OcrEncoder -> OcrDecoder -> schema linearise -> Ticket.
 
-Usage:
-    # M0 overfit sanity (tiny):
-    python scripts/train_ocr_vlm.py --n 8 --epochs 250 --lr 5e-4 --checkpoint-dir logs/ocr_m0
-    # M1 read pretraining (scaled; Kaggle T4):
-    python scripts/train_ocr_vlm.py --n 30000 --languages fr,en,es,de,it --epochs 40 \
-        --batch-size 24 --num-workers 2 --checkpoint-dir /kaggle/working/ocr_ckpts
+Les donnees ne sont pas sur le disque : les tickets sont dessines a la volee, donc le
+modele voit une mise en page differente a chaque epoch, avec un label parfait par
+construction.
+
+Concu pour les GPU gratuits, qui coupent la session sans prevenir : un checkpoint est
+ecrit a CHAQUE epoch, et le script reprend tout seul du dernier trouve. Une coupure
+coute donc au pire une epoch. Le tokenizer est fige au premier run et sauve a cote, pour
+que le vocabulaire ne bouge pas d'une session a l'autre.
+
+    python scripts/train_ocr_vlm.py --n 8 --epochs 250 --lr 5e-4       # sanity check
+    python scripts/train_ocr_vlm.py --n 30000 --epochs 40 --batch-size 24
 """
 
 from __future__ import annotations
@@ -36,11 +36,10 @@ from receipt_vlm.data.real_photos import load_real_samples  # noqa: E402
 from receipt_vlm.data.synthetic import generate_ticket, render_receipt_image  # noqa: E402
 from receipt_vlm.data.tokenizer import CharTokenizer  # noqa: E402
 from receipt_vlm.models.ocr_vlm import OcrVLM  # noqa: E402
-from receipt_vlm.utils.metrics import evaluate_tickets  # noqa: E402
+from receipt_vlm.utils.metrics import evaluate_tickets, levenshtein  # noqa: E402
 
 
-# ----------------------------------------------------------------------
-# Data: on-the-fly synthetic (module-level factory so DataLoader workers can fork it).
+# La fabrique est au niveau module pour que les workers du DataLoader puissent la forker.
 
 
 def _render_factory(seed: int, ticket, locale: str, distort: bool, intensity: str, return_text: bool):
@@ -65,9 +64,9 @@ def build_synthetic_samples(n, langs, seed, distort, intensity, return_text) -> 
     return samples
 
 
-# Real receipt datasets that carry a "train" split (cord/trainingdatapro are val/test only).
-# Stage B mixes these in so the model sees real-photo appearance and stops hallucinating its
-# synthetic prior. Paths resolve under a base dir holding raw/<name> + labels/<name>.
+# Les seuls jeux reels qui ont un split "train" (CORD et TrainingDataPro sont val/test).
+# On les melange au synthetique pour que le modele voie a quoi ressemble une vraie photo,
+# et arrete d'halluciner ses enseignes synthetiques.
 _DATA = Path(__file__).resolve().parents[1].parent / "data"
 REAL_TRAIN_SETS = ("wildreceipt", "expressexpense_srd")
 
@@ -77,17 +76,18 @@ def _has_data(d: Path) -> bool:
 
 
 def _resolve_real_base(base: Path) -> Path:
-    """Find the dir actually holding ``raw/`` + ``labels/``. A Kaggle Dataset upload may nest the
-    extracted zip one level down, or leave the zip unextracted — handle both so a layout quirk
-    doesn't waste a GPU run."""
+    """Trouve le dossier qui contient vraiment raw/ et labels/.
+
+    Kaggle imbrique parfois le zip extrait d'un niveau, ou ne l'extrait pas du tout. On gere
+    les deux : une bizarrerie d'arborescence ne doit pas gacher un run GPU."""
     if _has_data(base):
         return base
-    if base.is_dir():  # Kaggle sometimes nests extracted contents in a subfolder
+    if base.is_dir():  # Kaggle imbrique parfois le contenu extrait dans un sous-dossier
         for sub in sorted(p for p in base.iterdir() if p.is_dir()):
             if _has_data(sub):
                 return sub
     zips = sorted(base.glob("*.zip")) if base.is_dir() else []
-    if zips:  # unextracted zip attached as-is
+    if zips:  # le zip a ete attache sans etre extrait
         import zipfile
         work = Path("/kaggle/working")
         dest = (work if work.is_dir() else base.parent) / "_real_data_extracted"
@@ -97,13 +97,12 @@ def _resolve_real_base(base: Path) -> Path:
         for cand in (dest, *(p for p in dest.iterdir() if p.is_dir())):
             if _has_data(cand):
                 return cand
-    return base  # fall through; caller reports + lists contents
+    return base  # on laisse l'appelant rapporter et lister le contenu
 
 
 def build_real_train_samples(repeat: int, data_dir: str | None = None) -> list[ReceiptSample]:
-    """Load the real train splits (schema target only). ``repeat`` oversamples the small real
-    set so it isn't drowned by the on-the-fly synthetic each epoch. ``data_dir`` overrides the
-    base holding ``raw/<name>`` + ``labels/<name>`` (e.g. an attached Kaggle Dataset path)."""
+    """Charge les splits train reels. `repeat` les sur-echantillonne, sinon les quelques
+    centaines de vrais tickets sont noyes dans le synthetique genere a chaque epoch."""
     base = _resolve_real_base(Path(data_dir) if data_dir else _DATA)
     real: list[ReceiptSample] = []
     for name in REAL_TRAIN_SETS:
@@ -123,41 +122,13 @@ def build_real_train_samples(repeat: int, data_dir: str | None = None) -> list[R
     return real * max(1, repeat)
 
 
-def _levenshtein(a: str, b: str) -> int:
-    if a == b:
-        return 0
-    if not a:
-        return len(b)
-    if not b:
-        return len(a)
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        cur = [i]
-        for j, cb in enumerate(b, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
-        prev = cur
-    return prev[-1]
-
-
 def _cer(pred: str, gold: str) -> float:
-    return _levenshtein(pred, gold) / max(1, len(gold))
+    return levenshtein(pred, gold) / max(1, len(gold))
 
 
 def _wer(pred: str, gold: str) -> float:
-    a, b = pred.split(), gold.split()
-    if a == b:
-        return 0.0
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        cur = [i]
-        for j, cb in enumerate(b, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
-        prev = cur
-    return prev[-1] / max(1, len(b))
-
-
-# ----------------------------------------------------------------------
-# Resumable checkpointing.
+    gold_words = gold.split()
+    return levenshtein(pred.split(), gold_words) / max(1, len(gold_words))
 
 
 def _epoch_of(path: Path) -> int:
@@ -182,20 +153,18 @@ def _save_checkpoint(ckpt_dir: Path, model, optimizer, epoch: int, val_loss: flo
     tmp = path.with_suffix(".pt.tmp")
     torch.save(payload, tmp)
     tmp.replace(path)
-    # "_epoch" in the line lets a stdout-watching notebook mirror it to a Kaggle Dataset.
+    # Le "_epoch" dans la ligne permet au notebook, qui surveille stdout, de repousser le
+    # fichier vers un Dataset Kaggle.
     print(f"Checkpoint saved: {path} ({path.stat().st_size / 1e6:.0f} MB)", flush=True)
 
 
 def _prune_checkpoints(ckpt_dir: Path, keep_last: int) -> None:
-    """Keep only the newest ``keep_last`` epoch checkpoints (bounds the pushed folder size)."""
+    """Ne garde que les derniers checkpoints : sinon le dossier pousse sur Kaggle explose."""
     if keep_last <= 0:
         return
     files = sorted(ckpt_dir.glob("ocr_vlm_epoch*.pt"), key=_epoch_of)
     for old in files[:-keep_last]:
         old.unlink(missing_ok=True)
-
-
-# ----------------------------------------------------------------------
 
 
 @torch.no_grad()
@@ -229,8 +198,8 @@ def _eval_transcription(model, samples, device, max_len, limit) -> dict:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--target", default="transcription", choices=("transcription", "schema"),
-                   help="Stage A READ = transcription (all visible text); Stage B = schema (fields)")
-    p.add_argument("--n", type=int, default=20000, help="synthetic receipts per epoch")
+                   help="transcription = tout le texte visible ; schema = les champs du ticket")
+    p.add_argument("--n", type=int, default=20000, help="tickets synthetiques par epoch")
     p.add_argument("--real", action="store_true",
                    help="Stage B: mix real train splits (wildreceipt+srd) in (schema target only)")
     p.add_argument("--real-repeat", type=int, default=4,
@@ -268,7 +237,8 @@ def main() -> None:
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     device = args.device
 
-    # Fixed tokenizer (persist so resumes across sessions share one vocab).
+    # Tokenizer fige : sans ca, une reprise dans une autre session changerait le vocabulaire
+    # et le checkpoint deviendrait illisible.
     tok_path = ckpt_dir / "tokenizer.json"
     tokenizer = CharTokenizer.load(tok_path) if tok_path.is_file() else CharTokenizer.default()
     if not tok_path.is_file():
@@ -297,7 +267,7 @@ def main() -> None:
                    img_h=IMG_H, img_w=IMG_W, max_len=args.max_len).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
-    # Auto-resume from the latest epoch checkpoint in the dir.
+    # Reprise automatique depuis le dernier checkpoint du dossier.
     start_epoch = 0
     latest = _latest_checkpoint(ckpt_dir)
     if latest is not None:

@@ -1,4 +1,4 @@
-"""Tests for the synthetic French receipt generator."""
+"""Le generateur de tickets synthetiques."""
 
 import json
 
@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("PIL")
 
-from receipt_vlm.data.schema import ticket_from_dict  # noqa: E402
+from receipt_vlm.data.schema import serialize_ticket, ticket_from_dict  # noqa: E402
 from receipt_vlm.data.synthetic import (  # noqa: E402
     _LAYOUT_STYLES,
     distort_receipt_image,
@@ -16,7 +16,6 @@ from receipt_vlm.data.synthetic import (  # noqa: E402
     save_dataset,
 )
 from receipt_vlm.models.constrained import CanonicalJsonStateMachine  # noqa: E402
-from receipt_vlm.data.schema import serialize_ticket  # noqa: E402
 
 
 def test_generate_ticket_deterministic_with_seed() -> None:

@@ -23,7 +23,8 @@ from receipt_vlm.utils.metrics import evaluate_tickets
 
 
 class ReceiptTrainer:
-    """Raw-PyTorch trainer with mixed precision, clipping and best-val checkpoints."""
+    """Entraîne le modèle hybride (CLIP + SmolLM2). Pas l'OCR-VLM maison, qui a sa
+    propre boucle dans scripts/train_ocr_vlm.py."""
 
     def __init__(
         self,
@@ -61,12 +62,13 @@ class ReceiptTrainer:
     ) -> dict[str, Any]:
         """Joue une phase du curriculum, et rend le meilleur score de validation.
 
-        Each epoch writes two checkpoints: ``phase{p}_best.pt`` (overwritten on
-        improvement, used by export) and a per-epoch ``phase{p}_epoch{NN}_loss{L}.pt``
-        snapshot so a mid-phase stop loses at most the current epoch. ``start_epoch``
-        resumes the loop part-way through a phase (see ``scripts/train.py`` auto-resume);
-        optimizer momentum is not restored — adapter-only checkpoints stay small — but the
-        cosine LR schedule is fast-forwarded so the learning-rate curve still lines up.
+        Deux checkpoints par epoch : le meilleur (ecrase a chaque amelioration, c'est celui
+        qu'on exporte) et une snapshot datee de l'epoch. Une coupure en cours de phase ne
+        coute donc que l'epoch en cours.
+
+        `start_epoch` permet de reprendre au milieu d'une phase. Le momentum de l'optimiseur
+        n'est pas restaure, pour garder des checkpoints legers, mais le planning de LR est
+        avance d'autant : la courbe reste la meme.
         """
         self._set_trainable(trainable_patterns)
         trainable = [p for p in self.model.parameters() if p.requires_grad]
@@ -83,7 +85,7 @@ class ReceiptTrainer:
             if start_epoch >= epochs:
                 print(f"Phase {phase} already complete ({start_epoch}/{epochs} epochs)", flush=True)
                 return {"val_loss": float("inf"), "phase": phase, "epoch": start_epoch}
-            for _ in range(start_epoch):  # align the LR schedule with resumed progress
+            for _ in range(start_epoch):  # on avance le planning de LR d'autant
                 scheduler.step()
             print(f"Resuming phase {phase} at epoch {start_epoch + 1}/{epochs}", flush=True)
 
@@ -211,11 +213,10 @@ class ReceiptTrainer:
     def _is_adapter_key(key: str) -> bool:
         """Vrai pour les seuls tenseurs qu'on entraine vraiment.
 
-        The from-scratch projector and the LoRA adapters are the sole trained
-        weights; the frozen CLIP + SmolLM2 backbones are re-created identically
-        from their pretrained init on every ``ReceiptVLM(...)``. Persisting them
-        would bloat each checkpoint to ~1.8 GB and make Colab-disk saves and
-        browser transfers corruption-prone. Adapter-only is ~11M params (~45 MB).
+        Le projecteur et les LoRA sont les seuls poids entraines. Les backbones geles
+        se recreent a l'identique depuis leur init pre-entrainee a chaque construction du
+        modele : les sauvegarder ferait passer chaque checkpoint de 45 Mo a 1,8 Go, pour
+        rien, et rendrait les transferts fragiles.
         """
         return key.startswith("projector.") or "lora_A" in key or "lora_B" in key
 

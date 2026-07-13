@@ -1,4 +1,4 @@
-"""Tests for the canonical schema dataclasses and deterministic serializer."""
+"""Le schema canonique et son serialiseur deterministe."""
 
 import json
 
@@ -77,7 +77,7 @@ def test_from_dict_coercions() -> None:
     assert ticket.date == ""
     assert len(ticket.produits) == 1
     assert ticket.produits[0].prix_unitaire_ou_kg == 2.5
-    assert ticket.produits[0].unites == 1  # clamped to >= 1
+    assert ticket.produits[0].unites == 1  # ramene a 1 au minimum
 
 
 def test_from_dict_accepts_bare_inner() -> None:

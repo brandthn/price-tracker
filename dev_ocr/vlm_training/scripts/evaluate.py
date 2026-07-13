@@ -1,13 +1,11 @@
-"""Evaluate the hybrid VLM on the held-out set, side-by-side with Groq.
+"""Evalue le modele hybride sur le jeu de test, face a Groq.
 
-Prints the acceptance table from the adapted spec §7: field F1, ANLS,
-product recall, price MAE, date exact match, vlm_validate pass-rate and
-valid-JSON rate, for the hybrid model and (optionally) the Groq baseline.
+Sort le tableau d'acceptation : F1 par champ, ANLS, rappel produit, MAE des prix, date
+exacte, taux de JSON valide.
 
-Usage:
     python scripts/evaluate.py --checkpoint checkpoints/receipt_vlm_500m_merged.pt \
         --images ../data/raw/images_tickets_caisse --labels data/real_labels \
-        --split test [--baseline]
+        --split test --baseline
 """
 
 from __future__ import annotations
@@ -62,7 +60,7 @@ def run_groq(samples) -> tuple[list[Ticket], list[bool], list[bool]]:
 
     from receipt_ocr.env import load_project_env
 
-    load_project_env()  # pick up GROQ_API_KEY / groq_key from dev_ocr/.env
+    load_project_env()  # recupere GROQ_API_KEY (ou l'ancien groq_key) depuis dev_ocr/.env
 
     from receipt_ocr.backends.vlm.extraction import run_vlm_extraction
     from receipt_ocr.backends.vlm.groq_provider import GroqProvider
@@ -122,13 +120,13 @@ def print_table(results: list[dict]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", required=True, help="merged .pt checkpoint")
+    parser.add_argument("--checkpoint", required=True, help="le .pt fusionne")
     parser.add_argument("--images", required=True)
     parser.add_argument("--labels", required=True)
     parser.add_argument("--split", default="test")
     parser.add_argument("--baseline", action="store_true",
-                        help="also run the Groq baseline (needs GROQ_API_KEY)")
-    parser.add_argument("--output", help="optional JSON results file")
+                        help="fait aussi tourner Groq en comparaison (demande GROQ_API_KEY)")
+    parser.add_argument("--output", help="fichier JSON de resultats (optionnel)")
     args = parser.parse_args()
 
     samples = load_real_samples(args.images, args.labels, split=args.split)

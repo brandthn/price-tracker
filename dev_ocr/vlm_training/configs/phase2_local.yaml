@@ -1,4 +1,4 @@
-# Phase 2 — local run after phase1_local (projector + LoRA, real + live synthetic).
+# Phase 2 en local, apres phase1_local.
 phase: 2
 lr: 1.0e-4
 epochs: 5

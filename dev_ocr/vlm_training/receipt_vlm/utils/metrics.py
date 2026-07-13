@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from receipt_vlm.data.schema import Product, Ticket
 
 
-def levenshtein(a: str, b: str) -> int:
-    """Plain dynamic-programming edit distance."""
+def levenshtein(a, b) -> int:
+    """Distance d'edition. Marche sur des chaines comme sur des listes de mots."""
     if not a:
         return len(b)
     if not b:

@@ -15,5 +15,9 @@ license = { text = "MIT" }
 include = ["receipt_vlm*"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 pythonpath = [".", "../src"]
 addopts = "-ra"
+markers = [
+    "slow: télécharge les poids pré-entraînés (CLIP, SmolLM2).",
+]

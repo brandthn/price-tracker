@@ -1,19 +1,17 @@
-"""Compare every OCR backend on one common real test set (French receipt photos).
+"""Compare tous les backends OCR sur un meme jeu de tickets reels.
 
-Paddle, PP-OCRv4, hybrid CLIP+SmolLM2 VLM, from-scratch OCR-VLM, Groq, and Moondream each turn an image
-into a canonical :class:`Ticket`; all are scored by the **same** metrics (field F1, product recall,
-ANLS, price MAE, date EM) plus **read_acc** (1-CER over concatenated readable text — the fair
-cross-backend "did the glyphs get read" signal, robust to format/currency) and a `valid` rate. Prints
-one comparison table (metric rows x backend columns) and writes JSON.
+Paddle, PP-OCRv4, le VLM hybride, l'OCR-VLM maison, Groq et Moondream rendent chacun un
+Ticket canonique, et tous sont notes avec les memes metriques.
 
-Backends whose dependency / checkpoint / API key is missing are **skipped with a note**, never crash.
-Meant to run on Kaggle (GPU + internet); see ``notebooks/evaluate_all_backends_kaggle.ipynb``.
+La metrique qui compte ici est read_acc (1 - CER sur le texte lisible concatene) : les
+F1 et ANLS s'etranglent des que le format ou la devise different, alors que read_acc
+repond juste a "est-ce que les caracteres ont ete lus". C'est la seule qui permette de
+comparer un OCR classique et un VLM sans biais.
 
-Usage:
-    python scripts/evaluate_all_backends.py --backends paddle hybrid ocrvlm groq \
-        --hybrid-checkpoint checkpoints/receipt_vlm_500m_merged.pt \
-        --ocrvlm-checkpoint checkpoints/ocr_vlm_epoch050_loss0.3619.pt \
-        --ocrvlm-tokenizer checkpoints/tokenizer_20260607_0900.json
+Un backend dont la dependance, le checkpoint ou la cle API manque est saute, il ne fait
+pas tomber la comparaison. Prevu pour tourner sur Kaggle (GPU + internet).
+
+    python scripts/evaluate_all_backends.py --backends paddle hybrid ocrvlm groq
 """
 
 from __future__ import annotations
@@ -27,27 +25,26 @@ _SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPTS.parent))   # receipt_vlm package
 sys.path.insert(0, str(_SCRIPTS))          # sibling scripts (evaluate_ocr_vlm)
 
-import evaluate_ocr_vlm as ev  # noqa: E402  reuse score / predict / OcrVLM / CharTokenizer
+import evaluate_ocr_vlm as ev  # noqa: E402  on reutilise son score / predict / tokenizer
 from receipt_vlm.data.real_photos import load_real_samples  # noqa: E402
 from receipt_vlm.data.schema import Ticket, ticket_from_dict, ticket_from_json  # noqa: E402
 
-# Defaults for the common French test set.
-# _SCRIPTS = dev_ocr/vlm_training/scripts -> parent=vlm_training, parents[1]=dev_ocr.
-FRENCH_IMAGES = _SCRIPTS.parents[1] / "data/raw/images_tickets_caisse"   # dev_ocr/data/...
-FRENCH_LABELS = _SCRIPTS.parent / "data/real_labels"                      # vlm_training/data/real_labels
+# Le jeu de test francais commun a tous les backends.
+FRENCH_IMAGES = _SCRIPTS.parents[1] / "data/raw/images_tickets_caisse"
+FRENCH_LABELS = _SCRIPTS.parent / "data/real_labels"
 
 
 class SkipBackend(Exception):
-    """Raised by a backend when its dep/checkpoint/key is unavailable -> skip its column."""
+    """Levee quand une dependance, un checkpoint ou une cle manque : on saute la colonne."""
 
 
 def _run_per_image(samples, infer, name):
-    """Apply ``infer(sample) -> Ticket`` per image; per-image errors -> empty Ticket (not fatal)."""
+    """Une image qui plante ne doit pas faire tomber tout le backend : elle rend un Ticket vide."""
     preds, errs = [], 0
     for s in samples:
         try:
             preds.append(infer(s))
-        except Exception as e:  # noqa: BLE001 - one bad image shouldn't sink the backend
+        except Exception as e:
             errs += 1
             if errs <= 3:
                 print(f"  [{name}] {Path(str(s.image)).name}: {type(e).__name__}: {e}")
@@ -57,16 +54,15 @@ def _run_per_image(samples, infer, name):
     return preds
 
 
-# ----------------------------------------------------------------------
-# Backend adapters: each returns list[Ticket] aligned with `samples`.
+# Chaque backend rend une liste de Ticket alignee sur `samples`.
 
 
 def run_paddle(samples, cfg, name="paddle"):
     try:
         from receipt_ocr.extract_receipt import build_backend, extract_receipt
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise SkipBackend(f"receipt_ocr/paddle not importable: {e}")
-    backend = build_backend(name)  # instantiates PaddleOCR (auto-downloads models)
+    backend = build_backend(name)  # instancie PaddleOCR, qui telecharge ses modeles
     return _run_per_image(samples, lambda s: ticket_from_dict(extract_receipt(str(s.image), backend)), name)
 
 
@@ -117,7 +113,7 @@ def run_groq(samples, cfg):
         from receipt_ocr.backends.vlm.groq_provider import GroqProvider
 
         provider = GroqProvider()
-    except Exception as e:  # noqa: BLE001 - missing key / pkg / mode
+    except Exception as e:
         raise SkipBackend(f"Groq unavailable (key/pkg?): {e}")
     return _run_vlm_provider(samples, provider, "groq")
 
@@ -132,7 +128,7 @@ def run_moondream(samples, cfg):
         from receipt_ocr.backends.vlm.moondream_provider import MoondreamProvider
 
         provider = MoondreamProvider()  # needs the `moondream` pkg + local .mf int8 weights
-    except Exception as e:  # noqa: BLE001 - pkg/weights not present
+    except Exception as e:
         raise SkipBackend(f"Moondream unavailable (need moondream pkg + .mf weights): {e}")
     return _run_vlm_provider(samples, provider, "moondream")
 
@@ -140,7 +136,7 @@ def run_moondream(samples, cfg):
 def run_ocrvlm(samples, cfg):
     ckpt, tok = cfg.get("ocrvlm_checkpoint"), cfg.get("ocrvlm_tokenizer")
     if not ckpt or not Path(ckpt).is_file():
-        raise SkipBackend(f"from-scratch checkpoint not found: {ckpt}")
+        raise SkipBackend(f"checkpoint OcrVLM introuvable : {ckpt}")
     tok_path = ev._resolve_tokenizer(Path(ckpt), tok)
     tokenizer = ev.CharTokenizer.load(tok_path)
     model = ev.OcrVLM.from_checkpoint(str(ckpt), tokenizer, device=cfg["device"])
@@ -156,9 +152,6 @@ BACKENDS = {
     "ocrvlm": run_ocrvlm,
 }
 
-
-# ----------------------------------------------------------------------
-# Metrics + table.
 
 ROWS = (
     ("read_acc", "Read acc (1-CER)"),
@@ -202,9 +195,9 @@ def main():
     p.add_argument("--ocrvlm-checkpoint", default=None)
     p.add_argument("--ocrvlm-tokenizer", default=None)
     p.add_argument("--moondream-weights", default=None)
-    p.add_argument("--limit", type=int, default=0, help="cap number of test receipts (0=all)")
+    p.add_argument("--limit", type=int, default=0, help="plafonne le nombre de tickets (0 = tous)")
     p.add_argument("--batch-size", type=int, default=16)
-    p.add_argument("--device", default=None, help="cuda|cpu (default: auto)")
+    p.add_argument("--device", default=None, help="cuda ou cpu (par defaut : auto)")
     p.add_argument("--output", default=None)
     args = p.parse_args()
 
@@ -241,7 +234,7 @@ def main():
             print(f"[{name}] SKIPPED: {e}")
             skipped.append((name, str(e)))
             continue
-        except Exception as e:  # noqa: BLE001 - a real backend bug shouldn't kill the comparison
+        except Exception as e:
             print(f"[{name}] SKIPPED (error): {e}")
             traceback.print_exc()
             skipped.append((name, str(e)))

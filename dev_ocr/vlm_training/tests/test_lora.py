@@ -1,4 +1,4 @@
-"""Tests for the hand-rolled LoRA implementation: shapes, zero-init delta, merge."""
+"""Les LoRA : formes des tenseurs, delta nul a l'init, et fusion."""
 
 import pytest
 
@@ -14,7 +14,7 @@ from receipt_vlm.models.lora import (  # noqa: E402
 
 
 def test_zero_init_delta() -> None:
-    """At init the LoRA branch must be an exact no-op (B = 0)."""
+    """A l'init, la branche LoRA ne doit rien changer du tout (B vaut zero)."""
     base = nn.Linear(64, 32)
     lora = LoRALinear(base, rank=8)
     lora.eval()
@@ -37,10 +37,10 @@ def test_original_frozen_adapters_trainable() -> None:
 
 
 def test_merge_correctness() -> None:
-    """Merged linear must reproduce the adapted forward exactly."""
+    """Une fois fusionne, le lineaire doit rendre exactement la meme chose."""
     base = nn.Linear(32, 24)
     lora = LoRALinear(base, rank=4, dropout=0.0)
-    nn.init.normal_(lora.lora_B.weight, std=0.02)  # non-trivial delta
+    nn.init.normal_(lora.lora_B.weight, std=0.02)  # cette fois le delta n'est plus nul
     lora.eval()
 
     merged = lora.merge_weights()
@@ -87,6 +87,7 @@ def test_count_trainable_params() -> None:
     inject_lora(model, rank=2)
     stats = count_trainable_params(model)
     assert stats["total"] == stats["trainable"] + stats["frozen"]
-    # k_proj stays fully trainable; q/v originals frozen, adapters trainable.
+    # k_proj reste entierement entrainable. Les q/v d'origine sont geles, seuls
+    # leurs adaptateurs s'entrainent.
     expected_trainable = (16 * 16 + 16) + 4 * (16 * 2)
     assert stats["trainable"] == expected_trainable

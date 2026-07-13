@@ -1,4 +1,4 @@
-"""Tests for evaluation metrics."""
+"""Les metriques d'evaluation."""
 
 import pytest
 
@@ -48,16 +48,16 @@ def test_empty_prediction() -> None:
 
 def test_price_error_detected() -> None:
     pred = _ticket()
-    pred.produits[0] = Product("Lait 1L", 1.59, 2)  # wrong price
+    pred.produits[0] = Product("Lait 1L", 1.59, 2)  # mauvais prix
     metrics = evaluate_tickets([pred], [_ticket()])
     assert metrics["price_mae"] == pytest.approx(0.25)
-    assert metrics["product_recall"] == 1.0  # still matched by name
+    assert metrics["product_recall"] == 1.0  # apparie quand meme, par le nom
     assert metrics["field_f1"] < 1.0
 
 
 def test_fuzzy_product_matching() -> None:
     pred = _ticket()
-    pred.produits[0] = Product("LAIT 1L.", 1.09, 2)  # OCR-ish name variation
+    pred.produits[0] = Product("LAIT 1L.", 1.09, 2)  # le genre de variation que produit un OCR
     metrics = evaluate_tickets([pred], [_ticket()])
     assert metrics["product_recall"] == 1.0
 

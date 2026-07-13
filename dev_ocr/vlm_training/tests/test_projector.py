@@ -1,4 +1,4 @@
-"""Shape and gradient tests for the from-scratch multimodal projector."""
+"""Le projecteur multimodal : formes des tenseurs et gradients."""
 
 import pytest
 
@@ -38,7 +38,7 @@ def test_all_params_trainable() -> None:
 
 
 def test_param_budget() -> None:
-    """Projector stays small (~7M at lang_dim=960; spec's ~12-15M assumed 1024+)."""
+    """Le projecteur doit rester petit : c'est la seule piece qu'on entraine vraiment."""
     projector = MultimodalProjector(vision_dim=768, lang_dim=960, num_patches=197)
     n_params = sum(p.numel() for p in projector.parameters())
     assert 4_000_000 < n_params < 20_000_000, n_params

@@ -1,18 +1,13 @@
-"""Bundle EVERYTHING needed to train on Colab into one zip — no GitHub, no Drive.
+"""Met tout ce qu'il faut pour entrainer dans un seul zip : ni GitHub, ni Drive.
 
-Creates ``colab_upload/receipt_vlm_colab_bundle.zip`` containing the code
-(``receipt_ocr`` + ``receipt_vlm``), the training scripts/configs, the real
-receipt photos and their pseudo-labels. Upload this single file in the
-self-contained notebook (``notebooks/train_receipt_vlm_selfcontained.ipynb``)
-via the browser file picker, then run all cells.
+Le code (receipt_ocr et receipt_vlm), les scripts, les configs, les photos et leurs
+labels. On depose le zip dans le notebook et on lance.
 
-The archive keeps a ``dev_ocr/`` root so the notebook can:
-    pip install -e dev_ocr           # receipt_ocr
-    pip install -e dev_ocr/vlm_training  # receipt_vlm
+L'archive garde une racine dev_ocr/ pour que le notebook puisse faire un
+`pip install -e dev_ocr` puis un `pip install -e dev_ocr/vlm_training`.
 
-Usage (from repo root or dev_ocr/vlm_training):
     python scripts/zip_selfcontained_colab.py
-    python scripts/zip_selfcontained_colab.py --no-images   # code only (phase 1)
+    python scripts/zip_selfcontained_colab.py --no-images   # code seul (phase 1)
 """
 
 from __future__ import annotations
@@ -21,10 +16,10 @@ import argparse
 import zipfile
 from pathlib import Path
 
-# dev_ocr/ — two levels up from this file (dev_ocr/vlm_training/scripts/).
+# dev_ocr/ : deux niveaux au-dessus (dev_ocr/vlm_training/scripts/).
 DEV_OCR = Path(__file__).resolve().parents[2]
 
-# Files/dirs to copy verbatim (relative to dev_ocr/). Globs are expanded.
+# Ce qu'on copie tel quel, relativement a dev_ocr/. Les globs sont expanses.
 CODE_INCLUDE = [
     "pyproject.toml",
     "README.md",
@@ -41,7 +36,7 @@ CODE_INCLUDE = [
 IMAGE_DIR = "data/raw/images_tickets_caisse"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
-# Never bundle these even if a glob would match them.
+# Jamais embarque, meme si un glob les attrape.
 EXCLUDE_PARTS = {".venv", "__pycache__", ".pytest_cache", ".git", "checkpoints", "logs"}
 
 
@@ -89,7 +84,7 @@ def main() -> None:
     print(f"Wrote {out} ({size_mb:.1f} MB)")
     print(f"  code files: {n_code}")
     print(f"  images:     {n_img}{' (skipped)' if args.no_images else ''}")
-    print("\nNext: upload this zip in notebooks/train_receipt_vlm_selfcontained.ipynb")
+    print("\nA deposer dans le notebook train_receipt_vlm_selfcontained.ipynb.")
 
 
 if __name__ == "__main__":

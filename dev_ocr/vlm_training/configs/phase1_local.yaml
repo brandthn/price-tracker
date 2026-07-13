@@ -1,11 +1,11 @@
-# Phase 1 — local RTX 2070 friendly subset (~2–4 h).
-# On-the-fly diverse synthetic (no extra PNG disk use) + small CORD slice.
+# Phase 1 en local : un sous-ensemble reduit, synthetique a la volee et petite
+# tranche de CORD.
 phase: 1
 lr: 3.0e-4
 epochs: 3
 trainable: [projector]
 sources: [cord, synthetic]
-max_gen_samples: 0      # skip slow constrained-decoding val in phase 1
+max_gen_samples: 0
 log_every: 100
 batch_size: 4
 

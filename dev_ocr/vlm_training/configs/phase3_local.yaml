@@ -1,4 +1,5 @@
-# Phase 3 — local JSON alignment (low LR, real photos emphasized).
+# Phase 3 en local, avec du synthetique bien abime pour se rapprocher des vraies
+# photos.
 phase: 3
 lr: 5.0e-5
 epochs: 3

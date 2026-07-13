@@ -1,4 +1,5 @@
-# Pipeline smoke test — tiny subset, 1 epoch, validates the full loop end-to-end.
+# Valide la boucle complete en quelques minutes : 1 epoch, 48 tickets.
+# A relancer apres toute modif de models/ ou data/.
 phase: 1
 lr: 3.0e-4
 epochs: 1
@@ -7,5 +8,9 @@ sources: [synthetic]
 batch_size: 4
 num_workers: 0
 max_gen_samples: 2
+
 data:
+  # Indispensable : sans ca on irait chercher des PNG dans data/synthetic, qui
+  # n'existe pas dans le repo.
+  synthetic_on_the_fly: true
   synthetic_limit: 48

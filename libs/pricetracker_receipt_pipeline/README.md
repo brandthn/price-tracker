@@ -1,7 +1,7 @@
 # pricetracker-receipt-pipeline
 
 Code commun des workers OCR « un worker par backend » : `workers/ocr-paddle`,
-`ocr-vlm-moondream`, `ocr-vlm-scratch`.
+`ocr-vlm-moondream`, `ocr-vlm-receipt`, `ocr-vlm-scratch`.
 
 `dev_ocr/` reste la source de recherche. Cette lib en est une copie figée, adaptée
 au déploiement : un correctif de parsing doit donc être porté ici pour atteindre la

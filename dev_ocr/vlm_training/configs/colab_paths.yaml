@@ -1,6 +1,5 @@
-# Colab overlay — merged after base.yaml by phase*_colab.yaml via train.py.
-# Paths assume Drive folder: /content/drive/MyDrive/receipt_vlm/
-# (created by notebooks/train_receipt_vlm_colab.ipynb)
+# Surcouche Colab, appliquee apres base.yaml par les phase*_colab.yaml.
+# Les chemins supposent un dossier Drive /content/drive/MyDrive/receipt_vlm/.
 
 checkpoint_dir: /content/drive/MyDrive/receipt_vlm/checkpoints
 batch_size: 8

@@ -1,4 +1,4 @@
-"""Tests for the JSON-constrained decoding state machine."""
+"""La machine a etats du decodage JSON contraint."""
 
 import json
 
@@ -84,13 +84,13 @@ def test_string_escapes() -> None:
     machine = _machine()
     assert machine.feed_text(text)
     assert machine.is_complete()
-    json.loads(text)  # sanity: also valid for the stdlib parser
+    json.loads(text)  # au passage : le parser standard l'accepte aussi
 
 
 def test_try_feed_does_not_mutate() -> None:
     machine = _machine()
     assert machine.try_feed_text('{"ticket":')
-    # State unchanged: the same prefix must still be acceptable.
+    # L'etat n'a pas bouge : le meme prefixe doit rester acceptable.
     assert machine.feed_text('{"ticket":')
 
 
@@ -102,7 +102,7 @@ def test_invalid_feed_does_not_mutate() -> None:
 
 @pytest.mark.parametrize("chunk_size", [1, 2, 3, 7])
 def test_chunked_feeding(chunk_size: int) -> None:
-    """Grammar must accept the target regardless of token segmentation."""
+    """La grammaire doit accepter la cible, quelle que soit la decoupe en tokens."""
     text = serialize_ticket(Ticket(produits=[Product("Riz 1kg", 2.19, 3)]))
     machine = _machine()
     for i in range(0, len(text), chunk_size):
@@ -111,7 +111,7 @@ def test_chunked_feeding(chunk_size: int) -> None:
 
 
 def test_forced_continuation_always_terminates() -> None:
-    """From any prefix, repeatedly applying the forced continuation completes."""
+    """Depuis n'importe quel prefixe, la continuation forcee doit finir par terminer."""
     text = serialize_ticket(
         Ticket(date="20240101 09:00", chaine_supermarche="Lidl",
                produits=[Product("Pain", 1.05, 1)])
