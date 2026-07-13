@@ -34,7 +34,7 @@ export default function WithLayoutError({
         </h1>
         <p className="mb-6 max-w-md text-sm text-dark-6">
           La page n&apos;a pas pu se recharger correctement. Vos données ne sont
-          pas perdues — réessayez, ou revenez à l&apos;accueil.
+          pas perdues. Réessayez, ou revenez à l&apos;accueil.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button

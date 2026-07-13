@@ -89,7 +89,7 @@ export default async function ProductDetailPage({
 
       {offMissing && (
         <div className="mb-6 rounded-xl border border-dashed border-stroke bg-gray-1 p-4 text-sm text-dark-5 dark:border-dark-3 dark:bg-dark-2 dark:text-dark-6">
-          La fiche de ce produit est en cours d&apos;enrichissement — les
+          La fiche de ce produit est en cours d&apos;enrichissement. Les
           prix restent suivis normalement.
         </div>
       )}
@@ -239,7 +239,7 @@ export default async function ProductDetailPage({
               Produits proches
             </h2>
             <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-              Même famille, composition similaire — des pistes pour comparer
+              Même famille, composition similaire : des pistes pour comparer
               ou remplacer
             </p>
             {substitutes.length === 0 ? (
@@ -259,7 +259,7 @@ export default async function ProductDetailPage({
                           {s.name ?? s.ean}
                         </div>
                         <div className="text-xs text-dark-5 dark:text-dark-6">
-                          {s.brand ?? "—"}
+                          {s.brand ?? "-"}
                           {s.nutriscore && (
                             <span className="ml-2 opacity-70">
                               Nutri-Score {s.nutriscore.toUpperCase()}
@@ -293,7 +293,7 @@ function Field({
     <div className="flex items-baseline justify-between gap-2">
       <dt className="text-dark-5 dark:text-dark-6">{label}</dt>
       <dd className="text-right font-medium text-dark dark:text-white">
-        {value ?? <span className="text-dark-5 dark:text-dark-6">—</span>}
+        {value ?? <span className="text-dark-5 dark:text-dark-6">-</span>}
       </dd>
     </div>
   );

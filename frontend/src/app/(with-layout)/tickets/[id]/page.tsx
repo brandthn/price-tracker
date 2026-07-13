@@ -95,7 +95,7 @@ function ReadingCard({
         {ticket.ocr_error && (
           <Row
             label="Lecture"
-            value="Échouée — reprenez la photo, bien à plat et nette."
+            value="Échouée. Reprenez la photo, bien à plat et nette."
             variant="error"
           />
         )}

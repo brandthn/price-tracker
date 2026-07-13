@@ -78,7 +78,7 @@ export async function uploadToSignedURL(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Upload GCS échoué (HTTP ${res.status}) — ${text}`);
+    throw new Error(`Upload GCS échoué (HTTP ${res.status}): ${text}`);
   }
 }
 

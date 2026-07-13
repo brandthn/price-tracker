@@ -217,7 +217,7 @@ export function ItemsValidator({
                     ) : original.needs_validation ? (
                       <span className="text-xs text-orange-light">À vérifier</span>
                     ) : (
-                      <span className="text-xs text-dark-6">—</span>
+                      <span className="text-xs text-dark-6">-</span>
                     )}
                   </td>
                 </tr>

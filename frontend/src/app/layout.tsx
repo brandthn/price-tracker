@@ -10,7 +10,7 @@ import { Providers } from "./providers";
 export const metadata: Metadata = {
   title: {
     template: "%s | PriceTracker",
-    default: "PriceTracker — Suivi de l'inflation consommateur",
+    default: "PriceTracker · Suivi de l'inflation consommateur",
   },
   description:
     "Plateforme crowdsourcée de mesure de l'inflation réelle en France : upload de tickets, catalogue produits enrichi, indices Laspeyres.",

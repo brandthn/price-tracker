@@ -1,11 +1,8 @@
 "use client";
 
-// Choroplèthe France par département — SVG maison (asset généré par
-// scripts/build-france-map.mjs). Échelle DIVERGENTE bleu (baisse) ↔ gris
-// neutre (stable) ↔ rouge (hausse) : le couple rouge/vert est illisible en
-// deutéranopie, et sur une carte toutes les paires de couleurs peuvent se
-// toucher. La valeur signée est toujours affichée au survol (tooltip) et
-// dans la légende — la couleur ne porte jamais le sens seule.
+// asset généré par scripts/build-france-map.mjs
+// echelle bleu/gris/rouge et pas rouge/vert (deuteranopie), + valeur signée
+// au survol: la couleur ne porte jamais le sens toute seule
 
 import { useState } from "react";
 import franceMap from "@/assets/france-departements.json";
@@ -116,7 +113,6 @@ export function FranceMap({ values }: { values: MapDepartementValue[] }) {
         </div>
       )}
 
-      {/* Légende discrète */}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-dark-5 dark:text-dark-6">
         {BINS.map((b) => (
           <span key={b.varName} className="inline-flex items-center gap-1.5">

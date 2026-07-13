@@ -14,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ nom: string }>;
 }): Promise<Metadata> {
   const { nom } = await params;
-  return { title: `${decodeEnseigne(nom)} — Enseignes` };
+  return { title: `${decodeEnseigne(nom)} · Enseignes` };
 }
 
 // params encodés (Intermarch%C3%A9). no-op si déjà décodé, throw pas sur % invalide

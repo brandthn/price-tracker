@@ -108,7 +108,7 @@ export function UploadForm() {
     } catch (err) {
       setStage("failed");
       if (err instanceof ApiError) {
-        setError(`Erreur ${err.status} — ${err.detail ?? "réessayez dans un instant."}`);
+        setError(`Erreur ${err.status} : ${err.detail ?? "réessayez dans un instant."}`);
       } else {
         setError("Impossible de joindre le serveur. Vérifiez votre connexion.");
       }

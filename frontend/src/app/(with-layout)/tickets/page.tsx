@@ -58,7 +58,7 @@ export default async function TicketsPage({
                 >
                   Photographiez le premier
                 </Link>{" "}
-                — votre suivi démarre en deux minutes.
+                : votre suivi démarre en deux minutes.
               </p>
             </div>
           ) : (
@@ -84,10 +84,10 @@ export default async function TicketsPage({
                       )}
                     </td>
                     <td className="px-6 py-4 text-dark-6">
-                      {t.date_ticket ?? "—"}
+                      {t.date_ticket ?? "-"}
                     </td>
                     <td className="px-6 py-4 text-right font-medium text-dark dark:text-white">
-                      {t.total_eur != null ? `${t.total_eur.toFixed(2)} €` : "—"}
+                      {t.total_eur != null ? `${t.total_eur.toFixed(2)} €` : "-"}
                     </td>
                     <td className="px-6 py-4">
                       <StatusBadge status={t.status} />
@@ -134,7 +134,7 @@ function Pagination({
   return (
     <div className="flex items-center justify-between border-t border-stroke px-6 py-3 text-sm dark:border-dark-3">
       <span className="text-dark-6">
-        {offset + 1}–{Math.min(offset + limit, total)} sur {total}
+        {offset + 1}-{Math.min(offset + limit, total)} sur {total}
       </span>
       <div className="flex gap-2">
         <PageLink

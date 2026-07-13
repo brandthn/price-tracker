@@ -65,7 +65,7 @@ export default async function BudgetPage() {
             <StatTile
               label="Dépenses ce mois-ci"
               value={
-                lastMonth ? formatEuro(lastMonth.total_eur) : "—"
+                lastMonth ? formatEuro(lastMonth.total_eur) : "-"
               }
               context={
                 monthDeltaPct != null && (
@@ -81,7 +81,7 @@ export default async function BudgetPage() {
               value={
                 basket!.avg_ticket_eur != null
                   ? formatEuro(basket!.avg_ticket_eur)
-                  : "—"
+                  : "-"
               }
               context={<span>par passage en caisse</span>}
             />
@@ -101,7 +101,7 @@ export default async function BudgetPage() {
               value={
                 basket!.total_spent_eur != null
                   ? formatEuro(basket!.total_spent_eur)
-                  : "—"
+                  : "-"
               }
               context={<span>cumul de vos tickets</span>}
             />
@@ -185,7 +185,7 @@ export default async function BudgetPage() {
           <section className="mt-6 rounded-2xl bg-primary/5 p-6 dark:bg-primary/10">
             <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
               <p className="max-w-lg text-sm text-dark-5 dark:text-dark-6">
-                Plus vous ajoutez de tickets, plus votre suivi est fidèle — et
+                Plus vous ajoutez de tickets, plus votre suivi est fidèle, et
                 plus l&apos;observatoire est précis pour tout le monde.
               </p>
               <Link

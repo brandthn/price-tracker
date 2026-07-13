@@ -8,7 +8,7 @@ const DEMO_BEARER = process.env.NEXT_PUBLIC_DEMO_BEARER ?? "";
 
 if (!API_BASE) {
   console.warn(
-    "[api] NEXT_PUBLIC_API_BASE_URL non défini — voir .env.example",
+    "[api] NEXT_PUBLIC_API_BASE_URL non défini, voir .env.example",
   );
 }
 

@@ -3,12 +3,7 @@ import type { EnseigneProductRank } from "@/lib/api/types";
 import { DeltaPill } from "@/components/ui/delta-pill";
 import { formatEuro } from "@/lib/format-fr";
 
-// Liste des produits sur lesquels une enseigne se situe (moins / plus chère que
-// la médiane inter-enseignes). Server component : prix enseigne + prix de
-// référence en clair, l'écart signé porté par DeltaPill (la couleur n'est qu'un
-// renfort). Un EAN hors catalogue (`in_catalog=false`) n'est jamais nu : nom
-// remplacé par « Produit non référencé », accompagné de son prix et de son code.
-// Le clic aboutit toujours (la fiche produit absorbe les EAN « prix seulement »).
+// meme logique que movers-list pour les EAN hors catalogue
 export function ProductRankList({
   items,
   emptyMessage,
@@ -62,7 +57,7 @@ export function ProductRankList({
               <div className="truncate text-xs text-dark-5 dark:text-dark-6">
                 {item.brand && <span>{item.brand} · </span>}
                 <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {item.price_eur != null ? formatEuro(item.price_eur) : "—"}
+                  {item.price_eur != null ? formatEuro(item.price_eur) : "-"}
                   {item.ref_price_eur != null && (
                     <span className="opacity-70">
                       {" "}

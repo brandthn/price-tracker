@@ -9,7 +9,7 @@ const STATUS_STYLES: Record<string, string> = {
   validated: "bg-green-light-7 text-green",
 };
 
-// Plus d'étape « à valider » côté user : un ticket analysé est pris en compte.
+// pas d'étape "à valider" côté user, un ticket analysé compte direct
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente",
   processing: "Analyse…",

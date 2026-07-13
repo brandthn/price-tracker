@@ -72,7 +72,7 @@ export default async function ObservatoirePage({
       {apiDown && (
         <div className="mb-6 rounded-2xl border border-red-light bg-red-light-6 p-5 text-sm text-red dark:border-red-dark dark:bg-red/10">
           L&apos;observatoire est momentanément indisponible. Réessayez dans
-          quelques instants — vos données ne sont pas perdues.
+          quelques instants. Vos données ne sont pas perdues.
         </div>
       )}
 
@@ -107,7 +107,7 @@ export default async function ObservatoirePage({
             </p>
             <MoversList
               items={up?.items ?? []}
-              emptyMessage="Pas de hausse marquante détectée sur la période — ou pas encore assez de relevés."
+              emptyMessage="Pas de hausse marquante détectée sur la période, ou pas encore assez de relevés."
             />
           </section>
 
@@ -120,7 +120,7 @@ export default async function ObservatoirePage({
             </p>
             <MoversList
               items={down?.items ?? []}
-              emptyMessage="Pas de baisse marquante détectée sur la période — ou pas encore assez de relevés."
+              emptyMessage="Pas de baisse marquante détectée sur la période, ou pas encore assez de relevés."
             />
           </section>
         </div>
@@ -132,7 +132,7 @@ export default async function ObservatoirePage({
             Les hausses les plus visibles
           </h2>
           <p className="mb-2 mt-0.5 text-xs text-dark-5 dark:text-dark-6">
-            Produits très relevés et en forte hausse — ceux qui pèsent le plus en
+            Produits très relevés et en forte hausse, ceux qui pèsent le plus en
             caisse
           </p>
           <MoversList items={shame.items} emptyMessage="" />
@@ -212,7 +212,7 @@ function NationalIndexCard({
           ) : (
             <EmptyBlock className="mt-5">
               L&apos;indice se calcule dès que la fenêtre de relevés est
-              suffisante. Les premiers chiffres arrivent — revenez bientôt.
+              suffisante. Les premiers chiffres arrivent, revenez bientôt.
             </EmptyBlock>
           )}
         </div>
