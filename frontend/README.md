@@ -1,101 +1,42 @@
-# NextAdmin - Next.js Admin Dashboard Template and Components
+# frontend — PriceTracker
 
-**NextAdmin** is a Free, open-source Next.js admin dashboard toolkit featuring 200+ UI components and templates that come with pre-built elements, components, pages, high-quality design, integrations, and much more to help you create powerful admin dashboards with ease.
+Interface utilisateur Next.js 16 déployée sur Cloud Run.
 
-[![nextjs admin template](https://cdn.pimjo.com/nextadmin-2.png)](https://nextadmin.co/)
+Deux espaces : **l'Observatoire** (public, pas de compte) et **Mon budget** (personnel, nécessite un compte Firebase).
 
----
-## Useful Links
-- [Website](https://nextadmin.co/)
-- [Live Demo](https://demo.nextadmin.co/)
-- [Docs](https://nextadmin.co/docs)
-- [Components](https://nextadmin.co/components)
-
-## Quick start
-
-You'll need Node.js installed. Then:
-
-```bash
-git clone https://github.com/NextAdminHQ/nextjs-admin-dashboard.git
-cd nextjs-admin-dashboard
-```
-
-Install dependencies — pick your poison:
+## Lancer en local
 
 ```bash
 npm install
-# or: yarn / pnpm install / bun install
-```
-
-Copy the example env file and fill in your credentials:
-
-```bash
 cp .env.example .env.local
-```
-
-Then start the dev server:
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and you're good.
+`.env.local` attend les variables Firebase publiques (`NEXT_PUBLIC_FIREBASE_*`) et l'URL du backend (`NEXT_PUBLIC_API_URL`). Les valeurs de prod sont dans la config Cloud Run — demander à quelqu'un de l'équipe.
 
-## Deploying
+## Variables d'environnement
 
-Works out of the box on Vercel and Netlify.
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | URL du backend FastAPI |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Config Firebase (clé publique) |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | — |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | — |
 
-## Docs & components
+## Build et déploiement
 
-Full docs at [nextadmin.co/docs](https://nextadmin.co/docs). Component-level docs (props, examples, code) live under [/docs/components](https://nextadmin.co/docs) — accordions, charts, tables, form layouts, maps, modals, and everything else.
+```bash
+# Build local
+npm run build
 
-## Community
+# Déployer (via Cloud Build)
+gcloud builds submit --config cloudbuild.yaml
+# puis bumper frontend_image_tag dans infra/envs/prod/cloud_run.tf → terraform apply
+```
 
-- [Discord](https://pimjo.com/community)
-- [X / Twitter](https://twitter.com/PimjoHQ)
-- [GitHub](https://github.com/NextAdminHQ/)
+## Tests
 
-
-## Update Logs
-
-### Version 1.3.0 - [April 30, 2026]
-
-- Update Tailwind CSS to v4 and update dependencies.
-- Added new authentication pages.
-- Updated to latest Next.js
-- Implemented authentication with BetterAuth and Prisma.
-- Configured Role-Based Access Control (RBAC).
-- Added user profile data mutations and queries in profile and settings pages.
-
-### Version 1.2.3 - [Mar 16, 2026]
-
-- Update Next.js to ^16.1.6 and configure image qualities
-
-### Version 1.2.2 - [December 01, 2025]
-
-- Updated to Next.js 16
-- Updated dependencies.
-
-### Version 1.2.1 - [Mar 20, 2025]
-
-- Fix Peer dependency issues and NextConfig warning.
-- Updated apexcharts and react-apexhcarts to the latest version.
-
-### Version 1.2.0 - Major Upgrade and UI Improvements - [Jan 27, 2025]
-
-- Upgraded to Next.js v15 and updated dependencies
-- API integration with loading skeleton for tables and charts.
-- Improved code structure for better readability.
-- Rebuilt components like dropdown, sidebar, and all ui-elements using accessibility practices.
-- Using search-params to store dropdown selection and refetch data.
-- Semantic markups, better separation of concerns and more.
-
-### Version 1.1.0
-
-- Updated Dependencies
-- Removed Unused Integrations
-- Optimized App
-
-### Version 1.0
-
-- Initial Release - [May 13, 2024]
+```bash
+npm run lint
+npm run type-check
+```
