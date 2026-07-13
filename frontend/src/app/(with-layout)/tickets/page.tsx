@@ -106,7 +106,6 @@ export default async function TicketsPage({
             </table>
           )}
 
-          {/* Pagination */}
           <Pagination
             limit={limit}
             offset={offset}

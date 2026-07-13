@@ -16,12 +16,7 @@ import { formatDateLong, formatNumber } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
 
-// L'Observatoire : la vitrine publique. Chaque section répond à une question
-// de lecteur — « ça augmente de combien ? », « où ? », « sur quoi ? ».
-// Toutes les sources sont indépendantes (Promise.allSettled) : une table
-// Gold vide ou une erreur BQ ne fait jamais tomber la page entière.
-// La granularité (semaine/mois) est portée par le searchParam `?g=` et
-// propagée à toutes les requêtes.
+// allSettled: une table Gold vide ou une erreur BQ ne doit pas tuer la page
 export default async function ObservatoirePage({
   searchParams,
 }: {
@@ -81,10 +76,8 @@ export default async function ObservatoirePage({
         </div>
       )}
 
-      {/* ── Indice national ─────────────────────────────────────────── */}
       <NationalIndexCard index={national} granularity={gran} />
 
-      {/* ── Carte + mouvements ──────────────────────────────────────── */}
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <section className="rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark lg:col-span-2">
           <h2 className="text-lg font-bold text-dark dark:text-white">
@@ -133,7 +126,6 @@ export default async function ObservatoirePage({
         </div>
       </div>
 
-      {/* ── Hall of shame ───────────────────────────────────────────── */}
       {shame && shame.items.length > 0 && (
         <section className="mt-6 rounded-2xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
           <h2 className="text-lg font-bold text-dark dark:text-white">
@@ -147,7 +139,6 @@ export default async function ObservatoirePage({
         </section>
       )}
 
-      {/* ── Pont vers le personnel ──────────────────────────────────── */}
       <section className="mt-6 rounded-2xl bg-primary/5 p-6 dark:bg-primary/10 sm:p-8">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
@@ -197,7 +188,6 @@ function NationalIndexCard({
 
           {deltaPct != null ? (
             <>
-              {/* Hero : LE chiffre de la page */}
               <div className="mt-5 flex items-baseline gap-3">
                 <span className="text-heading-3 font-bold text-dark dark:text-white">
                   {index!.current!.toLocaleString("fr-FR", {

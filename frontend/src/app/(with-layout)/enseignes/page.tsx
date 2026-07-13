@@ -6,10 +6,8 @@ import { formatNumber } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
 
-// Comparateur d'enseignes : « chez qui payez-vous le moins cher ? ». Un seul
-// chiffre, honnête : l'indice de cherté relative (à produits identiques, il
-// neutralise les différences d'assortiment). Les enseignes sous le seuil de
-// couverture restent listées mais sans indice (transparence).
+// indice de cherté = à produits identiques, neutralise l'assortiment
+// sous le seuil de couverture on liste quand meme, mais sans indice
 export default async function EnseignesPage() {
   let data: EnseignesOut | null = null;
   try {
@@ -148,7 +146,6 @@ function EnseigneRow({ item }: { item: EnseigneSummary }) {
           </div>
         </div>
 
-        {/* Barre pleine largeur sous la ligne en mobile (le tableau ne scrolle pas). */}
         <div className="mt-2 sm:hidden">
           <CherteBar index={index} />
         </div>

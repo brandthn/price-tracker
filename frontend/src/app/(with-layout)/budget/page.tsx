@@ -8,9 +8,7 @@ import { formatDateLong, formatEuro } from "@/lib/format-fr";
 
 export const dynamic = "force-dynamic";
 
-// « Mon budget » : le pont entre l'observatoire (macro) et le quotidien.
-// Tout vient du panier réel de l'utilisateur (ses tickets) — aucun chiffre
-// simulé. Sans ticket : onboarding, pas de zéros tristes.
+// tout vient des tickets de l'user, rien de simulé
 export default async function BudgetPage() {
   let basket: BasketSummary | null = null;
   let recommendations: RecommendationsOut | null = null;
@@ -21,7 +19,7 @@ export default async function BudgetPage() {
     error = (err as Error).message;
   }
 
-  // Section optionnelle : une erreur ici ne doit pas casser la page budget.
+  // optionnel, une erreur ici ne doit pas casser la page
   if (basket && basket.tickets_count > 0) {
     try {
       recommendations = await getMyRecommendations();

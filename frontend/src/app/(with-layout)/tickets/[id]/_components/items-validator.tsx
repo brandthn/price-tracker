@@ -32,12 +32,11 @@ export function ItemsValidator({
   );
   const [isPending, startTransition] = useTransition();
 
-  // Une nouvelle passe OCR (ocr_attempts change) réécrit les lignes serveur : on
-  // reconstruit les brouillons. Les refresh sans nouvelle passe (ex. sauvegarde
-  // de corrections) ne déclenchent pas ce resync et préservent la saisie en cours.
+  // resync des brouillons uniquement quand ocr_attempts bouge, sinon on écraserait
+  // la saisie en cours à chaque refresh
   useEffect(() => {
     setDrafts(initialItems.map(toDraft));
-    // initialItems volontairement hors deps : on ne resync que sur une passe OCR.
+    // initialItems hors deps exprès (cf. au dessus)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ocrAttempts]);
 
@@ -46,8 +45,7 @@ export function ItemsValidator({
     [drafts],
   );
 
-  // Total recalculé en direct = somme des prix payés (le prix affiché est le
-  // montant payé de la ligne, pas un prix unitaire à multiplier).
+  // le prix d'une ligne est déjà le montant payé, pas un unitaire à multiplier
   const liveTotal = useMemo(
     () =>
       drafts.reduce((acc, d) => {
@@ -94,9 +92,7 @@ export function ItemsValidator({
         toast.success(
           `${changed.length} correction${changed.length > 1 ? "s" : ""} enregistrée${changed.length > 1 ? "s" : ""}.`,
         );
-        // Une sauvegarde ne change pas ocr_attempts → le resync des brouillons ne
-        // se déclenche pas : on efface les drapeaux dirty localement pour repasser
-        // le bouton à « Aucune correction ».
+        // une save ne bouge pas ocr_attempts donc pas de resync -> on clear dirty à la main
         setDrafts((prev) => prev.map((d) => ({ ...d, dirty: false })));
         router.refresh();
       } catch (err) {
@@ -126,7 +122,6 @@ export function ItemsValidator({
 
   return (
     <div className="rounded-[10px] bg-white shadow-1 dark:bg-gray-dark">
-      {/* Synthèse live : total = Σ prix payés, recalculée à chaque correction. */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stroke p-4 dark:border-dark-3">
         <div className="flex flex-wrap items-center gap-6">
           <Stat label="Total" value={`${liveTotal.toFixed(2)} €`} strong />
@@ -160,9 +155,7 @@ export function ItemsValidator({
           </thead>
           <tbody className="divide-y divide-stroke dark:divide-dark-3">
             {drafts.map((d) => {
-              // Garde défensive : si le state local se désynchronise du serveur
-              // (ex: lignes ré-écrites avec de nouveaux ids après un re-OCR),
-              // on saute la ligne au lieu de crasher tout l'arbre.
+              // ids réécrits après un re-OCR: on saute la ligne plutot que de crasher
               const original = initialItems.find((i) => i.id === d.id);
               if (!original) return null;
               return (
@@ -181,7 +174,6 @@ export function ItemsValidator({
                       }
                       placeholder={original.raw_text || "Nom du produit"}
                     />
-                    {/* Texte lu sur le ticket, en contexte. */}
                     <div className="mt-1 truncate font-mono text-[11px] text-dark-6">
                       {original.raw_text}
                     </div>
