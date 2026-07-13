@@ -1,9 +1,7 @@
-"""receipt_ocr — extract structured data from photos of French supermarket receipts.
+"""D'une photo de ticket de caisse vers un dict structuré.
 
-Public API
-----------
->>> from receipt_ocr import extract_receipt
->>> data = extract_receipt("path/to/ticket.jpg")
+    from receipt_ocr import extract_receipt
+    data = extract_receipt("chemin/vers/ticket.jpg")
 """
 
 from receipt_ocr.exceptions import (

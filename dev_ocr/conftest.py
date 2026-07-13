@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 DATA_DIR = ROOT / "data" / "raw"
 
-# Make `from receipt_ocr import ...` work without installation.
+# Pour que `from receipt_ocr import ...` marche sans avoir installe le paquet.
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -70,7 +70,7 @@ def _groq_api_key_available() -> bool:
 
 
 def _data_available() -> bool:
-    """Return True when at least one real receipt image is on disk."""
+    """Vrai s'il y a au moins une vraie photo de ticket sur le disque."""
     if not DATA_DIR.exists():
         return False
     image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}

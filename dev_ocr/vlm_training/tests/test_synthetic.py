@@ -33,7 +33,8 @@ def test_generate_ticket_valid_canonical() -> None:
             assert product.unites >= 1
         if ticket.date:
             assert len(ticket.date) == 14  # yyyyMMdd HH:mm
-        # Labels must be accepted by the constrained-decoding grammar.
+        # Les labels doivent etre acceptes par la grammaire du decodage contraint :
+    # si le serialiseur et la grammaire divergent, l'entrainement est fausse.
         machine = CanonicalJsonStateMachine()
         assert machine.feed_text(serialize_ticket(ticket))
         assert machine.is_complete()

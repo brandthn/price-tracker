@@ -1,8 +1,7 @@
-"""OCR backends — pluggable via the Strategy pattern.
+"""Les backends OCR, interchangeables.
 
-Each backend lives in its own module and lazily imports its third-party
-dependency, so :mod:`receipt_ocr` can be imported even if a particular
-OCR library is not installed.
+Chacun vit dans son module et importe sa lib tierce paresseusement, pour qu'on
+puisse importer receipt_ocr sans avoir PaddleOCR ni Moondream installés.
 """
 
 from receipt_ocr.backends.base import OcrBackend

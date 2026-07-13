@@ -12,7 +12,7 @@ import torch.nn as nn
 
 
 class MultimodalProjector(nn.Module):
-    """Project CLIP patch embeddings into the language model embedding space."""
+    """Envoie les patchs de CLIP dans l'espace d'embedding du modele de langue."""
 
     def __init__(
         self,

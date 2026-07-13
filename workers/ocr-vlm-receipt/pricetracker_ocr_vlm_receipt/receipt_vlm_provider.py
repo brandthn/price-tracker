@@ -43,7 +43,7 @@ def _require_json_vlm_mode() -> None:
 
 
 def resolve_checkpoint_path(model_path: str | None = None) -> str:
-    """Return the merged checkpoint path from arg or ``RECEIPT_VLM_MODEL_PATH``."""
+    """Le chemin du checkpoint fusionne : argument explicite, sinon la variable d'env."""
     raw = model_path or os.environ.get(ENV_VLM_MODEL_PATH, "")
     raw = raw.strip().strip('"').strip("'")
     if not raw:
@@ -58,7 +58,7 @@ def resolve_checkpoint_path(model_path: str | None = None) -> str:
 
 
 class ReceiptVlmProvider(VlmProvider):
-    """Local inference for the hybrid CLIP+SmolLM receipt VLM (JSON mode only)."""
+    """Inference locale du VLM hybride. Mode JSON uniquement."""
 
     def __init__(
         self,
